@@ -1,0 +1,23 @@
+services:
+  observer:
+    build: ./observer
+    ports:
+      - "8080:8080"
+    environment:
+      - NATS_URL=nats://host.docker.internal:4222
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux compatibility
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "${WEB_PORT:-8081}:8080"
+    environment:
+      - NATS_URL=nats://host.docker.internal:${NATS_PORT:-4222}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
