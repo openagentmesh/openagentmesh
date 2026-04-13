@@ -1,10 +1,10 @@
 # Multi-Process Agents
 
-The most common deployment: one process provides an agent, another discovers and calls it. No shared imports, no shared memory -- just NATS.
+The most common deployment: one process provides an agent, another discovers and calls it. No shared imports, no shared memory. Just NATS.
 
 ## Provider
 
-**provider.py** -- registers a summarizer agent and blocks:
+**provider.py** registers a summarizer agent and blocks:
 
 ```python
 from pydantic import BaseModel
@@ -34,7 +34,7 @@ mesh.run()  # blocks, like uvicorn.run()
 
 ## Consumer
 
-**consumer.py** -- discovers agents on the mesh and calls one:
+**consumer.py** discovers agents on the mesh and calls one:
 
 ```python
 import asyncio
@@ -82,7 +82,7 @@ AgentMesh connects agents over NATS. Ag
 
 ## How It Works
 
-Both processes call `AgentMesh.local()`, which connects to the same embedded NATS server. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name -- no import of the provider's code required.
+Both processes call `AgentMesh.local()`, which connects to the same embedded NATS server. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
 
 ```mermaid
 sequenceDiagram

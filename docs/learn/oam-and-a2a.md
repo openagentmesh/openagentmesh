@@ -46,7 +46,7 @@ OAM contracts are an **A2A-compatible superset**. The contract schema places A2A
 }
 ```
 
-The `to_agent_card()` method is a **thin projection**, not a conversion. It strips the `x-agentmesh` extension and injects the `url` field -- the only A2A field that isn't stored in the OAM registry, because it's gateway-provided at the federation boundary.
+The `to_agent_card()` method is a **thin projection**, not a conversion. It strips the `x-agentmesh` extension and injects the `url` field, the only A2A field that isn't stored in the OAM registry (it's gateway-provided at the federation boundary).
 
 ## The `url` field
 

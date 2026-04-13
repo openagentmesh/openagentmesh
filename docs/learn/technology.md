@@ -2,7 +2,7 @@
 
 ## Why NATS
 
-Most agent frameworks cobble together separate systems for messaging, service discovery, and state management. OAM uses **NATS** -- a single deployment that provides everything the mesh needs:
+Most agent frameworks cobble together separate systems for messaging, service discovery, and state management. OAM uses **NATS**, a single deployment that provides everything the mesh needs:
 
 ```python
 from openagentmesh import AgentMesh
@@ -64,15 +64,15 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
 
 What you get from Pydantic:
 
-- **JSON Schema generation** from type hints -- schemas that LLMs can consume for tool selection
-- **Runtime validation** at the mesh boundary -- malformed requests are rejected before reaching your handler
-- **Serialization/deserialization** -- the SDK handles JSON encoding automatically
+- **JSON Schema generation** from type hints: schemas that LLMs can consume for tool selection
+- **Runtime validation** at the mesh boundary: malformed requests are rejected before reaching your handler
+- **Serialization/deserialization**: the SDK handles JSON encoding automatically
 
 ## Why protocol-first
 
 The NATS protocol **is** the product. The Python SDK is a convenience layer.
 
-Any NATS client in any language can participate in the mesh by following the subject naming conventions and message envelope format. A Go service, a Rust CLI tool, or a Node.js application can register agents, discover the catalog, and invoke other agents -- no SDK required.
+Any NATS client in any language can participate in the mesh by following the subject naming conventions and message envelope format. A Go service, a Rust CLI tool, or a Node.js application can register agents, discover the catalog, and invoke other agents. No SDK required.
 
 ```
 # Subject conventions (any NATS client can use these directly)
@@ -98,7 +98,7 @@ If you've built microservices with Istio or Linkerd, the architecture will feel 
 | Sidecar middleware | SDK middleware hooks |
 | Shared filesystem | NATS Object Store via `mesh.workspace` |
 
-The key difference: service meshes route based on network rules (URLs, headers, IP ranges). OAM routes based on **semantic understanding** -- what the agent does, what it accepts, and whether it's the right fit for a given task.
+The key difference: service meshes route based on network rules (URLs, headers, IP ranges). OAM routes based on **semantic understanding**: what the agent does, what it accepts, and whether it's the right fit for a given task.
 
 ## Same code, any scale
 
@@ -114,7 +114,7 @@ mesh = AgentMesh("nats://mesh.company.com:4222")
 
 `AgentMesh.local()` downloads the NATS binary to `~/.agentmesh/bin/`, starts it as a subprocess with JetStream and KV pre-configured. Your agent code doesn't change. Your interaction patterns don't change. The only thing that changes is the connection string.
 
-!!! info "Not two modes -- one continuum"
+!!! info "Not two modes, one continuum"
     Local and production are endpoints on the same architecture. Moving from one developer experimenting locally to a team sharing a NATS cluster requires changing one line of code.
 
 For how OAM fits in the broader multi-agent ecosystem, see [The Multi-Agent Landscape](enterprise-landscape.md).
