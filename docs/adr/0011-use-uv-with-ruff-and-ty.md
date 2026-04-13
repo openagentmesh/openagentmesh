@@ -17,4 +17,4 @@ Use uv for package and dependency management, ruff for linting/formatting, and t
 
 - uv is relatively new but rapidly maturing. Lock file format may evolve.
 - ty is very early-stage (v0.0.x). May have gaps compared to mypy/pyright. Acceptable for a new project.
-- All three tools are dev dependencies only — they don't affect the published package.
+- All three tools are dev dependencies only; they don't affect the published package.

@@ -39,13 +39,13 @@ asyncio.run(main())
 ```
 
 !!! info "What just happened?"
-    `AgentMesh.local()` started an embedded NATS server. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it — all through the message bus, not a direct function call.
+    `AgentMesh.local()` started an embedded NATS server. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
 
 ## Two Separate Processes
 
 The more realistic case: provider and consumer run independently.
 
-**provider.py** — registers the agent and keeps it running:
+**provider.py.** Registers the agent and keeps it running:
 
 ```python
 from pydantic import BaseModel
@@ -73,7 +73,7 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
 mesh.run()  # blocks, like uvicorn.run()
 ```
 
-**consumer.py** — discovers the agent and calls it:
+**consumer.py.** Discovers the agent and calls it:
 
 ```python
 import asyncio

@@ -11,7 +11,7 @@ When exposing mesh agents via `mesh.run_mcp()`, some agents should be visible to
 
 ## Decision
 
-Use a simple boolean `mcp=True/False` on the `@mesh.agent` decorator. The list pattern (`export=["mcp", "a2a"]`) was premature generalization — A2A exposure happens at the gateway level (boundary config, not per-agent), and no other export target is foreseeable.
+Use a simple boolean `mcp=True/False` on the `@mesh.agent` decorator. The list pattern (`export=["mcp", "a2a"]`) was premature generalization; A2A exposure happens at the gateway level (boundary config, not per-agent), and no other export target is foreseeable.
 
 Mesh-level default policy is preserved:
 ```python
@@ -23,9 +23,9 @@ Local dev default: opt-out (expose everything). Production default: opt-in.
 
 ## Alternatives Considered
 
-- **`export=["mcp"]` list** — rejected as premature generalization. A2A is gateway-level, not per-agent. The list would never grow beyond one entry.
+- **`export=["mcp"]` list.** Rejected as premature generalization. A2A is gateway-level, not per-agent. The list would never grow beyond one entry.
 
 ## Risks and Implications
 
-- If a future protocol requires per-agent export control (unlikely), the flag would need to evolve. Considered acceptable — YAGNI.
+- If a future protocol requires per-agent export control (unlikely), the flag would need to evolve. Considered acceptable. YAGNI.
 - The `mcp` field lives in the contract under `x-agentmesh.mcp`. Must be documented for manual `mesh.register()` users, not just decorator users.

@@ -33,7 +33,7 @@ tool = contract.to_generic_tool()
 
 ### `.to_agent_card(url=None)`
 
-Projects the contract to A2A Agent Card format. A thin projection — injects `url` if provided.
+Projects the contract to A2A Agent Card format. A thin projection; injects `url` if provided.
 
 ```python
 card = contract.to_agent_card()

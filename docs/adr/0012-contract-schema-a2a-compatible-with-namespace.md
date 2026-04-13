@@ -7,18 +7,18 @@
 
 ## Context
 
-The agent contract schema needed to be designed. The question was how to relate it to the A2A Agent Card format — strict superset, subset, or structurally translatable.
+The agent contract schema needed to be designed. The question was how to relate it to the A2A Agent Card format: strict superset, subset, or structurally translatable.
 
 ## Decision
 
 Store contracts as structurally compatible with A2A Agent Cards. A2A-standard fields (`name`, `description`, `version`, `capabilities`, `skills`) live at the top level. AgentMesh-specific fields (`channel`, `subject`, `sla`, `error_schema`, `metadata`) live under an `x-agentmesh` namespace extension block.
 
-The `url` field is the only A2A field not stored in the registry — it is gateway-provided at federation time. `.to_agent_card(url=None)` is a thin projection that injects the URL if provided, not a deep conversion.
+The `url` field is the only A2A field not stored in the registry; it is gateway-provided at federation time. `.to_agent_card(url=None)` is a thin projection that injects the URL if provided, not a deep conversion.
 
 ## Alternatives Considered
 
-- **Strict A2A superset with mixed fields** — rejected; AgentMesh-specific fields scattered alongside A2A fields makes the boundary unclear.
-- **Separate internal format with A2A conversion** — rejected; unnecessary complexity when the schemas are naturally compatible.
+- **Strict A2A superset with mixed fields.** Rejected; AgentMesh-specific fields scattered alongside A2A fields makes the boundary unclear.
+- **Separate internal format with A2A conversion.** Rejected; unnecessary complexity when the schemas are naturally compatible.
 
 ## Risks and Implications
 

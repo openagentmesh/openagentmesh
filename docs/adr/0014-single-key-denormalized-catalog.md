@@ -11,13 +11,13 @@ The catalog needs to serve LLM-based agent selection efficiently. The question w
 
 ## Decision
 
-Use a single KV key (`catalog` in the `mesh-catalog` bucket) containing a JSON array of all lightweight catalog entries. This gives O(1) catalog reads — one KV get returns the entire agent list, ideal for stuffing into LLM context (~20-30 tokens per agent).
+Use a single KV key (`catalog` in the `mesh-catalog` bucket) containing a JSON array of all lightweight catalog entries. This gives O(1) catalog reads: one KV get returns the entire agent list, ideal for stuffing into LLM context (~20-30 tokens per agent).
 
 Updates use CAS (Compare-And-Swap): read the current value + revision, modify the array, write back only if the revision hasn't changed. On conflict, retry the read-modify-write loop. Brief staleness (milliseconds) is acceptable; `mesh.contract()` reads per-agent full contracts and is the authoritative source.
 
 ## Alternatives Considered
 
-- **One KV key per agent** — requires listing/enumerating all keys for catalog reads, which is O(n) and inefficient for the primary use case (LLM planning needs the full list at once).
+- **One KV key per agent.** Requires listing/enumerating all keys for catalog reads, which is O(n) and inefficient for the primary use case (LLM planning needs the full list at once).
 
 ## Risks and Implications
 

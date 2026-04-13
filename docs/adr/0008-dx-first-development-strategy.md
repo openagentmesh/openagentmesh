@@ -13,14 +13,14 @@ The project needed a development methodology. The choice was between traditional
 
 Work backwards from the desired developer experience:
 
-1. **DX first** — Write example code showing exactly how a library user would use the feature. This is the contract. If it looks awkward to write, fix the API before touching implementation.
-2. **Tests second** — Write tests that exercise the example code. Tests must pass before implementation is considered done.
-3. **Implementation last** — Write the minimum code that makes the tests pass. No speculative abstractions.
+1. **DX first.** Write example code showing exactly how a library user would use the feature. This is the contract. If it looks awkward to write, fix the API before touching implementation.
+2. **Tests second.** Write tests that exercise the example code. Tests must pass before implementation is considered done.
+3. **Implementation last.** Write the minimum code that makes the tests pass. No speculative abstractions.
 
 When implementing any new feature or phase, start by writing an `examples/` file showing the ideal user-facing code.
 
 ## Risks and Implications
 
 - Requires discipline to not jump straight to implementation. Every feature starts with example code.
-- May lead to API designs that are clean to use but harder to implement. This is the intended tradeoff — user experience over implementation convenience.
+- May lead to API designs that are clean to use but harder to implement. This is the intended tradeoff: user experience over implementation convenience.
 - Tests are always written against the public API, never internals. This makes refactoring safe.

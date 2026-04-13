@@ -13,7 +13,7 @@ The question: can we detect agent failure faster than heartbeat polling, without
 
 ## Decision
 
-Use NATS `$SYS.ACCOUNT.*.DISCONNECT` advisories as the primary failure detection mechanism. These are server-emitted events triggered by TCP disconnect — near-instant for process crashes, seconds for network partitions (with tuned ping settings). Heartbeats become a secondary mechanism reserved for zombie detection (process alive but unresponsive).
+Use NATS `$SYS.ACCOUNT.*.DISCONNECT` advisories as the primary failure detection mechanism. These are server-emitted events triggered by TCP disconnect: near-instant for process crashes, seconds for network partitions (with tuned ping settings). Heartbeats become a secondary mechanism reserved for zombie detection (process alive but unresponsive).
 
 A hybrid approach with four failure modes, each with the fastest available detection path:
 
@@ -24,7 +24,7 @@ A hybrid approach with four failure modes, each with the fastest available detec
 | Network partition | Disconnect advisory (TCP keepalive timeout) | 10-20s (tuned) |
 | Zombie | Heartbeat timeout | 30s (3x interval) |
 
-Introduce `mesh.death.{channel}.{name}` subject for death notices that any agent can subscribe to — enabling orchestration recovery, auto-scaling triggers, and monitoring.
+Introduce `mesh.death.{channel}.{name}` subject for death notices that any agent can subscribe to, enabling orchestration recovery, auto-scaling triggers, and monitoring.
 
 ## Alternatives Considered
 
@@ -35,6 +35,6 @@ Introduce `mesh.death.{channel}.{name}` subject for death notices that any agent
 ## Risks and Implications
 
 - `$SYS.ACCOUNT.>` may require elevated permissions on hardened NATS configurations. Need to verify and document required permissions.
-- Multi-instance agents (queue groups) need instance-count tracking — death notice should only fire when the *last* instance disconnects, not on individual scale-down.
+- Multi-instance agents (queue groups) need instance-count tracking; death notice should only fire when the *last* instance disconnects, not on individual scale-down.
 - Network blips cause rapid disconnect/reconnect. A reconnection grace period prevents flapping but reintroduces latency. Tuning needed.
 - NATS `ping_interval` should be tuned from default 2m to ~10s for mesh use, documented in recommended server config.

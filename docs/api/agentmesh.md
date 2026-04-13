@@ -111,7 +111,7 @@ Synchronous request/reply. Blocks until the agent responds or times out.
 | `payload` | `dict` | required | JSON-serializable input |
 | `timeout` | `float` | `30.0` | Timeout in seconds |
 
-**Returns:** `dict` — deserialized response payload.
+**Returns:** `dict`: deserialized response payload.
 
 ### `await mesh.send(name, payload, *, reply_to)`
 
@@ -134,7 +134,18 @@ Lightweight listing of registered agents.
 | `channel` | `str \| None` | `None` | Filter by channel prefix |
 | `tags` | `list[str] \| None` | `None` | Filter by tags |
 
-**Returns:** `list[dict]` — entries with `name`, `description`, `version`, `tags`.
+**Returns:** `list[dict]`: entries with `name`, `description`, `version`, `tags`.
+
+```python
+catalog = await mesh.catalog(channel="nlp")
+
+# [
+#   {"name": "summarizer", "channel": "nlp", "description": "Summarizes text to a target length.",
+#    "version": "1.0.0", "tags": ["text", "summarization"]},
+#   {"name": "sentiment", "channel": "nlp", "description": "Classifies sentiment of input text.",
+#    "version": "1.2.0", "tags": ["text", "classification"]},
+# ]
+```
 
 ### `await mesh.discover(*, channel=None)`
 
@@ -146,6 +157,15 @@ Full `AgentContract` objects for all matching agents.
 
 **Returns:** `list[AgentContract]`
 
+```python
+agents = await mesh.discover(channel="nlp")
+
+# [
+#   AgentContract(name="summarizer", channel="nlp", version="1.0.0", ...),
+#   AgentContract(name="sentiment", channel="nlp", version="1.2.0", ...),
+# ]
+```
+
 ### `await mesh.contract(name)`
 
 Fetch a single agent's full contract. This is the authoritative source.
@@ -155,3 +175,16 @@ Fetch a single agent's full contract. This is the authoritative source.
 | `name` | `str` | required | Agent name |
 
 **Returns:** `AgentContract`
+
+```python
+contract = await mesh.contract("summarizer")
+
+# AgentContract(
+#   name="summarizer",
+#   description="Summarizes text to a target length.",
+#   version="1.0.0",
+#   capabilities={"streaming": False, "pushNotifications": True},
+#   skills=[Skill(id="summarizer", tags=["text", "summarization"], ...)],
+#   x_agentmesh={"type": "agent", "channel": "nlp", "sla": {...}},
+# )
+```

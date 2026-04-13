@@ -21,11 +21,11 @@ All messages use NATS headers for metadata and a JSON body for payload.
 
 ## Success Response
 
-`X-Mesh-Status: ok` — body contains the agent's output as JSON.
+`X-Mesh-Status: ok`: body contains the agent's output as JSON.
 
 ## Error Response
 
-`X-Mesh-Status: error` — body contains a structured error:
+`X-Mesh-Status: error`: body contains a structured error:
 
 ```json
 {

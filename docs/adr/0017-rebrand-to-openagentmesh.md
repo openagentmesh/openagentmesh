@@ -13,7 +13,7 @@ Project repo named `openagentmesh` from inception. Docs drafts use "OpenAgentMes
 
 - **Project name:** OpenAgentMesh (OAM)
 - **Python package:** `openagentmesh` (PyPI name)
-- **Code class name:** `AgentMesh` — stays as-is. Short, clean API. `from openagentmesh import AgentMesh`.
+- **Code class name:** `AgentMesh`. Stays as-is. Short, clean API. `from openagentmesh import AgentMesh`.
 - **CLI command:** `agentmesh` or `oam` (TBD)
 - **Docs/marketing:** "OpenAgentMesh" or "OAM"
 
@@ -21,6 +21,6 @@ The split is intentional: package/brand is "OpenAgentMesh", but the developer-fa
 
 ## Risks and Implications
 
-- All km/ spec files reference "AgentMesh" — need systematic rename to "OpenAgentMesh" where referring to the project (not the class).
+- All km/ spec files reference "AgentMesh"; need systematic rename to "OpenAgentMesh" where referring to the project (not the class).
 - CLAUDE.md, README, docs all need alignment.
 - PyPI name `openagentmesh` should be reserved early.

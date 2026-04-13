@@ -49,7 +49,7 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 ```
 
-Pydantic v2 models produce JSON Schemas for `inputSchema` and `outputSchema`. The `description` field is written for LLM consumption — it should state what the agent does, what inputs it handles, and what it should **not** be used for.
+Pydantic v2 models produce JSON Schemas for `inputSchema` and `outputSchema`. The `description` field is written for LLM consumption: it should state what the agent does, what inputs it handles, and what it should **not** be used for.
 
 ## LLM Tool Conversion
 
@@ -66,7 +66,7 @@ contract.to_agent_card()       # A2A Agent Card format
 
 ## A2A Compatibility
 
-The only A2A field not stored in the registry is `url` — it's gateway-provided at federation time:
+The only A2A field not stored in the registry is `url`; it's gateway-provided at federation time:
 
 ```python
 contract.to_agent_card(url="https://api.company.com/agents/summarizer")

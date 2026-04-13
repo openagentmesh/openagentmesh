@@ -30,7 +30,7 @@ agents = await mesh.catalog(channel="finance")
 
 - Channels represent **domains or teams**, not technical categories
 - They map directly to NATS subject hierarchy, enabling wildcard subscriptions
-- Channels are **optional** — agents without a channel register at the root level
+- Channels are **optional**; agents without a channel register at the root level
 - Keep hierarchies shallow (2-3 levels max)
 
 ## Examples
