@@ -40,6 +40,26 @@ Updated via CAS (compare-and-swap) on every registration/deregistration. May be 
 
 Full contract with JSON Schemas, SLA metadata, and error schema. This is the authoritative source for an agent's capabilities.
 
+## JetStream Buckets
+
+The protocol requires four JetStream buckets, pre-created on startup by `agentmesh up` or `AgentMesh.local()`.
+
+### KV Stores
+
+| Bucket | Purpose | Key pattern | History | Notes |
+|--------|---------|-------------|---------|-------|
+| `mesh-catalog` | Lightweight agent index | Single key: `catalog` | 1 | CAS updates on every register/deregister |
+| `mesh-registry` | Full agent contracts | `{channel}.{name}` or `{name}` | 1 | One key per agent, authoritative source |
+| `mesh-context` | Shared context between agents | Agent-defined | 1 | For structured data (JSON). Explicit delete; no TTL by default |
+
+### Object Store
+
+| Bucket | Purpose | Notes |
+|--------|---------|-------|
+| `mesh-artifacts` | Binary artifacts shared between agents | For files, images, large payloads. Uses JetStream Object Store API |
+
+Bucket names use hyphens, not dots (NATS KV naming constraint; see [ADR-0013](../adr/0013-hyphenated-kv-bucket-names.md)).
+
 ## Consistency Model
 
 - **Catalog.** Eventually consistent within milliseconds. CAS retries handle concurrent writes.

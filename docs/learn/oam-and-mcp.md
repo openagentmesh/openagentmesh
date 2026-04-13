@@ -42,7 +42,7 @@ An LLM can scan a catalog of 500 agents in a single context window, select the r
 
 ## When MCP is "not enough": patterns beyond request/reply
 
-MCP is designed for synchronous tool calls. OAM supports three interaction patterns:
+MCP is client-to-tool: a client calls one tool at a time, with streamed responses over SSE or stdio. OAM supports three agent-to-agent interaction patterns:
 
 ```python
 # 1. Sync request/reply (like MCP)
@@ -82,7 +82,7 @@ No Slack messages. No configuration PRs. No "did you add the new MCP server?" co
 |---------|-----|-----|
 | LLM-to-tool invocation | Native | Via `to_anthropic_tool()` / `to_openai_tool()` |
 | Tool discovery | Manual configuration | Automatic runtime discovery |
-| Async patterns | Not supported | Async callbacks, pub/sub |
+| Interaction model | Client-initiated, single tool, streamed response | Agent-to-agent: sync, async callback, pub/sub |
 | Load balancing | Not supported | NATS queue groups (built-in) |
 | Cross-team discovery | Manual setup per consumer | Automatic via shared mesh |
 | Context efficiency | Full schema per tool | Two-tier: catalog then contract |
