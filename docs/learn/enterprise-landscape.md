@@ -21,7 +21,7 @@ This doesn't scale past a single team.
 
 Two protocols have emerged to address parts of this problem:
 
-**MCP (Model Context Protocol)** connects LLMs to tools. It's the standard for giving a model access to external capabilities -- file systems, APIs, databases. MCP is LLM-to-tool.
+**MCP (Model Context Protocol)** connects LLMs to tools. It's the standard for giving a model access to external capabilities: file systems, APIs, databases. MCP is LLM-to-tool.
 
 **A2A (Agent-to-Agent)** is Google's protocol for cross-organization agent federation. It defines how agents from different companies discover and invoke each other over HTTP. A2A is org-to-org.
 
@@ -49,7 +49,7 @@ graph LR
     style Internal fill:#f0f7ff,stroke:#3b82f6
 ```
 
-There's no **LAN of agents** -- no internal discovery fabric where agents register themselves, publish typed contracts, and find each other at runtime without any caller knowing about any provider in advance.
+There's no **LAN of agents**, no internal discovery fabric where agents register themselves, publish typed contracts, and find each other at runtime without any caller knowing about any provider in advance.
 
 ## How OAM fills this
 
@@ -70,14 +70,14 @@ result = await mesh.call("summarizer", {"text": doc, "max_length": 200})
 
 What this gives you:
 
-- **Runtime discovery** -- agents register on startup, deregister on shutdown. Consumers discover what's available right now, not what was available at deploy time.
-- **Typed contracts** -- every agent publishes input/output JSON Schemas via Pydantic v2. Validation happens automatically at the mesh boundary.
-- **Zero coupling** -- adding a new agent requires zero changes to existing code. Any consumer can discover and invoke it immediately.
-- **NATS as shared bus** -- a single infrastructure component provides pub/sub, request/reply, load balancing (queue groups), and a KV store for the registry. No separate service registry, message queue, or load balancer.
+- **Runtime discovery**: agents register on startup, deregister on shutdown. Consumers discover what's available right now, not what was available at deploy time.
+- **Typed contracts**: every agent publishes input/output JSON Schemas via Pydantic v2. Validation happens automatically at the mesh boundary.
+- **Zero coupling**: adding a new agent requires zero changes to existing code. Any consumer can discover and invoke it immediately.
+- **NATS as shared bus**: a single infrastructure component provides pub/sub, request/reply, load balancing (queue groups), and a KV store for the registry. No separate service registry, message queue, or load balancer.
 
 ## The service mesh analogy
 
-If you've worked with Istio, Linkerd, or MuleSoft, the pattern will feel familiar. OAM applies the **service mesh** concept -- proven in enterprise infrastructure -- to AI agent architectures.
+If you've worked with Istio, Linkerd, or MuleSoft, the pattern will feel familiar. OAM applies the **service mesh** concept, proven in enterprise infrastructure, to AI agent architectures.
 
 A service mesh gives microservices discovery, load balancing, and observability without each service knowing about the network topology. OAM does the same for agents, with one difference: routing is based on **semantic understanding** (what the agent does, what it accepts) rather than network-level rules.
 

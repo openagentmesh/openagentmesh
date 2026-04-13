@@ -18,7 +18,7 @@ async def summarize(req: dict) -> Summary:
 result = await mesh.call("summarizer", {"content": "A long document..."})
 ```
 
-Two agents. One shared bus. No imports between them, no HTTP servers, no shared packages. The `@mesh.agent` decorator registered a typed contract on a NATS message bus. Any agent on the mesh discovered it by name and called it. The caller never imported the provider's code -- it only knew the name.
+Two agents. One shared bus. No imports between them, no HTTP servers, no shared packages. The `@mesh.agent` decorator registered a typed contract on a NATS message bus. Any agent on the mesh discovered it by name and called it. The caller never imported the provider's code; it only knew the name.
 
 ## Why OpenAgentMesh
 
@@ -26,20 +26,20 @@ Multi-agent systems start simple and become a wiring nightmare. Agent A calls Ag
 
 The root problem is **coupling**. Agents shouldn't know where other agents live, how they're deployed, or what framework they use. They should know *what* another agent does and *how* to ask for it.
 
-OpenAgentMesh gives every agent a typed contract on a shared message bus. Providers declare what they accept and return. Consumers discover agents at runtime and invoke them by name. Add an agent, remove an agent, scale an agent to ten instances -- nothing else changes.
+OpenAgentMesh gives every agent a typed contract on a shared message bus. Providers declare what they accept and return. Consumers discover agents at runtime and invoke them by name. Add an agent, remove an agent, scale an agent to ten instances. Nothing else changes.
 
 The protocol runs on [NATS](https://nats.io), which provides pub/sub, request/reply, queue-group load balancing, and a key-value store for contracts in a single binary. One connection string replaces your service registry, message queue, and load balancer.
 
 ## Feature Highlights
 
-**Discovery** -- Agents publish contracts to a shared catalog. Consumers browse the catalog, filter by channel or tags, and fetch full schemas on demand. Two-step discovery keeps token costs flat even with hundreds of agents.
+**Discovery.** Agents publish contracts to a shared catalog. Consumers browse the catalog, filter by channel or tags, and fetch full schemas on demand. Two-step discovery keeps token costs flat even with hundreds of agents.
 
 ```python
 catalog  = await mesh.catalog(channel="nlp")
 contract = await mesh.contract("summarizer")
 ```
 
-**Type Safety** -- Input and output models are Pydantic v2. Contracts carry JSON Schemas generated from your type hints. Validation happens before your handler runs, and errors are structured, not stack traces.
+**Type Safety.** Input and output models are Pydantic v2. Contracts carry JSON Schemas generated from your type hints. Validation happens before your handler runs, and errors are structured, not stack traces.
 
 ```python
 @mesh.agent(name="scorer", channel="finance",
@@ -48,18 +48,18 @@ async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
 
-**Same Code, Any Scale** -- `AgentMesh.local()` starts an embedded NATS subprocess for development. `AgentMesh("nats://...")` connects to shared infrastructure. The agent code is identical.
+**Same Code, Any Scale.** `AgentMesh.local()` starts an embedded NATS subprocess for development. `AgentMesh("nats://...")` connects to shared infrastructure. The agent code is identical.
 
 ```python
 mesh = AgentMesh.local()                         # dev
 mesh = AgentMesh("nats://mesh.company.com:4222") # production
 ```
 
-**Protocol-First** -- The core asset is the protocol, not the SDK. Any NATS client in any language can participate by following the subject naming and envelope conventions. The Python SDK removes boilerplate; it doesn't gate access.
+**Protocol-First.** The core asset is the protocol, not the SDK. Any NATS client in any language can participate by following the subject naming and envelope conventions. The Python SDK removes boilerplate; it doesn't gate access.
 
 ## Positioning
 
-OpenAgentMesh is the **intra-system fabric** -- agents within a team or platform talking to each other.
+OpenAgentMesh is the **intra-system fabric**: agents within a team or platform talking to each other.
 
 | Tool | Purpose |
 |------|---------|
@@ -71,6 +71,6 @@ OpenAgentMesh contracts are a superset of the A2A Agent Card format. Agents on t
 
 ## Next Steps
 
-- **[Quickstart](quickstart.md)** -- Two agents talking in under 30 lines
-- **[Why OpenAgentMesh](learn/index.md)** -- The problem in depth and how OAM solves it
-- **[Concepts](concepts/index.md)** -- Contracts, channels, discovery, and invocation patterns
+- **[Quickstart](quickstart.md)**: Two agents talking in under 30 lines
+- **[Why OpenAgentMesh](learn/index.md)**: The problem in depth and how OAM solves it
+- **[Concepts](concepts/index.md)**: Contracts, channels, discovery, and invocation patterns

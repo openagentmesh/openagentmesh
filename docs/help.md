@@ -16,4 +16,4 @@ For commercial support, consulting, or partnership inquiries, contact us at [ope
 
 Contributions are welcome. Before submitting a pull request, open an issue to discuss the change. This keeps effort focused and avoids surprises during review.
 
-For bug fixes, include a failing test that demonstrates the issue. For new features, start with the use case -- describe what you're trying to build and why the current API doesn't cover it.
+For bug fixes, include a failing test that demonstrates the issue. For new features, start with the use case: describe what you're trying to build and why the current API doesn't cover it.

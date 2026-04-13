@@ -2,7 +2,7 @@
 
 OpenAgentMesh does not replace MCP. It complements it.
 
-MCP is the standard for connecting LLMs to tools. OAM supports it directly -- any agent contract can be projected into the tool format your LLM expects:
+MCP is the standard for connecting LLMs to tools. OAM supports it directly. Any agent contract can be projected into the tool format your LLM expects:
 
 ```python
 from openagentmesh import AgentMesh
@@ -24,7 +24,7 @@ So where does OAM add value? In three areas where MCP alone runs into friction a
 
 ## When MCP is "too much": context bloat
 
-MCP works well with a handful of tools. In an enterprise with hundreds of tools across dozens of teams, loading every tool specification into the LLM's context makes tool selection brittle. The model sees too many options and picks the wrong one -- or the context window fills up before the conversation starts.
+MCP works well with a handful of tools. In an enterprise with hundreds of tools across dozens of teams, loading every tool specification into the LLM's context makes tool selection brittle. The model sees too many options and picks the wrong one, or the context window fills up before the conversation starts.
 
 OAM solves this with **two-tier discovery**:
 
@@ -88,6 +88,6 @@ No Slack messages. No configuration PRs. No "did you add the new MCP server?" co
 | Context efficiency | Full schema per tool | Two-tier: catalog then contract |
 
 !!! tip "Use both"
-    OAM agents can be projected as MCP tools. Use OAM for the internal fabric -- discovery, routing, validation -- and project to MCP format at the LLM boundary.
+    OAM agents can be projected as MCP tools. Use OAM for the internal fabric (discovery, routing, validation) and project to MCP format at the LLM boundary.
 
 For how OAM relates to Google's A2A protocol, see [OAM and A2A](oam-and-a2a.md).

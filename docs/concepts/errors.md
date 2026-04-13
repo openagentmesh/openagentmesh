@@ -31,7 +31,7 @@ When an agent returns `X-Mesh-Status: error`, the response body is always this s
 }
 ```
 
-The `details` field carries extra context when available -- validation errors include the field-level issues, handler errors may include a truncated traceback.
+The `details` field carries extra context when available. Validation errors include the field-level issues; handler errors may include a truncated traceback.
 
 ## Error Codes
 
@@ -48,7 +48,7 @@ The `details` field carries extra context when available -- validation errors in
 The mesh catches exceptions so callers don't have to guess what went wrong.
 
 1. The caller sends a request via `mesh.call()`.
-2. The mesh validates the payload against the agent's input schema. If it fails, a `validation_error` is returned immediately -- the handler never runs.
+2. The mesh validates the payload against the agent's input schema. If it fails, a `validation_error` is returned immediately; the handler never runs.
 3. If the handler raises an exception, the mesh wraps it in the error envelope with code `handler_error` and returns it to the caller.
 4. The caller receives a structured `MeshError`, not a raw Python exception.
 
@@ -72,4 +72,4 @@ async def on_error(msg):
 await nc.subscribe("mesh.errors.nlp.summarizer", cb=on_error)
 ```
 
-This is a passive stream -- it doesn't affect the caller's response.
+This is a passive stream. It doesn't affect the caller's response.
