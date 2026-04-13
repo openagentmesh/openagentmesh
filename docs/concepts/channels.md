@@ -42,6 +42,15 @@ agents = await mesh.catalog(channel="finance")
 | `finance.compliance` | Compliance checking |
 | `data.ingest` | Data ingestion pipeline |
 
+## Wildcard Subscriptions
+
+NATS subject wildcards apply to channel hierarchies:
+
+- `mesh.agent.finance.*` matches all agents one level deep (`finance.risk.scorer`, `finance.compliance.checker`)
+- `mesh.agent.finance.>` matches all agents at any depth under `finance`
+
+These are NATS-native wildcards, not SDK features. The SDK's `mesh.catalog(channel="finance")` filters the catalog index; NATS wildcards apply to direct subject subscriptions.
+
 ## Root-Level Agents
 
 Agents without a channel register at the root and are invoked by name alone:
