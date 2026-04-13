@@ -18,9 +18,9 @@ Use plain Pydantic v2 only. PydanticAI is a mismatch because:
 3. **Unnecessary dependency weight.** PydanticAI pulls in LLM client libraries. AgentMesh's hard deps should only be `nats-py` and `pydantic`.
 4. **Pydantic v2 already covers everything:** `BaseModel` for validation, `.model_json_schema()` for contracts, `get_type_hints()` for introspection.
 
-PydanticAI is a valid choice *inside* a handler function — that's a good `examples/` showcase, not a core dependency.
+PydanticAI is a valid choice *inside* a handler function; that's a good `examples/` showcase, not a core dependency.
 
 ## Risks and Implications
 
-- Users wanting PydanticAI integration must write a thin bridge function themselves. This is by design — the handler is their territory.
+- Users wanting PydanticAI integration must write a thin bridge function themselves. This is by design; the handler is their territory.
 - The SDK stays lightweight with only two hard dependencies: `nats-py` and `pydantic`.

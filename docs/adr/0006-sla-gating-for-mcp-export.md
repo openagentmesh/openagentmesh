@@ -7,7 +7,7 @@
 
 ## Context
 
-MCP clients (Claude Desktop, Cursor) are synchronous — they block on `tools/call`. Mesh agents can have arbitrarily long timeouts (e.g., 5-minute human-in-the-loop agents). Exposing slow agents to MCP clients would stall or timeout the client.
+MCP clients (Claude Desktop, Cursor) are synchronous: they block on `tools/call`. Mesh agents can have arbitrarily long timeouts (e.g., 5-minute human-in-the-loop agents). Exposing slow agents to MCP clients would stall or timeout the client.
 
 ## Decision
 

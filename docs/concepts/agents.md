@@ -49,10 +49,10 @@ mesh.register(
 
 Agents follow a predictable lifecycle:
 
-1. **Start** — `mesh.run()` (blocking) or `await mesh.start()` (non-blocking)
-2. **Register** — subscribe to NATS subject, write contract to KV
-3. **Serve** — handle incoming requests via queue group
-4. **Stop** — `await mesh.stop()`: unsubscribe, drain, deregister, disconnect
+1. **Start.** `mesh.run()` (blocking) or `await mesh.start()` (non-blocking)
+2. **Register.** Subscribe to NATS subject, write contract to KV
+3. **Serve.** Handle incoming requests via queue group
+4. **Stop.** `await mesh.stop()`: unsubscribe, drain, deregister, disconnect
 
 ## Queue Groups
 

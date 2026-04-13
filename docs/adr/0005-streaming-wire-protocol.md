@@ -20,9 +20,9 @@ Terminal: mesh.stream.{request_id}        (final message, X-Mesh-Stream-End: tru
 ```
 
 New headers:
-- `X-Mesh-Stream: true` — request-side, caller wants streaming
-- `X-Mesh-Stream-Seq: N` — response-side, chunk sequence number (0-indexed)
-- `X-Mesh-Stream-End: true` — response-side, final chunk
+- `X-Mesh-Stream: true`: request-side, caller wants streaming
+- `X-Mesh-Stream-Seq: N`: response-side, chunk sequence number (0-indexed)
+- `X-Mesh-Stream-End: true`: response-side, final chunk
 
 New SDK method:
 ```python
@@ -30,7 +30,7 @@ async for chunk in mesh.stream("agent-name", payload, timeout=30.0):
     # chunk.delta, chunk.seq, chunk.done
 ```
 
-Capability enforcement: if a caller sends `X-Mesh-Stream: true` to an agent with `streaming: false`, the agent returns a `MeshError` with `code: "streaming_not_supported"` — no silent fallback to buffered mode.
+Capability enforcement: if a caller sends `X-Mesh-Stream: true` to an agent with `streaming: false`, the agent returns a `MeshError` with `code: "streaming_not_supported"`. No silent fallback to buffered mode.
 
 ## Risks and Implications
 

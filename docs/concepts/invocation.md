@@ -45,7 +45,7 @@ Agents can emit events on their event subject for fan-out consumption:
 mesh.agent.{channel}.{name}.events
 ```
 
-No invocation — any subscriber receives the event. Useful for notifications, audit trails, and reactive pipelines.
+No invocation; any subscriber receives the event. Useful for notifications, audit trails, and reactive pipelines.
 
 ## Error Handling
 

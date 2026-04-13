@@ -12,10 +12,10 @@ Initial design used dots in KV bucket names (`mesh.catalog`, `mesh.registry`). N
 ## Decision
 
 Use hyphens instead of dots for all KV bucket names:
-- `mesh-registry` — per-agent full contracts
-- `mesh-catalog` — single key with lightweight catalog array
-- `mesh-context` — shared context data
-- `mesh-artifacts` — shared object store for binary artifacts
+- `mesh-registry`: per-agent full contracts
+- `mesh-catalog`: single key with lightweight catalog array
+- `mesh-context`: shared context data
+- `mesh-artifacts`: shared object store for binary artifacts
 
 NATS subjects (which do use dots) remain unchanged: `mesh.agent.{channel}.{name}`, `mesh.registry.{channel}.{name}`, etc.
 

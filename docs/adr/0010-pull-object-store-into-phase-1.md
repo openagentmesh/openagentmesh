@@ -16,5 +16,5 @@ Add object store support to Phase 1. It should be part of the demo or walkthroug
 ## Risks and Implications
 
 - Expands Phase 1 scope. The object store itself is thin (JetStream Object Store is a NATS primitive), but it needs lifecycle management (bucket creation on startup, cleanup on shutdown).
-- Resolves the open question in `km/ideas.md` about "Shared memory/context" — the object store is the answer for binary artifacts.
+- Resolves the open question in `km/ideas.md` about "Shared memory/context": the object store is the answer for binary artifacts.
 - Demo code must show a compelling use case (e.g., agents sharing files/results) to justify the early inclusion.

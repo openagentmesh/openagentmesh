@@ -42,6 +42,6 @@ Full contract with JSON Schemas, SLA metadata, and error schema. This is the aut
 
 ## Consistency Model
 
-- **Catalog** — eventually consistent within milliseconds. CAS retries handle concurrent writes.
-- **Registry** — strongly consistent per key. Each agent owns its own key.
-- **Discovery** — `mesh.contract()` reads from registry (authoritative). `mesh.catalog()` reads from catalog (fast, possibly stale).
+- **Catalog.** Eventually consistent within milliseconds. CAS retries handle concurrent writes.
+- **Registry.** Strongly consistent per key. Each agent owns its own key.
+- **Discovery.** `mesh.contract()` reads from registry (authoritative). `mesh.catalog()` reads from catalog (fast, possibly stale).
