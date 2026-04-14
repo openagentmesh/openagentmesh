@@ -10,21 +10,28 @@ from agentmesh import AgentMesh
 # Connect to an existing NATS server
 mesh = AgentMesh("nats://localhost:4222")
 
-# Start an embedded NATS subprocess (dev only)
-mesh = AgentMesh.local()
+# Connect using default localhost URL
+mesh = AgentMesh()
 ```
 
-### `AgentMesh(url: str)`
+### `AgentMesh(url: str = "nats://localhost:4222")`
 
-Connect to a running NATS server.
+Connect to a running NATS server. Defaults to `nats://localhost:4222` when no URL is provided.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `url` | `str` | NATS connection URL |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `url` | `str` | `"nats://localhost:4222"` | NATS connection URL |
 
 ### `AgentMesh.local()`
 
-Start an embedded NATS subprocess with JetStream and pre-created KV buckets. For development only.
+Async context manager that starts an embedded NATS subprocess with JetStream and pre-created KV buckets. For tests and quick demos only. The NATS process stops when the context exits.
+
+```python
+async with AgentMesh.local() as mesh:
+    # embedded NATS starts, KV buckets created
+    result = await mesh.call("echo", {"message": "hello"})
+    # NATS stops when context exits
+```
 
 ## Lifecycle
 

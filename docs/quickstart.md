@@ -8,6 +8,14 @@ Two agents discovering and calling each other in under 30 lines.
 pip install agentmesh
 ```
 
+## Prerequisites
+
+Start a local NATS server in a separate terminal:
+
+```bash
+agentmesh up
+```
+
 ## Hello World
 
 One file. Two agents. One calls the other.
@@ -17,7 +25,7 @@ import asyncio
 from pydantic import BaseModel
 from openagentmesh import AgentMesh
 
-mesh = AgentMesh.local()  # starts embedded NATS, no setup required
+mesh = AgentMesh()  # connects to localhost:4222
 
 class EchoInput(BaseModel):
     message: str
@@ -39,7 +47,7 @@ asyncio.run(main())
 ```
 
 !!! info "What just happened?"
-    `AgentMesh.local()` started an embedded NATS server. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
+    `agentmesh up` started a local NATS server with JetStream and KV buckets. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
 
 ## Two Separate Processes
 
@@ -51,7 +59,7 @@ The more realistic case: provider and consumer run independently.
 from pydantic import BaseModel
 from openagentmesh import AgentMesh
 
-mesh = AgentMesh.local()
+mesh = AgentMesh()
 
 class SummarizeInput(BaseModel):
     text: str
@@ -80,7 +88,7 @@ import asyncio
 from openagentmesh import AgentMesh
 
 async def main():
-    mesh = AgentMesh.local()
+    mesh = AgentMesh()
     await mesh.start()
 
     # See what's on the mesh
@@ -128,13 +136,13 @@ Agents without a channel register at the root level and are invoked directly by 
 
 ## Connect to Shared NATS
 
-Replace `AgentMesh.local()` with a connection string. Agent code is unchanged.
+Replace the default localhost connection with a connection string. Agent code is unchanged.
 
 ```python
 mesh = AgentMesh("nats://mesh.company.com:4222")
 ```
 
-> **Note:** `AgentMesh.local()` is for development only. It starts an embedded NATS subprocess. In staging and production, connect to a shared NATS deployment.
+> **Note:** `AgentMesh()` connects to `nats://localhost:4222` by default (your `agentmesh up` server). In staging and production, pass the connection string for your shared NATS deployment.
 
 ## Embed in an Existing App
 
@@ -189,7 +197,8 @@ contract.to_agent_card(url="https://api.company.com/agents/summarizer")
 | Method | Description |
 |--------|-------------|
 | `AgentMesh(url)` | Connect to an existing NATS server |
-| `AgentMesh.local()` | Start embedded NATS subprocess (dev only) |
+| `AgentMesh()` | Connect to localhost:4222 (default) |
+| `async with AgentMesh.local() as mesh:` | Embedded NATS for tests and demos |
 | `mesh.run()` | Start event loop, block until interrupted |
 | `await mesh.start()` | Start non-blocking (for embedding) |
 | `await mesh.stop()` | Graceful shutdown: drain → deregister → disconnect |

@@ -82,6 +82,6 @@ If you've worked with Istio, Linkerd, or MuleSoft, the pattern will feel familia
 A service mesh gives microservices discovery, load balancing, and observability without each service knowing about the network topology. OAM does the same for agents, with one difference: routing is based on **semantic understanding** (what the agent does, what it accepts) rather than network-level rules.
 
 !!! info "One architecture, not two modes"
-    The same agent code runs against a local NATS subprocess during development and a multi-region cluster in production. The only thing that changes is the connection string: `AgentMesh.local()` becomes `AgentMesh("nats://mesh.company.com:4222")`.
+    The same agent code runs against a local NATS server during development and a multi-region cluster in production. The only thing that changes is the connection string: `AgentMesh()` becomes `AgentMesh("nats://mesh.company.com:4222")`.
 
 For a deeper look at the technology choices, see [Technology Stack](technology.md).
