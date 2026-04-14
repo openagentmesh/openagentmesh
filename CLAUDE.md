@@ -144,22 +144,90 @@ A feature flows through two phases. A feature can enter the DESIGN phase at any 
 ### DESIGN phase
 
 ```
-Discussion → Spec document (km/) / ADR → Docs (docs/)
+Discussion -> Spec document (km/) / ADR -> Docs (docs/)
 ```
 
-1. **Discussion** — Conversations, notes (`km/notes/`), SpecStory transcripts. Ideas explored, trade-offs weighed.
-2. **Spec document** — Decision crystallized into a km/ spec file (internal, authoritative). ADR extracted to `docs/adr/` to track the decision.
-3. **Docs** — User-facing documentation updated to reflect the decision. This is the gate: no code changes that imply doc changes until docs are updated first.
+1. **Discussion** -- Conversations, notes (`km/notes/`), SpecStory transcripts. Ideas explored, trade-offs weighed.
+2. **Spec document** -- Decision crystallized into a km/ spec file (internal, authoritative). ADR extracted to `docs/adr/` to track the decision.
+3. **Docs** -- User-facing documentation updated to reflect the decision. This is the gate: no code changes that imply doc changes until docs are updated first.
 
-### DEVELOPMENT phase
+### DEVELOPMENT phase: Scenario-Driven Development
+
+Development is driven by executable scenarios (cookbook recipes). Each scenario describes a real use case from the end-user's perspective, layered as BDD specs from business behavior down to technical invariants. Agents work backwards from these scenarios to implement the SDK.
+
+#### Scenario structure
+
+Each scenario lives in `cookbook/{scenario_name}/` with three files:
 
 ```
-Tests → Implementation (red → green → refactor)
+cookbook/{scenario_name}/
+  scenario.md          # Prose BDD spec (Layer 1: business behavior, Layer 2: technical invariants)
+  expected_usage.py    # DX contract: the code a library user would write. THIS IS THE SPEC.
+  scenario_test.py     # Executable BDD tests (pytest). Layer 2 first, then Layer 1.
 ```
 
-1. **DX first** — Write example code showing exactly how a library user would use the feature. This is the contract. If it looks awkward to write, fix the API before touching implementation.
-2. **Tests second** — Write tests that exercise the example code from step 1. Tests must fail (red).
-3. **Implementation last** — Write the minimum code that makes the tests pass (green). No speculative abstractions. Then refactor.
+`expected_usage.py` is the most important file. If the API looks awkward to use, fix the API before touching implementation. The test file is the oracle: the scenario passes or it doesn't.
+
+#### Agent development loop
+
+```
+Input:  Prose scenario (scenario.md) + DX contract (expected_usage.py)
+                        |
+              +---------v----------+
+              |  What exists that  |
+              |  supports this?    |---> audit codebase + deps
+              +---------+----------+
+                        |
+              +---------v----------+
+              |  What's missing?   |---> gap list: A, B, C
+              +---------+----------+
+                        |
+              +---------v----------+
+              |  Sequence: what    |---> dependency sort
+              |  must come first?  |
+              +---------+----------+
+                        |
+            +-----------v-----------+
+            |  For each gap:        |
+            |    write test -> red  |<--+
+            |    -> implement ->    |   | next gap
+            |    green -> commit +  |---+
+            |    decision log       |
+            +-----------+-----------+
+                        |
+              +---------v----------+
+              |  Run full scenario |
+              |  Does it pass?     |
+              +----+----------+----+
+                  yes         no
+                   |    +-----v-----+
+                   |    | New gaps? |---> loop back
+                   |    | Decision  |
+                   |    | loop > 3? |---> STOP, report to human
+                   |    +-----------+
+                   |
+            +------v------+
+            |  Output:     |
+            |  - working code
+            |  - test suite
+            |  - decision log
+            |  - open questions
+            +-------------+
+```
+
+**Circuit breaker:** If the agent revisits the same design choice more than 3 times (flip-flops on a decision), it stops and surfaces the question for human judgment.
+
+**Decision log:** Every time the agent chooses between alternatives during implementation, it writes the decision down before proceeding ("Chose X because Y"). This is the raw material for ADRs.
+
+**Commits are atomic per gap.** Not one big commit at the end. Each gap gets its own test, implementation, and commit.
+
+#### DX-first, then TDD
+
+The old workflow (DX first, tests second, implementation last) is preserved inside the loop. Each gap within a scenario follows: write the test (red), implement (green), refactor. The scenario just provides the top-down entry point that sequences which gaps to tackle.
+
+#### Bootstrapping
+
+The first scenario (`cookbook/shared_plan/`) is the bootstrapping scenario. It exercises the core SDK primitives (connection, KV, CAS, agents, concurrency). Once it passes, the same coordination pattern can be used to build subsequent features, with agents on the mesh coordinating their own development.
 
 ### ADR as tracking tool
 
