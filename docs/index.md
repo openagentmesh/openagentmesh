@@ -4,7 +4,7 @@
 from openagentmesh import AgentMesh
 from pydantic import BaseModel
 
-mesh = AgentMesh.local()
+mesh = AgentMesh()
 
 class Summary(BaseModel):
     text: str
@@ -48,10 +48,10 @@ async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
 
-**Same Code, Any Scale.** `AgentMesh.local()` starts an embedded NATS subprocess for development. `AgentMesh("nats://...")` connects to shared infrastructure. The agent code is identical.
+**Same Code, Any Scale.** Run `agentmesh up` to start a local NATS server, then connect with `AgentMesh()`. Point at shared infrastructure with a connection string. The agent code is identical.
 
 ```python
-mesh = AgentMesh.local()                         # dev
+mesh = AgentMesh()                               # dev (after agentmesh up)
 mesh = AgentMesh("nats://mesh.company.com:4222") # production
 ```
 

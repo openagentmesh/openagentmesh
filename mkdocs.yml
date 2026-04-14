@@ -83,6 +83,7 @@ nav:
       - Discovery: concepts/discovery.md
       - Invocation: concepts/invocation.md
       - Error Handling: concepts/errors.md
+      - Usage Attribution: concepts/usage.md
   - Cookbook:
       - cookbook/index.md
       - Multi-Process Agents: cookbook/multi-process.md

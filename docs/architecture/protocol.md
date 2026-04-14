@@ -42,7 +42,7 @@ Full contract with JSON Schemas, SLA metadata, and error schema. This is the aut
 
 ## JetStream Buckets
 
-The protocol requires four JetStream buckets, pre-created on startup by `agentmesh up` or `AgentMesh.local()`.
+The protocol requires four JetStream buckets, pre-created on startup by `agentmesh up` (or `AgentMesh.local()` in test contexts).
 
 ### KV Stores
 

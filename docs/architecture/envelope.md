@@ -18,6 +18,7 @@ All messages use NATS headers for metadata and a JSON body for payload.
 | `X-Mesh-Request-Id` | Echoed from request |
 | `X-Mesh-Source` | Name of the responding agent |
 | `X-Mesh-Status` | `ok` or `error` |
+| `X-Mesh-Usage` | Optional JSON with token usage data (see [Usage Attribution](../concepts/usage.md)) |
 
 ## Success Response
 

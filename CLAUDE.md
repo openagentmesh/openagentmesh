@@ -25,7 +25,7 @@ OpenAgentMesh (OAM) is a NATS-based protocol and Python SDK for agent-to-agent c
 
 ### Core Abstractions
 
-**`AgentMesh`** — the central class. Manages NATS connection, subscriptions, heartbeat loops, and lifecycle. Instantiated with a connection string or `AgentMesh.local()` for embedded NATS subprocess.
+**`AgentMesh`** — the central class. Manages NATS connection, subscriptions, heartbeat loops, and lifecycle. Instantiated with a connection string or no arguments (defaults to `nats://localhost:4222`). `AgentMesh.local()` is an async context manager for tests and demos that starts an embedded NATS subprocess with scoped lifecycle.
 
 **`@mesh.agent` decorator** — turns any async function into a mesh participant. Internally: subscribes to a NATS queue group, deserializes/validates via Pydantic v2, calls the handler, serializes the response, writes the contract to KV on startup.
 
@@ -73,7 +73,11 @@ Error body when `X-Mesh-Status: error`:
 
 ```python
 mesh = AgentMesh("nats://localhost:4222")   # connect to NATS
-mesh = AgentMesh.local()                    # start embedded NATS subprocess
+mesh = AgentMesh()                          # same, using default localhost URL
+
+# For tests and demos only:
+async with AgentMesh.local() as mesh:       # embedded NATS, stops on exit
+    ...
 
 @mesh.agent(name="summarizer", channel="nlp", description="...", tags=[...])
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
@@ -131,7 +135,7 @@ agentmesh status  # show registered agents and health
 - **CAS on catalog updates** — concurrent registration retries read-modify-write until KV revision matches. Catalog may be momentarily stale (milliseconds); `mesh.contract()` is authoritative.
 - **No framework adapters** — the handler function body is the developer's territory. Wrapping existing agents is a thin bridge function, not an SDK concern.
 - **Two-step discovery at scale** — `catalog()` for LLM-based selection (20–30 tokens/agent), then `contract()` for targeted schema fetch. No RAG or vector DB needed up to ~500 agents.
-- **Embedded NATS** (`AgentMesh.local()`) downloads the NATS binary to `~/.agentmesh/bin/`, runs as a subprocess with JetStream + KV pre-configured. Dev only.
+- **Embedded NATS** (`AgentMesh.local()`) is an async context manager that downloads the NATS binary to `~/.agentmesh/bin/`, runs as a subprocess with JetStream + KV pre-configured. Scoped to tests and demos; the standard dev workflow uses `agentmesh up` + `AgentMesh()`.
 
 ## Workflow
 
@@ -174,7 +178,7 @@ ADRs in `docs/adr/` track each decision through the workflow via the **Status** 
 
 The spec defines four phases. **Phase 1 is the current target:**
 
-**Phase 1 (MVP):** `AgentMesh` class, `@mesh.agent` decorator, Pydantic v2 validation, `mesh.call()` / `mesh.send()` / `mesh.discover()`, lifecycle management, `AgentMesh.local()` embedded NATS, `agentmesh up` CLI, "Hello World" in <30 lines.
+**Phase 1 (MVP):** `AgentMesh` class, `@mesh.agent` decorator, Pydantic v2 validation, `mesh.call()` / `mesh.send()` / `mesh.discover()`, lifecycle management, `AgentMesh.local()` async context manager for tests, `agentmesh up` CLI, "Hello World" in <30 lines.
 
 Not in Phase 1: middleware hooks, OTel, Docker Compose tier, admin UI, TypeScript SDK, spawning from specs.
 

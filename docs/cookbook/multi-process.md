@@ -10,7 +10,7 @@ The most common deployment: one process provides an agent, another discovers and
 from pydantic import BaseModel
 from openagentmesh import AgentMesh
 
-mesh = AgentMesh.local()
+mesh = AgentMesh()
 
 class SummarizeInput(BaseModel):
     text: str
@@ -41,7 +41,7 @@ import asyncio
 from openagentmesh import AgentMesh
 
 async def main():
-    mesh = AgentMesh.local()
+    mesh = AgentMesh()
     await mesh.start()
 
     # Browse the mesh
@@ -63,13 +63,16 @@ asyncio.run(main())
 
 ## Run It
 
-Start the provider first, then the consumer in a second terminal:
+Start NATS, then the provider and consumer in separate terminals:
 
 ```bash
 # Terminal 1
-python provider.py
+agentmesh up
 
 # Terminal 2
+python provider.py
+
+# Terminal 3
 python consumer.py
 ```
 
@@ -82,7 +85,7 @@ AgentMesh connects agents over NATS. Ag
 
 ## How It Works
 
-Both processes call `AgentMesh.local()`, which connects to the same embedded NATS server. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
+Both processes connect to the NATS server started by `agentmesh up`. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
 
 ```mermaid
 sequenceDiagram
@@ -104,10 +107,10 @@ sequenceDiagram
 
 ## Moving to Shared NATS
 
-Replace `AgentMesh.local()` with a connection string in both files. Nothing else changes.
+Replace the default connection with a connection string in both files. Nothing else changes.
 
 ```python
 mesh = AgentMesh("nats://mesh.company.com:4222")
 ```
 
-`AgentMesh.local()` is for development. In production, point both processes at the same NATS cluster.
+`AgentMesh()` connects to `nats://localhost:4222` by default. In production, pass the connection string for your shared NATS cluster.

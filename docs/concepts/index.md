@@ -10,3 +10,4 @@ Core abstractions in OpenAgentMesh.
 | [Discovery](discovery.md) | Two-tier system for finding agents at runtime |
 | [Invocation](invocation.md) | Patterns for calling agents: sync, async callback, pub/sub |
 | [Error Handling](errors.md) | Structured errors, error codes, and dead-letter monitoring |
+| [Usage Attribution](usage.md) | LLM cost model, token usage reporting, and cost visibility |

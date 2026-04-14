@@ -10,7 +10,7 @@ Use the `@mesh.agent` decorator:
 from pydantic import BaseModel
 from agentmesh import AgentMesh
 
-mesh = AgentMesh.local()
+mesh = AgentMesh()
 
 class EchoInput(BaseModel):
     message: str
