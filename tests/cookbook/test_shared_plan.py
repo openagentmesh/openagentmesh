@@ -1,13 +1,13 @@
-"""BDD tests for the Shared Plan Coordination scenario.
+"""BDD tests for the Shared Plan Coordination cookbook recipe.
 
-These tests exercise the expected_usage.py DX contract against the real SDK.
-They run in order from Layer 2 (technical invariants) to Layer 1 (business behavior),
-since Layer 2 must hold for Layer 1 to be meaningful.
+Executable version of the code samples in docs/cookbook/shared-plan.md.
+Layer 2 (technical invariants) first, then Layer 1 (business behavior).
 
 Each test uses AgentMesh.local() for a fully isolated embedded NATS instance.
 """
 
 import asyncio
+import time
 
 import pytest
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from agentmesh import AgentMesh
 
 
-# --- Shared models (same as expected_usage.py) ---
+# --- Shared models (same as docs/cookbook/shared-plan.md) ---
 
 class Task(BaseModel):
     id: str
@@ -220,8 +220,6 @@ class TestSharedPlanCoordination:
 
     async def test_parallelism_is_faster_than_sequential(self):
         """Elapsed time < 2x single-agent time proves real concurrency."""
-        import time
-
         async with AgentMesh.local() as mesh:
 
             plan = make_plan(5)

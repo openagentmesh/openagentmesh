@@ -87,6 +87,7 @@ nav:
   - Cookbook:
       - cookbook/index.md
       - Multi-Process Agents: cookbook/multi-process.md
+      - Shared Plan Coordination: cookbook/shared-plan.md
   - API Reference:
       - api/index.md
       - AgentMesh: api/agentmesh.md
@@ -97,6 +98,4 @@ nav:
       - Protocol: architecture/protocol.md
       - Subject Naming: architecture/subjects.md
       - Message Envelope: architecture/envelope.md
-  - Decisions:
-      - decisions/index.md
   - Getting Help: help.md

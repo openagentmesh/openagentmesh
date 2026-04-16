@@ -13,14 +13,17 @@ Bucket names were established across ADR-0013 (hyphenated naming) and ADR-0010 (
 
 Publish an authoritative bucket specification covering all four JetStream buckets:
 
-| Bucket | Type | Purpose | Key Pattern |
-|--------|------|---------|-------------|
-| `mesh-catalog` | KV | Single-key lightweight catalog index | `catalog` (single key) |
-| `mesh-registry` | KV | Per-agent full contract storage | `{channel}.{name}` or `{name}` |
-| `mesh-context` | KV | Shared context data between agents | Application-defined |
-| `mesh-artifacts` | Object Store | Binary artifact storage between agents | Application-defined |
+
+| Bucket           | Type         | Purpose                                | Key Pattern                    |
+| ---------------- | ------------ | -------------------------------------- | ------------------------------ |
+| `mesh-catalog`   | KV           | Single-key lightweight catalog index   | `catalog` (single key)         |
+| `mesh-registry`  | KV           | Per-agent full contract storage        | `{channel}.{name}` or `{name}` |
+| `mesh-context`   | KV           | Shared context data between agents     | Application-defined            |
+| `mesh-artifacts` | Object Store | Binary artifact storage between agents | Application-defined            |
+
 
 Open questions deferred to implementation:
+
 - TTL for `mesh-context` entries (session-scoped? explicit expiry?)
 - Max object size for `mesh-artifacts`
 - Replica count (1 for dev/local, configurable for production)

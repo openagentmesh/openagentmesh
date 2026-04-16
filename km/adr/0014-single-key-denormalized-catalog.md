@@ -22,5 +22,5 @@ Updates use CAS (Compare-And-Swap): read the current value + revision, modify th
 ## Risks and Implications
 
 - CAS contention under high concurrent registration. In practice, registration is infrequent compared to reads, so this is acceptable. Retries converge quickly.
-- The catalog JSON array grows linearly. At ~500 agents the payload is still small (~15KB). Beyond that, the two-step discovery pattern (catalog for selection, contract for detail) remains correct.
+- The catalog JSON array grows linearly. At ~~500 agents the payload is still small (~~15KB). Beyond that, the two-step discovery pattern (catalog for selection, contract for detail) remains correct.
 - Single point of write contention. If this becomes a bottleneck, the catalog could be sharded by channel. Not needed for Phase 1 targets.

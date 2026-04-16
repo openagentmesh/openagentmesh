@@ -30,11 +30,13 @@ The standard development workflow becomes `agentmesh up` in one terminal, then `
 
 **New constructor semantics:**
 
-| Constructor | Use case |
-|------------|----------|
-| `AgentMesh()` | Default, connects to `nats://localhost:4222` |
-| `AgentMesh("nats://...")` | Explicit NATS URL |
+
+| Constructor                             | Use case                                             |
+| --------------------------------------- | ---------------------------------------------------- |
+| `AgentMesh()`                           | Default, connects to `nats://localhost:4222`         |
+| `AgentMesh("nats://...")`               | Explicit NATS URL                                    |
 | `async with AgentMesh.local() as mesh:` | Tests and demos, embedded NATS with scoped lifecycle |
+
 
 ## Alternatives Considered
 
@@ -47,3 +49,4 @@ The standard development workflow becomes `agentmesh up` in one terminal, then `
 - All existing documentation and spec references to `AgentMesh.local()` as a general-purpose constructor must be updated.
 - The hello world example adds one prerequisite step (`agentmesh up`), slightly increasing the "time to first agent." The trade-off is worth it because the multi-process workflow works immediately.
 - `AgentMesh()` with no arguments is a new convention that must be documented clearly.
+

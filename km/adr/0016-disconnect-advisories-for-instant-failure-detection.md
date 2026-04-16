@@ -17,12 +17,14 @@ Use NATS `$SYS.ACCOUNT.*.DISCONNECT` advisories as the primary failure detection
 
 A hybrid approach with four failure modes, each with the fastest available detection path:
 
-| Mode | Detection | Latency |
-|------|-----------|---------|
-| Graceful shutdown | Self-deregistration | Instant |
-| Process crash | Disconnect advisory (TCP FIN/RST) | Sub-second |
-| Network partition | Disconnect advisory (TCP keepalive timeout) | 10-20s (tuned) |
-| Zombie | Heartbeat timeout | 30s (3x interval) |
+
+| Mode              | Detection                                   | Latency           |
+| ----------------- | ------------------------------------------- | ----------------- |
+| Graceful shutdown | Self-deregistration                         | Instant           |
+| Process crash     | Disconnect advisory (TCP FIN/RST)           | Sub-second        |
+| Network partition | Disconnect advisory (TCP keepalive timeout) | 10-20s (tuned)    |
+| Zombie            | Heartbeat timeout                           | 30s (3x interval) |
+
 
 Introduce `mesh.death.{channel}.{name}` subject for death notices that any agent can subscribe to, enabling orchestration recovery, auto-scaling triggers, and monitoring.
 
