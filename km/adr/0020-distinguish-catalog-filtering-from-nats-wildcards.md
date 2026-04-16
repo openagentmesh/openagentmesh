@@ -14,8 +14,7 @@ The channels documentation mentioned "enabling wildcard subscriptions" without c
 These are two distinct mechanisms with different semantics:
 
 1. **SDK catalog filtering** (`mesh.catalog(channel="nlp")`, `mesh.catalog(tags=["summarization"])`): Filters the in-memory catalog index. This is SDK sugar that reads the single `mesh-catalog` KV key and filters client-side. No NATS subscription involved.
-
-2. **NATS subject wildcards** (`*` for single token, `>` for any depth): Operate on NATS subject subscriptions. For example, `mesh.agent.nlp.*` matches all NLP agent invocation subjects. These are protocol-level and apply to direct subject subscriptions, not catalog queries.
+2. **NATS subject wildcards** (`*` for single token, `>` for any depth): Operate on NATS subject subscriptions. For example, `mesh.agent.nlp.`* matches all NLP agent invocation subjects. These are protocol-level and apply to direct subject subscriptions, not catalog queries.
 
 Documentation must keep these distinct. The SDK does not expose NATS wildcards as an API; they are available to developers who subscribe to NATS subjects directly.
 

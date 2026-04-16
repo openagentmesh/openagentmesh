@@ -12,9 +12,7 @@ The spec defines how agents register, discover, and invoke each other, but is si
 In a mesh interaction, LLM tokens are consumed at up to three sites:
 
 1. **The orchestrating LLM (consumer side).** A consumer discovers agents via `mesh.discover()`, converts them to tool definitions (`.to_anthropic_tool()`), and feeds them to their own LLM. That LLM decides which agent to invoke. The consumer pays for the decision-making tokens.
-
 2. **The agent's internal LLM (provider side).** When `mesh.call("summarizer", payload)` reaches the handler, that handler might call Claude, GPT, or any model internally. The provider deployed the agent, the provider's API key is in the handler, the provider pays.
-
 3. **Mesh-spawned agents (operator side, Tier 3+).** For `type: llm` agents, the spawner control plane holds the API keys and creates agent processes. The mesh operator pays.
 
 The primary use case for OAM is **within-company orchestration** — agents built and operated by teams inside the same organization. In this context, inter-party billing and chargeback are not concerns. All costs flow to the same organization.
@@ -35,13 +33,15 @@ X-Mesh-Usage: {"input_tokens": 1500, "output_tokens": 300, "model": "claude-sonn
 
 Fields (all optional):
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `input_tokens` | `int` | Tokens consumed in the LLM input/prompt |
-| `output_tokens` | `int` | Tokens generated in the LLM output |
-| `total_tokens` | `int` | Sum, if provider reports it separately |
-| `model` | `string` | Model identifier used for this call |
-| `estimated_cost_usd` | `float` | Agent-computed cost estimate (advisory) |
+
+| Field                | Type     | Description                             |
+| -------------------- | -------- | --------------------------------------- |
+| `input_tokens`       | `int`    | Tokens consumed in the LLM input/prompt |
+| `output_tokens`      | `int`    | Tokens generated in the LLM output      |
+| `total_tokens`       | `int`    | Sum, if provider reports it separately  |
+| `model`              | `string` | Model identifier used for this call     |
+| `estimated_cost_usd` | `float`  | Agent-computed cost estimate (advisory) |
+
 
 Non-LLM agents (deterministic functions, database lookups) omit the header entirely.
 
@@ -95,3 +95,4 @@ The `Usage` object is not part of the output schema — the SDK intercepts it an
 - Usage data is agent-reported and unverified. A malicious or buggy agent could report incorrect values. This is acceptable for the within-company use case. Cross-org cost attribution (if ever needed) would require a trusted metering layer, which is out of scope.
 - The `Usage` return-value convention requires SDK support for intercepting the object before serialization. This is a small addition to the decorator machinery.
 - External monitoring integration (OTel → dashboards) is the user's responsibility. The mesh provides the data; visualization is out of scope.
+

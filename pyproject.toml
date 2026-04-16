@@ -1,5 +1,5 @@
 [project]
-name = "agentmesh"
+name = "openagentmesh"
 version = "0.1.0"
 description = "Python SDK for agent-to-agent communication based on the Open Agent Mesh Protocol"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mesh = "agentmesh.cli:app"
+mesh = "openagentmesh.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.9.27,<0.10.0"]
@@ -41,7 +41,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agentmesh"]
+known-first-party = ["openagentmesh"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
