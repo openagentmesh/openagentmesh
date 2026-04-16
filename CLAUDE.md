@@ -2,124 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Status
+## Repository Layout
 
-Pre-implementation. This repository currently contains only specification documents — no source code exists yet. The task is to implement the OpenAgentMesh (OAM) Python SDK from these specs.
-
-Key specs and ideas are found in the km/ directory (knowledge management):
-- `agentmesh-spec.md` — Protocol specification (authoritative)
-- `agentmesh-developer-experience.md` — SDK design and DX philosophy
-- `agentmesh-registry-and-discovery.md` — Registry, channels, catalog, and discovery patterns
-- `agentmesh-liveness-and-failure.md` — Liveness checks, failure modes, death notices
-- `ideas.md` — Unresolved design questions and future ideas
+- `km/` -- Internal knowledge management. Rough specs, ideas, and ADRs (`km/adr/`). Working material, not user-facing.
+- `docs/` -- Official documentation (Zensical/MkDocs). Source of truth for users. Code samples here drive development (see Workflow below).
+- `docs/cookbook/` -- Practical recipes with embedded code samples. These code samples are the DX contract.
+- `km/adr/index.md` -- ADR tracking index with status per decision.
+- `tests/cookbook/` -- Executable versions of docs/cookbook code samples, wrapped in pytest. Thin wrappers: same code, plus assertions and fixtures (e.g. `AgentMesh.local()`).
 
 ## What OpenAgentMesh Is
 
-OpenAgentMesh (OAM) is a NATS-based protocol and Python SDK for agent-to-agent communication. Agents register on a shared NATS message bus, publish typed contracts, and discover/invoke each other at runtime without direct coupling. Analogous to a service mesh (Istio/Linkerd) but for AI agents.
+OpenAgentMesh (OAM) is a protocol and Python SDK for multi-agent interation. Agents register on a shared message bus, publish typed contracts, and discover/invoke each other at runtime without direct coupling. Analogous to a service mesh (Istio/Linkerd) but for AI agents.
 
-**Positioning:** "The LAN of agents" — internal fabric (vs. MCP for tools, A2A for cross-org federation).
+**Positioning:** "The LAN of agents" -- internal fabric (vs. MCP for tools, A2A for cross-org federation).
 
 **Naming convention:** Project/brand is "OpenAgentMesh" / "OAM". Code class name stays `AgentMesh` for ergonomics (`from openagentmesh import AgentMesh`).
 
 ## Architecture
 
-### Core Abstractions
+For full details, see the official docs (`docs/`):
 
-**`AgentMesh`** — the central class. Manages NATS connection, subscriptions, heartbeat loops, and lifecycle. Instantiated with a connection string or no arguments (defaults to `nats://localhost:4222`). `AgentMesh.local()` is an async context manager for tests and demos that starts an embedded NATS subprocess with scoped lifecycle.
+- **Core abstractions:** `docs/concepts/agents.md` (AgentMesh class, @mesh.agent decorator, handler shape inference)
+- **Channels and discovery:** `docs/concepts/channels.md`, `docs/concepts/discovery.md`
+- **Contracts and registry:** `docs/concepts/contracts.md` (two-tier KV: catalog + per-agent registry)
+- **Invocation patterns:** `docs/concepts/invocation.md` (call, stream, send, subscribe)
+- **Protocol and subjects:** `docs/architecture/protocol.md`, `docs/architecture/subjects.md`
+- **Message envelope:** `docs/architecture/envelope.md`
+- **Errors:** `docs/concepts/errors.md`
+- **API reference:** `docs/api/agentmesh.md`, `docs/api/contract.md`, `docs/api/cli.md`
+- **Quickstart:** `docs/quickstart.md`
 
-**`@mesh.agent` decorator** — turns any async function into a mesh participant. Internally: subscribes to a NATS queue group, deserializes/validates via Pydantic v2, calls the handler, serializes the response, writes the contract to KV on startup.
-
-**Contract registry** — NATS JetStream KV store. Two tiers:
-
-- `mesh.catalog` — single KV key containing a JSON array of lightweight entries (name, channel, description, version, tags). Updated via CAS on every registration/deregistration.
-- `mesh.registry.{channel}.{name}` — per-agent full contract with JSON Schemas, SLA metadata, and error schema.
-
-**Channels** — hierarchical namespace prefix (e.g., `nlp`, `finance.risk`). Map directly to NATS subject hierarchy, enabling wildcard subscriptions. Channels represent domains/teams, not technical categories. Optional — agents without a channel register at root.
-
-### Subject Naming
-
-```
-mesh.agent.{channel}.{name}      # invocation subject (queue group subscription)
-mesh.agent.{name}                # invocation for root-level agents (no channel)
-mesh.registry.{channel}.{name}   # KV registry key for full contract
-mesh.catalog                     # KV key for lightweight catalog index
-mesh.health.{channel}.{name}     # heartbeat subject
-mesh.agent.{channel}.{name}.events  # pub/sub event emissions
-mesh.errors.{channel}.{name}     # dead-letter subject
-mesh.results.{request_id}        # async callback reply subject
-```
-
-### Message Envelope
-
-All messages use NATS headers for metadata, JSON body for payload.
-
-Request headers: `X-Mesh-Request-Id`, `X-Mesh-Source`, `X-Mesh-Reply-To` (async pattern), `traceparent` (W3C Trace Context).
-Response headers: `X-Mesh-Request-Id` (echoed), `X-Mesh-Source`, `X-Mesh-Status: ok | error`.
-
-Error body when `X-Mesh-Status: error`:
-```json
-{"code": "validation_error|handler_error|timeout|not_found|rate_limited", "message": "...", "agent": "...", "request_id": "...", "details": {}}
-```
-
-### Invocation Patterns
-
-1. **Sync req/reply** — `mesh.call()` — NATS native request/reply, caller blocks.
-2. **Async callback** — `mesh.send(reply_to=...)` — caller sets `X-Mesh-Reply-To`, continues working, subscribes to callback subject independently.
-3. **Pub/sub** — `mesh.agent.{name}.events` — no invocation, fan-out events.
-
-## SDK API Surface
-
-### Provider (registering an agent)
-
-```python
-mesh = AgentMesh("nats://localhost:4222")   # connect to NATS
-mesh = AgentMesh()                          # same, using default localhost URL
-
-# For tests and demos only:
-async with AgentMesh.local() as mesh:       # embedded NATS, stops on exit
-    ...
-
-@mesh.agent(name="summarizer", channel="nlp", description="...", tags=[...])
-async def summarize(req: SummarizeInput) -> SummarizeOutput:
-    ...
-
-mesh.register(name=..., channel=..., description=...,
-              input_model=..., output_model=..., handler=...)
-
-mesh.run()             # blocking (like uvicorn.run)
-await mesh.start()     # non-blocking (embed in existing async app)
-await mesh.stop()      # graceful: unsubscribe → drain → deregister → disconnect
-```
-
-### Consumer (using the mesh)
-
-```python
-# Discovery
-catalog  = await mesh.catalog()                    # lightweight list
-catalog  = await mesh.catalog(channel="nlp")       # filtered
-catalog  = await mesh.catalog(tags=["summarization"])
-agents   = await mesh.discover()                   # full AgentContract objects
-agents   = await mesh.discover(channel="nlp")
-contract = await mesh.contract("summarizer")       # single agent
-
-# AgentContract methods
-contract.to_anthropic_tool()
-contract.to_openai_tool()
-contract.to_generic_tool()
-contract.to_agent_card(url=None)  # thin projection; injects url if provided
-
-# Invocation
-result = await mesh.call("summarizer", payload, timeout=30.0)
-await mesh.send("summarizer", payload, reply_to="mesh.results.abc")
-```
-
-### CLI
-
-```bash
-agentmesh up      # start local NATS with JetStream + pre-created KV buckets
-agentmesh init    # generate Docker Compose stack for team dev
-agentmesh status  # show registered agents and health
-```
+Internal specs in `km/` contain deeper rationale and rough design notes:
+- `km/agentmesh-spec.md` -- Protocol specification (most detailed)
+- `km/agentmesh-developer-experience.md` -- SDK design and DX philosophy
+- `km/agentmesh-registry-and-discovery.md` -- Registry, catalog, discovery patterns
+- `km/agentmesh-liveness-and-failure.md` -- Liveness, failure modes, death notices
+- `km/ideas.md` -- Unresolved design questions and future ideas
 
 ## Documentation
 
@@ -130,169 +48,99 @@ agentmesh status  # show registered agents and health
 
 ## Key Design Decisions
 
-- **Pydantic v2** for input/output validation and JSON Schema generation. Type hints on the handler function are used for introspection — explicit `input_model`/`output_model` parameters are the fallback.
-- **Queue groups** for every invocation subscription — native NATS load balancing enables multiple instances of the same agent with no config changes.
-- **CAS on catalog updates** — concurrent registration retries read-modify-write until KV revision matches. Catalog may be momentarily stale (milliseconds); `mesh.contract()` is authoritative.
-- **No framework adapters** — the handler function body is the developer's territory. Wrapping existing agents is a thin bridge function, not an SDK concern.
-- **Two-step discovery at scale** — `catalog()` for LLM-based selection (20–30 tokens/agent), then `contract()` for targeted schema fetch. No RAG or vector DB needed up to ~500 agents.
+- **Pydantic v2** for input/output validation and JSON Schema generation. Type hints on the handler function are used for introspection -- explicit `input_model`/`output_model` parameters are the fallback.
+- **Queue groups** for every invocation subscription -- native NATS load balancing enables multiple instances of the same agent with no config changes.
+- **CAS on catalog updates** -- concurrent registration retries read-modify-write until KV revision matches. Catalog may be momentarily stale (milliseconds); `mesh.contract()` is authoritative.
+- **No framework adapters** -- the handler function body is the developer's territory. Wrapping existing agents is a thin bridge function, not an SDK concern.
+- **Two-step discovery at scale** -- `catalog()` for LLM-based selection (20–30 tokens/agent), then `contract()` for targeted schema fetch. No RAG or vector DB needed up to ~500 agents.
 - **Embedded NATS** (`AgentMesh.local()`) is an async context manager that downloads the NATS binary to `~/.agentmesh/bin/`, runs as a subprocess with JetStream + KV pre-configured. Scoped to tests and demos; the standard dev workflow uses `agentmesh up` + `AgentMesh()`.
 
-## Workflow
+## Workflow: Documentation Driven Development
 
-A feature flows through two phases. A feature can enter the DESIGN phase at any stage, but the DESIGN phase must be complete (docs updated) before DEVELOPMENT begins.
+OAM is a protocol and SDK where the primary value is developer experience. The documentation is the source of truth for users: it teaches them how to use the protocol and SDK through both explanation and code samples. Those code samples are the pivot point of the entire development workflow.
 
-### DESIGN phase
-
-```
-Discussion -> Spec document (km/) / ADR -> Docs (docs/)
-```
-
-1. **Discussion** -- Conversations, notes (`km/notes/`), SpecStory transcripts. Ideas explored, trade-offs weighed.
-2. **Spec document** -- Decision crystallized into a km/ spec file (internal, authoritative). ADR extracted to `docs/adr/` to track the decision.
-3. **Docs** -- User-facing documentation updated to reflect the decision. This is the gate: no code changes that imply doc changes until docs are updated first.
-
-### DEVELOPMENT phase: Scenario-Driven Development
-
-Development is driven by executable scenarios (cookbook recipes). Each scenario describes a real use case from the end-user's perspective, layered as BDD specs from business behavior down to technical invariants. Agents work backwards from these scenarios to implement the SDK.
-
-#### Scenario structure
-
-Each scenario lives in `cookbook/{scenario_name}/` with three files:
+### The pipeline
 
 ```
-cookbook/{scenario_name}/
-  scenario.md          # Prose BDD spec (Layer 1: business behavior, Layer 2: technical invariants)
-  expected_usage.py    # DX contract: the code a library user would write. THIS IS THE SPEC.
-  scenario_test.py     # Executable BDD tests (pytest). Layer 2 first, then Layer 1.
+Brainstorm -> Shape -> ADR (with code sample) -> Test -> Implement -> Finalize docs
 ```
 
-`expected_usage.py` is the most important file. If the API looks awkward to use, fix the API before touching implementation. The test file is the oracle: the scenario passes or it doesn't.
+1. **Brainstorm.** Discuss ideas, explore trade-offs. Record rough notes in `km/notes/` or spec files in `km/`. No commitment yet.
 
-#### Agent development loop
+2. **Shape.** When an idea is "shaped" enough (from the Shape Up methodology: clear problem, rough solution, bounded scope, identified rabbit holes), crystallize it into an ADR in `km/adr/`. The ADR must include a **code sample** showing how the feature should look from the user's perspective. This code sample is the DX contract: if it looks awkward, fix the API design before proceeding.
 
-```
-Input:  Prose scenario (scenario.md) + DX contract (expected_usage.py)
-                        |
-              +---------v----------+
-              |  What exists that  |
-              |  supports this?    |---> audit codebase + deps
-              +---------+----------+
-                        |
-              +---------v----------+
-              |  What's missing?   |---> gap list: A, B, C
-              +---------+----------+
-                        |
-              +---------v----------+
-              |  Sequence: what    |---> dependency sort
-              |  must come first?  |
-              +---------+----------+
-                        |
-            +-----------v-----------+
-            |  For each gap:        |
-            |    write test -> red  |<--+
-            |    -> implement ->    |   | next gap
-            |    green -> commit +  |---+
-            |    decision log       |
-            +-----------+-----------+
-                        |
-              +---------v----------+
-              |  Run full scenario |
-              |  Does it pass?     |
-              +----+----------+----+
-                  yes         no
-                   |    +-----v-----+
-                   |    | New gaps? |---> loop back
-                   |    | Decision  |
-                   |    | loop > 3? |---> STOP, report to human
-                   |    +-----------+
-                   |
-            +------v------+
-            |  Output:     |
-            |  - working code
-            |  - test suite
-            |  - decision log
-            |  - open questions
-            +-------------+
-```
+3. **Test.** Extract the ADR's code sample into an executable test under `tests/` (pytest). The test is a thin wrapper: same code as the doc sample, plus assertions and fixtures. Tests must fail (red) since there is no implementation yet.
 
-**Circuit breaker:** If the agent revisits the same design choice more than 3 times (flip-flops on a decision), it stops and surfaces the question for human judgment.
+4. **Implement.** Write the minimum code to make the tests pass (green). Follow TDD: red, green, refactor. Commits are atomic per logical unit, not one big commit at the end.
 
-**Decision log:** Every time the agent chooses between alternatives during implementation, it writes the decision down before proceeding ("Chose X because Y"). This is the raw material for ADRs.
+5. **Finalize docs.** Update `docs/cookbook/` and any other relevant pages in `docs/` to reflect the implemented feature. The code samples in docs must match what actually works. Duplication between `docs/cookbook/` and `tests/cookbook/` is intentional: docs stay clean (no pytest noise), tests stay executable.
 
-**Commits are atomic per gap.** Not one big commit at the end. Each gap gets its own test, implementation, and commit.
+### ADR as work item
 
-#### DX-first, then TDD
-
-The old workflow (DX first, tests second, implementation last) is preserved inside the loop. Each gap within a scenario follows: write the test (red), implement (green), refactor. The scenario just provides the top-down entry point that sequences which gaps to tackle.
-
-#### Bootstrapping
-
-The first scenario (`cookbook/shared_plan/`) is the bootstrapping scenario. It exercises the core SDK primitives (connection, KV, CAS, agents, concurrency). Once it passes, the same coordination pattern can be used to build subsequent features, with agents on the mesh coordinating their own development.
-
-### ADR as tracking tool
-
-ADRs in `docs/adr/` track each decision through the workflow via the **Status** field:
+Each ADR in `km/adr/` is a trackable unit of work. The **Status** field in `km/adr/index.md` reflects where the ADR sits in the pipeline:
 
 | Status | Meaning |
 |--------|---------|
-| `discussion` | Decision identified in conversation/notes, not yet spec'd |
-| `spec` | Written into km/ spec document |
-| `documented` | User-facing docs updated |
-| `implemented` | Code exists and tests pass |
-| `accepted` | Legacy status — treat as `implemented` or `documented` |
+| `discussion` | Idea identified, not yet shaped |
+| `spec` | Shaped into ADR with code sample |
+| `test` | Code sample extracted into failing tests |
+| `implemented` | Tests pass, code exists |
+| `documented` | Official docs in `docs/` updated |
 | `superseded by ADR-NNNN` | Replaced by a later decision |
+
+**Rules:**
+- An ADR cannot move to `test` without a code sample in the ADR body.
+- An ADR cannot move to `documented` without passing tests.
+- The `accepted` status is legacy; treat as `implemented` or `documented` depending on whether docs exist.
+
+## Parallel Development with Worktrees
+
+Multiple features can be implemented simultaneously using git worktrees. Each worktree is an isolated workspace with its own branch, virtual environment, and working copy.
+
+### Isolation rule
+
+- **Code changes only happen inside worktrees.** All modifications to `src/`, `tests/`, `docs/`, and dependency files (`pyproject.toml`, `uv.lock`) must be in a worktree branch, never directly on `main`.
+- **`main` is the thinking space.** Direct work on `main` is limited to `km/` (ADRs, specs, notes, brainstorming), `CLAUDE.md`, and project config files.
+
+### When to create a worktree
+
+A worktree is created when an ADR (or group of related ADRs) reaches `spec` status and is ready for the test-implement-document cycle. Brainstorming, shaping, and ADR writing happen on `main`. Worktrees are an implementation tool, not a design tool.
+
+### Claim protocol
+
+Before creating a worktree, the session must claim the target ADRs in `km/adr/index.md` by filling in the **Branch** column. This makes active work visible to all sessions and prevents overlap. If a target ADR is already claimed by an active branch, flag the conflict to the user before proceeding.
+
+### Branch and directory conventions
+
+- Worktrees live in `.worktrees/` (gitignored).
+- Branch naming: `feature/<short-name>` (descriptive slug, not ADR numbers).
+- A branch can span multiple related ADRs.
+
+### PR workflow
+
+When implementation is complete (tests pass, docs updated), push the branch and open a draft PR referencing the implemented ADRs. The user reviews and merges on their schedule. After merge, clean up the worktree; the branch name stays in the ADR index as a historical record.
+
+### Detailed procedures
+
+Step-by-step procedures for each stage of the parallel workflow are in `km/workflow/`:
+- `km/workflow/starting-a-session.md`
+- `km/workflow/during-a-session.md`
+- `km/workflow/finishing-a-session.md`
+- `km/workflow/after-merge.md`
 
 ## Development Phases
 
 The spec defines four phases. **Phase 1 is the current target:**
 
-**Phase 1 (MVP):** `AgentMesh` class, `@mesh.agent` decorator, Pydantic v2 validation, `mesh.call()` / `mesh.send()` / `mesh.discover()`, lifecycle management, `AgentMesh.local()` async context manager for tests, `agentmesh up` CLI, "Hello World" in <30 lines.
+**Phase 1 (MVP):** `AgentMesh` class, `@mesh.agent` decorator (with type inference from handler shape), Pydantic v2 validation, `mesh.call()` / `mesh.stream()` / `mesh.send()` / `mesh.subscribe()` / `mesh.discover()`, lifecycle management, `AgentMesh.local()` async context manager for tests, `agentmesh up` CLI, "Hello World" in <30 lines.
 
 Not in Phase 1: middleware hooks, OTel, Docker Compose tier, admin UI, TypeScript SDK, spawning from specs.
 
 ## Contract Schema Reference
 
-The contract schema is a superset of the A2A Agent Card format. A2A fields are at the top level; AgentMesh-specific fields are under `x-agentmesh`. The `url` field is the only A2A field not stored in the registry — it is gateway-provided at federation time. `.to_agent_card(url=None)` is a thin projection, not a conversion.
+The contract schema is a superset of the A2A Agent Card format. A2A fields at top level; OAM-specific fields under `x-agentmesh`. Full schema and examples in `docs/api/contract.md`. Key points:
 
-```json
-{
-  "name": "summarizer",
-  "description": "Written for LLM consumption: what it does, what inputs it handles, when NOT to use it.",
-  "version": "1.0.0",
-  "capabilities": { "streaming": false, "pushNotifications": true },
-  "defaultInputModes": ["application/json"],
-  "defaultOutputModes": ["application/json"],
-  "skills": [
-    {
-      "id": "summarizer",
-      "name": "Summarize text",
-      "description": "Written for LLM consumption...",
-      "tags": ["text", "summarization"],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"],
-      "inputSchema": {},
-      "outputSchema": {}
-    }
-  ],
-  "x-agentmesh": {
-    "type": "agent",
-    "channel": "nlp",
-    "subject": "mesh.agent.nlp.summarizer",
-    "sla": {
-      "expected_latency_ms": 5000,
-      "timeout_ms": 30000,
-      "retry_policy": "idempotent",
-      "max_retries": 2
-    },
-    "error_schema": {},
-    "metadata": {
-      "framework": "custom",
-      "language": "python",
-      "registered_at": "ISO8601",
-      "heartbeat_interval_ms": 10000
-    }
-  }
-}
-```
-
-The `description` field (top-level and in `skills[0]`) is consumed by LLMs for tool selection — it must state what the agent does, what input formats it handles, and what it should NOT be used for.
+- `x-agentmesh.type`: `"agent"` (streaming, LLM-powered), `"tool"` (buffered, deterministic), `"publisher"` (events, not invocable), `"subscriber"` (reserved).
+- `capabilities.streaming`: inferred from handler shape (return vs. yield).
+- `url` field is not stored in registry; injected by gateway at federation time. `.to_agent_card(url=None)` is a thin projection.
+- `description` is consumed by LLMs for tool selection: must state what the agent does, what inputs it handles, when NOT to use it.
