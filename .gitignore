@@ -50,11 +50,11 @@ site/
 .vscode/
 .idea/
 
-# km
-km/
-
 # Work in progress (code not yet public)
 .wip/
 
 # Session memory
 .remember/
+
+# Git worktrees
+.worktrees/
