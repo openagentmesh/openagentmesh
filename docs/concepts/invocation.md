@@ -32,25 +32,60 @@ The agent must be a streaming handler (async generator). Calling `mesh.stream()`
 
 ## Async Callback
 
-Fire-and-forget with a reply subject. The caller continues working while the agent processes the request.
+Non-blocking invocation with a managed callback. The SDK generates the reply subject, subscribes, and dispatches to your callback.
+
+```python
+from openagentmesh import MeshError
+
+async def handle_summary(result: dict):
+    print(result["summary"])
+
+async def handle_error(err: MeshError):
+    print(f"Failed: {err.message}")
+
+await mesh.send(
+    "summarizer",
+    {"text": long_doc, "max_length": 500},
+    on_reply=handle_summary,
+    on_error=handle_error,
+    timeout=30.0,
+)
+# Continues immediately. Callback fires when the agent responds.
+```
+
+For manual control over the reply subject:
 
 ```python
 import uuid
 
 request_id = uuid.uuid4().hex
-await mesh.send(
-    "summarizer",
-    {"text": long_doc, "max_length": 500},
-    reply_to=f"mesh.results.{request_id}",
-)
-# Result arrives on mesh.results.{request_id}
+reply_subject = f"mesh.results.{request_id}"
+await mesh.send("summarizer", payload, reply_to=reply_subject)
+
+async for msg in mesh.subscribe(subject=reply_subject, timeout=30.0):
+    print(msg["summary"])
+    break
 ```
 
-The caller subscribes to the reply subject independently. This pattern is useful for long-running operations or pipeline workflows.
+This pattern is useful for long-running operations or pipeline workflows where you need explicit subject control.
 
 ## Pub/Sub Events
 
-Event emitter agents yield events on their event subject for fan-out consumption:
+Subscribe to an agent's event stream:
+
+```python
+async for event in mesh.subscribe(agent="price-feed"):
+    print(event["symbol"], event["price"])
+```
+
+Subscribe to all events in a channel:
+
+```python
+async for event in mesh.subscribe(channel="finance"):
+    print(event)
+```
+
+Publisher agents yield events with no request parameter. The SDK publishes each yielded value to the agent's event subject automatically:
 
 ```
 mesh.agent.{channel}.{name}.events

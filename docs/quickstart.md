@@ -18,10 +18,9 @@ oam mesh up
 
 ## Hello World
 
-One file. Two agents. One calls the other.
+One file. One agent. Registered and serving.
 
 ```python
-import asyncio
 from pydantic import BaseModel
 from openagentmesh import AgentMesh, AgentSpec
 
@@ -39,16 +38,11 @@ spec = AgentSpec(name="echo", description="Echoes a message back.")
 async def echo(req: EchoInput) -> EchoOutput:
     return EchoOutput(reply=f"Echo: {req.message}")
 
-async def main():
-    async with mesh:
-        result = await mesh.call("echo", {"message": "hello"})
-        print(result["reply"])  # Echo: hello
-
-asyncio.run(main())
+mesh.run()  # blocks, like uvicorn.run()
 ```
 
 !!! info "What just happened?"
-    `oam mesh up` started a local development server with JetStream and KV buckets. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
+    `oam mesh up` started a local development server with JetStream and KV buckets. `@mesh.agent` registered `echo` with a typed contract. `mesh.run()` connects to the bus, publishes the contract, and serves requests until interrupted.
 
 ## Two Separate Processes
 
@@ -101,7 +95,7 @@ async def main():
         # Call by name
         result = await mesh.call(
             "summarizer",
-            {"text": "AgentMesh is a protocol for agent-to-agent communication.", "max_length": 50},
+            {"text": "OpenAgentMesh makes coding multi-agent systems as easy as writing REST endpoint", "max_length": 50},
         )
         print(result["summary"])
 
@@ -161,18 +155,25 @@ async def lifespan(app):
 
 ## Async Callback Invocation
 
-For fire-and-forget invocations, use `mesh.send()` with a reply subject.
+For non-blocking invocations, use `mesh.send()` with a callback:
 
 ```python
-import uuid
+from openagentmesh import MeshError
 
-request_id = uuid.uuid4().hex
+async def on_summary(result: dict):
+    print(result["summary"])
+
+async def on_error(err: MeshError):
+    print(f"Failed: {err.message}")
+
 await mesh.send(
     "summarizer",
     {"text": long_doc, "max_length": 500},
-    reply_to=f"mesh.results.{request_id}",
+    on_reply=on_summary,
+    on_error=on_error,
+    timeout=30.0,
 )
-# The agent processes the request; result arrives on mesh.results.{request_id}
+# Continues immediately. Callback fires when the agent responds.
 ```
 
 ## LLM Tool Definitions
@@ -223,7 +224,17 @@ tool = {
 |--------|-------------|
 | `await mesh.call(name, payload, timeout=30.0)` | Synchronous request/reply. Returns `dict`. |
 | `async for chunk in mesh.stream(name, payload)` | Streaming request. Yields `dict` chunks. |
-| `await mesh.send(name, payload, reply_to)` | Async callback, non-blocking |
+| `await mesh.send(name, payload, on_reply=cb, on_error=err_cb)` | Managed async callback |
+| `await mesh.send(name, payload, reply_to=subject)` | Manual reply subject |
+| `await mesh.send(name, payload)` | Fire-and-forget |
+
+### Subscription
+
+| Method | Description |
+|--------|-------------|
+| `async for msg in mesh.subscribe(agent=name)` | Subscribe to an agent's event stream |
+| `async for msg in mesh.subscribe(channel=name)` | Subscribe to all events in a channel (wildcard) |
+| `async for msg in mesh.subscribe(subject=raw)` | Subscribe to a raw NATS subject |
 
 ### Discovery
 
