@@ -84,6 +84,7 @@ class AgentMesh:
         self._embedded: EmbeddedNats | None = None
         self._catalog_cache: dict[str, CatalogEntry] = {}
         self._catalog_watcher_task: asyncio.Task | None = None
+        self._publisher_tasks: dict[str, asyncio.Task] = {}
 
     # --- Async context manager ---
 
@@ -128,7 +129,15 @@ class AgentMesh:
         """Subscribe any agents not yet subscribed."""
         for name, (spec, info, contract) in self._agents.items():
             if name not in self._subscribed:
-                await self._subscribe_agent(name, info, contract)
+                if info.invocable:
+                    await self._subscribe_agent(name, info, contract)
+                else:
+                    # Publisher agent: launch emission task (ADR-0034)
+                    if name not in self._publisher_tasks:
+                        task = asyncio.create_task(
+                            self._emit_publisher_events(name, spec, info)
+                        )
+                        self._publisher_tasks[name] = task
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
@@ -165,6 +174,16 @@ class AgentMesh:
             except (asyncio.CancelledError, Exception):
                 pass
             self._catalog_watcher_task = None
+
+        # Cancel publisher tasks (ADR-0034)
+        for task in self._publisher_tasks.values():
+            task.cancel()
+        for task in self._publisher_tasks.values():
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._publisher_tasks.clear()
 
         for sub in self._subscriptions:
             try:
@@ -431,6 +450,75 @@ class AgentMesh:
             },
         )
 
+    # --- Publisher emission (ADR-0034) ---
+
+    async def _emit_publisher_events(
+        self, name: str, spec: AgentSpec, info: HandlerInfo
+    ) -> None:
+        """Run a publisher handler and publish yielded values to its event subject."""
+        if spec.channel:
+            event_subject = f"mesh.agent.{spec.channel}.{name}.events"
+        else:
+            event_subject = f"mesh.agent.{name}.events"
+
+        gen = info.func()
+        seq = 0
+        try:
+            async for chunk in gen:
+                if isinstance(chunk, BaseModel):
+                    data = chunk.model_dump_json().encode()
+                else:
+                    data = json.dumps(chunk).encode()
+
+                await self._nc.publish(
+                    event_subject,
+                    data,
+                    headers={
+                        "X-Mesh-Stream-Seq": str(seq),
+                        "X-Mesh-Stream-End": "false",
+                    },
+                )
+                seq += 1
+
+            # Generator returned normally: send terminal
+            await self._nc.publish(
+                event_subject,
+                b"",
+                headers={
+                    "X-Mesh-Stream-Seq": str(seq),
+                    "X-Mesh-Stream-End": "true",
+                },
+            )
+        except asyncio.CancelledError:
+            # Shutdown: send terminal
+            try:
+                await self._nc.publish(
+                    event_subject,
+                    b"",
+                    headers={
+                        "X-Mesh-Stream-Seq": str(seq),
+                        "X-Mesh-Stream-End": "true",
+                    },
+                )
+            except Exception:
+                pass
+        except Exception as e:
+            _log.warning("Publisher '%s' failed: %s", name, e)
+            error = MeshError(
+                code="handler_error", message=str(e), agent=name,
+            )
+            try:
+                await self._nc.publish(
+                    event_subject,
+                    error.to_json(),
+                    headers={
+                        "X-Mesh-Stream-End": "true",
+                        "X-Mesh-Status": "error",
+                    },
+                )
+            except Exception:
+                pass
+
     # --- Invocation ---
 
     async def call(self, name: str, payload: Any = None, timeout: float = 30.0) -> dict:
@@ -595,7 +683,10 @@ class AgentMesh:
             if is_end:
                 await items.put(None)
 
+        # Subscribe to NATS *before* launching publisher tasks so the
+        # subscriber is ready to receive the first emitted event.
         sub = await self._nc.subscribe(resolved, cb=_on_msg)
+        await self._subscribe_pending()
 
         try:
             while True:
