@@ -11,7 +11,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0002](0002-bidirectional-mcp-bridge-design.md) | Bidirectional MCP bridge design | discussion | |
 | [ADR-0003](0003-mcp-export-flag-as-boolean.md) | MCP export flag as boolean | spec | |
 | [ADR-0004](0004-schema-quality-tiers-for-mcp-intake.md) | Schema quality tiers for MCP intake | discussion | |
-| [ADR-0005](0005-streaming-wire-protocol.md) | Streaming wire protocol | spec | |
+| [ADR-0005](0005-streaming-wire-protocol.md) | Streaming wire protocol | spec | feature/streaming-protocol |
 | [ADR-0006](0006-sla-gating-for-mcp-export.md) | SLA gating for MCP export | spec | |
 | [ADR-0007](0007-use-plain-pydantic-not-pydanticai.md) | Use plain Pydantic, not PydanticAI | discussion | |
 | [ADR-0008](0008-dx-first-development-strategy.md) | DX-first development strategy | documented | |
