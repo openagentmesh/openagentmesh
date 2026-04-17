@@ -68,10 +68,9 @@ class TestConcurrentCASUpdates:
 
     async def test_two_simultaneous_claims_both_succeed(self):
         async with AgentMesh.local() as mesh:
-            await mesh.start()
 
             plan = make_plan(2)
-            await mesh.context.put("plan-001", plan.model_dump_json())
+            await mesh.kv.put("plan-001", plan.model_dump_json())
 
             async def claim_task(task_id: str, agent_name: str):
                 def mutate(value: str) -> str:
@@ -81,7 +80,7 @@ class TestConcurrentCASUpdates:
                     task.assigned_to = agent_name
                     return p.model_dump_json()
 
-                await mesh.context.update("plan-001", mutate)
+                await mesh.kv.update("plan-001", mutate)
 
             # Two agents claim different tasks at the same time
             await asyncio.gather(
@@ -90,7 +89,7 @@ class TestConcurrentCASUpdates:
             )
 
             # Both claims should be reflected in the final state
-            raw = await mesh.context.get("plan-001")
+            raw = await mesh.kv.get("plan-001")
             final = Plan.model_validate_json(raw)
 
             assigned = {t.id: t.assigned_to for t in final.tasks}
@@ -103,14 +102,13 @@ class TestTaskClaimExclusivity:
 
     async def test_second_agent_sees_claimed_tasks(self):
         async with AgentMesh.local() as mesh:
-            await mesh.start()
 
             plan = make_plan(3)
             plan.tasks[0].status = "in-progress"
             plan.tasks[0].assigned_to = "agent-a"
-            await mesh.context.put("plan-001", plan.model_dump_json())
+            await mesh.kv.put("plan-001", plan.model_dump_json())
 
-            raw = await mesh.context.get("plan-001")
+            raw = await mesh.kv.get("plan-001")
             current = Plan.model_validate_json(raw)
             pending = current.pending_tasks()
 
@@ -123,15 +121,14 @@ class TestPlanObservability:
 
     async def test_watch_receives_updates(self):
         async with AgentMesh.local() as mesh:
-            await mesh.start()
 
             plan = make_plan(1)
-            await mesh.context.put("plan-001", plan.model_dump_json())
+            await mesh.kv.put("plan-001", plan.model_dump_json())
 
             updates = []
 
             async def watch_plan():
-                async for value in mesh.context.watch("plan-001"):
+                async for value in mesh.kv.watch("plan-001"):
                     p = Plan.model_validate_json(value)
                     updates.append(p.tasks[0].status)
                     if p.is_complete():
@@ -140,14 +137,14 @@ class TestPlanObservability:
             async def update_plan():
                 await asyncio.sleep(0.05)  # let watch start first
 
-                async with mesh.context.cas("plan-001") as entry:
+                async with mesh.kv.cas("plan-001") as entry:
                     p = Plan.model_validate_json(entry.value)
                     p.tasks[0].status = "in-progress"
                     entry.value = p.model_dump_json()
 
                 await asyncio.sleep(0.05)
 
-                async with mesh.context.cas("plan-001") as entry:
+                async with mesh.kv.cas("plan-001") as entry:
                     p = Plan.model_validate_json(entry.value)
                     p.tasks[0].status = "complete"
                     entry.value = p.model_dump_json()
@@ -173,7 +170,7 @@ class TestSharedPlanCoordination:
         async with AgentMesh.local() as mesh:
 
             plan = make_plan(5)
-            await mesh.context.put("plan-001", plan.model_dump_json())
+            await mesh.kv.put("plan-001", plan.model_dump_json())
 
             completed_by: dict[str, str] = {}
 
@@ -187,7 +184,7 @@ class TestSharedPlanCoordination:
                     task.assigned_to = "worker"
                     return p.model_dump_json()
 
-                await mesh.context.update("plan-001", claim)
+                await mesh.kv.update("plan-001", claim)
 
                 await asyncio.sleep(0.1)  # simulate work
 
@@ -198,12 +195,11 @@ class TestSharedPlanCoordination:
                     task.status = "complete"
                     return p.model_dump_json()
 
-                await mesh.context.update("plan-001", complete)
+                await mesh.kv.update("plan-001", complete)
 
                 completed_by[req.task_id] = "worker"
                 return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
 
-            await mesh.start()
 
             # Dispatch all tasks concurrently (simulating two+ agents via queue group)
             calls = [
@@ -213,7 +209,7 @@ class TestSharedPlanCoordination:
             results = await asyncio.gather(*calls)
 
             # Verify: all tasks complete
-            raw = await mesh.context.get("plan-001")
+            raw = await mesh.kv.get("plan-001")
             final = Plan.model_validate_json(raw)
 
             assert final.is_complete(), f"Tasks not complete: {[t.status for t in final.tasks]}"
@@ -229,7 +225,7 @@ class TestSharedPlanCoordination:
         async with AgentMesh.local() as mesh:
 
             plan = make_plan(5)
-            await mesh.context.put("plan-001", plan.model_dump_json())
+            await mesh.kv.put("plan-001", plan.model_dump_json())
 
             @mesh.agent(AgentSpec(name="worker", channel="dev", description="Completes plan tasks"))
             async def worker(req: TaskClaim) -> TaskResult:
@@ -240,12 +236,11 @@ class TestSharedPlanCoordination:
                     task.assigned_to = "worker"
                     return p.model_dump_json()
 
-                await mesh.context.update("plan-001", mark_complete)
+                await mesh.kv.update("plan-001", mark_complete)
 
                 await asyncio.sleep(0.1)  # 100ms of "work" per task
                 return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
 
-            await mesh.start()
 
             start = time.monotonic()
             calls = [

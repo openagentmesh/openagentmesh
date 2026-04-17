@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -41,10 +40,15 @@ def _compute_registry_key(name: str, channel: str | None) -> str:
 class AgentMesh:
     """Client and host for OpenAgentMesh agents.
 
-    Constructors::
+    Use as an async context manager::
 
-        mesh = AgentMesh()                           # localhost:4222
-        mesh = AgentMesh("nats://mesh.example.com")  # explicit URL
+        mesh = AgentMesh()
+
+        @mesh.agent(spec)
+        async def echo(req: EchoInput) -> EchoOutput: ...
+
+        async with mesh:
+            result = await mesh.call("echo", {"message": "hi"})
 
     For tests and demos::
 
@@ -59,15 +63,26 @@ class AgentMesh:
         self._catalog_kv: KeyValue | None = None
         self._registry_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
-        self.context: ContextStore | None = None
+        self.kv: ContextStore | None = None
 
-        # Registered agents (pending start)
+        # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
+        self._subscribed: set[str] = set()
         self._subscriptions: list[Any] = []
-        self._running = False
         self._embedded: EmbeddedNats | None = None
 
-    # --- Connection ---
+    # --- Async context manager ---
+
+    async def __aenter__(self) -> AgentMesh:
+        await self._connect()
+        await self._ensure_buckets()
+        await self._subscribe_pending()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self._shutdown()
+
+    # --- Connection (private) ---
 
     async def _connect(self) -> None:
         if self._nc is not None:
@@ -92,34 +107,75 @@ class AgentMesh:
         except Exception:
             self._context_kv = await self._js.create_key_value(bucket=_CONTEXT_BUCKET)
 
-        self.context = ContextStore(self._context_kv)
+        self.kv = ContextStore(self._context_kv)
 
-    # --- local() context manager ---
+    async def _subscribe_pending(self) -> None:
+        """Subscribe any agents not yet subscribed."""
+        for name, (spec, info, contract) in self._agents.items():
+            if name not in self._subscribed:
+                await self._subscribe_agent(name, info, contract)
+                await self._publish_contract(contract)
+                await self._update_catalog(contract, add=True)
+                self._subscribed.add(name)
+
+    async def _shutdown(self) -> None:
+        for sub in self._subscriptions:
+            try:
+                await sub.unsubscribe()
+            except Exception:
+                pass
+        self._subscriptions.clear()
+
+        if self._catalog_kv and self._registry_kv:
+            for name in self._subscribed:
+                if name in self._agents:
+                    spec, _, contract = self._agents[name]
+                    try:
+                        await self._update_catalog(contract, add=False)
+                    except Exception:
+                        pass
+                    try:
+                        key = _compute_registry_key(name, spec.channel)
+                        await self._registry_kv.delete(key)
+                    except Exception:
+                        pass
+
+        self._subscribed.clear()
+
+        if self._nc and self._nc.is_connected:
+            try:
+                await self._nc.drain()
+            except Exception:
+                try:
+                    await self._nc.close()
+                except Exception:
+                    pass
+            self._nc = None
+
+    # --- local() ---
 
     @classmethod
     @asynccontextmanager
     async def local(cls) -> AsyncIterator[AgentMesh]:
-        """Async context manager: start an embedded NATS server for tests/demos.
+        """Embedded NATS for tests and demos.
 
-        Usage::
+        Starts a NATS subprocess, connects, creates KV buckets,
+        and tears everything down on exit::
 
             async with AgentMesh.local() as mesh:
                 @mesh.agent(spec)
                 async def echo(req: EchoInput) -> EchoOutput:
                     ...
-                await mesh.start()
-                result = await mesh.call("echo", ...)
+                result = await mesh.call("echo", {"message": "hi"})
         """
         embedded = EmbeddedNats()
         await embedded.start()
         mesh = cls(url=embedded.url)
         mesh._embedded = embedded
         try:
-            await mesh._connect()
-            await mesh._ensure_buckets()
-            yield mesh
+            async with mesh:
+                yield mesh
         finally:
-            await mesh._shutdown()
             await embedded.stop()
 
     # --- Registration ---
@@ -163,7 +219,7 @@ class AgentMesh:
                 ),
             )
             if info.streaming:
-                contract.output_schema = None  # streaming agents use chunk_schema
+                contract.output_schema = None
 
             self._agents[spec.name] = (spec, info, contract)
             return func
@@ -172,69 +228,25 @@ class AgentMesh:
 
     # --- Lifecycle ---
 
-    async def start(self) -> None:
-        """Connect (if needed), subscribe agents, publish contracts."""
-        await self._connect()
-        await self._ensure_buckets()
-
-        for name, (spec, info, contract) in self._agents.items():
-            await self._subscribe_agent(name, info, contract)
-            await self._publish_contract(contract)
-            await self._update_catalog(contract, add=True)
-
-        self._running = True
-
-    async def stop(self) -> None:
-        """Graceful shutdown: drain subscriptions, deregister, disconnect."""
-        await self._shutdown()
-
-    async def _shutdown(self) -> None:
-        self._running = False
-
-        # Drain subscriptions
-        for sub in self._subscriptions:
-            try:
-                await sub.unsubscribe()
-            except Exception:
-                pass
-        self._subscriptions.clear()
-
-        # Deregister from catalog and registry
-        if self._catalog_kv and self._registry_kv:
-            for name, (spec, _, contract) in self._agents.items():
-                try:
-                    await self._update_catalog(contract, add=False)
-                except Exception:
-                    pass
-                try:
-                    key = _compute_registry_key(name, spec.channel)
-                    await self._registry_kv.delete(key)
-                except Exception:
-                    pass
-
-        # Close NATS connection
-        if self._nc and self._nc.is_connected:
-            try:
-                await self._nc.drain()
-            except Exception:
-                try:
-                    await self._nc.close()
-                except Exception:
-                    pass
-            self._nc = None
-
     def run(self) -> None:
-        """Start the mesh and block until interrupted. Like ``uvicorn.run()``."""
+        """Block until interrupted. Like ``uvicorn.run()``.
+
+        Connects, subscribes agents, and serves requests::
+
+            mesh = AgentMesh()
+
+            @mesh.agent(spec)
+            async def echo(req: EchoInput) -> EchoOutput: ...
+
+            mesh.run()
+        """
 
         async def _run_forever():
-            await self.start()
-            try:
-                stop_event = asyncio.Event()
-                await stop_event.wait()
-            except asyncio.CancelledError:
-                pass
-            finally:
-                await self.stop()
+            async with self:
+                try:
+                    await asyncio.Event().wait()
+                except asyncio.CancelledError:
+                    pass
 
         try:
             asyncio.run(_run_forever())
@@ -280,25 +292,21 @@ class AgentMesh:
         agent_name: str,
         request_id: str,
     ) -> None:
-        # Deserialize input
         if info.input_model and msg.data:
             payload = info.input_model.model_validate_json(msg.data)
         else:
             payload = None
 
-        # Execute handler
         if payload is not None:
             result = await info.func(payload)
         else:
             result = await info.func()
 
-        # Serialize output
         if isinstance(result, BaseModel):
             response_data = result.model_dump_json().encode()
         else:
             response_data = json.dumps(result).encode() if result is not None else b"{}"
 
-        # Respond
         if msg.reply:
             await self._nc.publish(
                 msg.reply,
@@ -319,13 +327,11 @@ class AgentMesh:
     ) -> None:
         stream_subject = f"mesh.stream.{request_id}"
 
-        # Deserialize input
         if info.input_model and msg.data:
             payload = info.input_model.model_validate_json(msg.data)
         else:
             payload = None
 
-        # Execute async generator
         gen = info.func(payload) if payload is not None else info.func()
         seq = 0
         async for chunk in gen:
@@ -345,7 +351,6 @@ class AgentMesh:
             )
             seq += 1
 
-        # End-of-stream marker
         await self._nc.publish(
             stream_subject,
             b"",
@@ -359,25 +364,19 @@ class AgentMesh:
     # --- Invocation ---
 
     async def call(self, name: str, payload: Any = None, timeout: float = 30.0) -> dict:
-        """Synchronous request/reply invocation.
-
-        Returns the response as a dict.
-        """
-        assert self._nc is not None, "Not connected. Call start() first."
+        """Synchronous request/reply. Returns the response as a dict."""
+        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
+        await self._subscribe_pending()
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
         data = self._serialize_payload(payload)
 
-        headers = {
-            "X-Mesh-Request-Id": request_id,
-        }
-
         response = await self._nc.request(
-            subject, data, timeout=timeout, headers=headers
+            subject, data, timeout=timeout,
+            headers={"X-Mesh-Request-Id": request_id},
         )
 
-        # Check status
         status = ""
         if response.headers:
             status = response.headers.get("X-Mesh-Status", "")
@@ -397,14 +396,14 @@ class AgentMesh:
     async def stream(
         self, name: str, payload: Any = None, timeout: float = 60.0
     ) -> AsyncIterator[dict]:
-        """Streaming request: yields response chunks as dicts."""
-        assert self._nc is not None, "Not connected. Call start() first."
+        """Streaming request. Yields response chunks as dicts."""
+        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
+        await self._subscribe_pending()
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
         stream_subject = f"mesh.stream.{request_id}"
 
-        # Subscribe to stream subject before sending request
         chunks: asyncio.Queue[dict | None] = asyncio.Queue()
 
         async def chunk_handler(msg: nats.aio.msg.Msg) -> None:
@@ -424,7 +423,6 @@ class AgentMesh:
             }
             await self._nc.publish(subject, data, headers=headers)
 
-            # Yield chunks until end marker
             deadline = asyncio.get_event_loop().time() + timeout
             while True:
                 remaining = deadline - asyncio.get_event_loop().time()
@@ -443,7 +441,8 @@ class AgentMesh:
         self, name: str, payload: Any = None, reply_to: str | None = None
     ) -> None:
         """Fire-and-forget invocation with optional reply subject."""
-        assert self._nc is not None, "Not connected. Call start() first."
+        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
+        await self._subscribe_pending()
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
@@ -466,6 +465,7 @@ class AgentMesh:
     ) -> list[CatalogEntry]:
         """Lightweight agent listing from the catalog KV (ADR-0028)."""
         assert self._catalog_kv is not None
+        await self._subscribe_pending()
 
         try:
             entry = await self._catalog_kv.get(_CATALOG_KEY)
@@ -473,7 +473,6 @@ class AgentMesh:
         except Exception:
             return []
 
-        # Filter
         if channel is not None:
             entries = [e for e in entries if e.channel == channel]
         if tags is not None:
@@ -492,7 +491,6 @@ class AgentMesh:
 
         key = _compute_registry_key(name, channel)
 
-        # If channel not provided, try local registry first, then scan
         if channel is None and name in self._agents:
             _, _, c = self._agents[name]
             return c
@@ -500,7 +498,6 @@ class AgentMesh:
         try:
             entry = await self._registry_kv.get(key)
         except Exception:
-            # Try without channel
             if channel is not None:
                 try:
                     entry = await self._registry_kv.get(name)
@@ -542,12 +539,9 @@ class AgentMesh:
     # --- Internal helpers ---
 
     def _resolve_subject(self, name: str) -> str:
-        """Resolve agent name to NATS subject."""
         if name in self._agents:
             _, _, contract = self._agents[name]
             return contract.subject
-
-        # TODO: look up catalog for remote agents
         return f"mesh.agent.{name}"
 
     @staticmethod
@@ -564,15 +558,12 @@ class AgentMesh:
             return payload.encode()
         return json.dumps(payload).encode()
 
-    # --- Contract / catalog management ---
-
     async def _publish_contract(self, contract: AgentContract) -> None:
         assert self._registry_kv is not None
         key = _compute_registry_key(contract.name, contract.channel)
         await self._registry_kv.put(key, contract.to_registry_json().encode())
 
     async def _update_catalog(self, contract: AgentContract, *, add: bool) -> None:
-        """CAS update the catalog: add or remove an entry."""
         assert self._catalog_kv is not None
         entry_dict = contract.to_catalog_entry().model_dump()
 
@@ -587,9 +578,7 @@ class AgentMesh:
                 current = []
                 revision = 0
 
-            # Remove existing entry with same name
             current = [e for e in current if e.get("name") != contract.name]
-
             if add:
                 current.append(entry_dict)
 

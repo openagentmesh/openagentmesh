@@ -35,7 +35,7 @@ class SummarizeChunk(BaseModel):
 
 
 class TestHelloWorld:
-    async def test_register_start_call(self):
+    async def test_register_and_call(self):
         """Simplest end-to-end: one agent, one call."""
         spec = AgentSpec(name="echo", description="Echoes messages")
 
@@ -44,7 +44,6 @@ class TestHelloWorld:
             async def echo(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=f"Echo: {req.message}")
 
-            await mesh.start()
             result = await mesh.call("echo", {"message": "hello"})
             assert result["reply"] == "Echo: hello"
 
@@ -57,7 +56,6 @@ class TestHelloWorld:
             async def echo(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=f"Echo: {req.message}")
 
-            await mesh.start()
             result = await mesh.call("echo", EchoInput(message="world"))
             assert result["reply"] == "Echo: world"
 
@@ -75,7 +73,6 @@ class TestCapabilityInference:
             async def buf(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
-            await mesh.start()
             catalog = await mesh.catalog()
 
             assert len(catalog) == 1
@@ -95,7 +92,6 @@ class TestCapabilityInference:
                 for word in req.text.split():
                     yield SummarizeChunk(delta=word)
 
-            await mesh.start()
             catalog = await mesh.catalog()
 
             assert len(catalog) == 1
@@ -117,8 +113,6 @@ class TestCatalog:
             async def b(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
-            await mesh.start()
-
             nlp = await mesh.catalog(channel="nlp")
             assert len(nlp) == 1
             assert nlp[0].name == "a"
@@ -132,8 +126,6 @@ class TestCatalog:
             @mesh.agent(AgentSpec(name="b", description="B", tags=["finance"]))
             async def b(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
-
-            await mesh.start()
 
             nlp = await mesh.catalog(tags=["nlp"])
             assert len(nlp) == 1
@@ -154,8 +146,6 @@ class TestStreaming:
                 for word in req.text.split():
                     yield SummarizeChunk(delta=word)
 
-            await mesh.start()
-
             chunks = []
             async for chunk in mesh.stream("summarizer", {"text": "one two three"}):
                 chunks.append(chunk["delta"])
@@ -163,44 +153,44 @@ class TestStreaming:
             assert chunks == ["one", "two", "three"]
 
 
-# --- Context KV ---
+# --- KV Store ---
 
 
-class TestContext:
+class TestKV:
     async def test_put_get(self):
         async with AgentMesh.local() as mesh:
-            await mesh.context.put("key1", "value1")
-            result = await mesh.context.get("key1")
+            await mesh.kv.put("key1", "value1")
+            result = await mesh.kv.get("key1")
             assert result == "value1"
 
     async def test_cas(self):
         async with AgentMesh.local() as mesh:
-            await mesh.context.put("counter", "0")
+            await mesh.kv.put("counter", "0")
 
-            async with mesh.context.cas("counter") as entry:
+            async with mesh.kv.cas("counter") as entry:
                 val = int(entry.value)
                 entry.value = str(val + 1)
 
-            result = await mesh.context.get("counter")
+            result = await mesh.kv.get("counter")
             assert result == "1"
 
     async def test_watch(self):
         async with AgentMesh.local() as mesh:
-            await mesh.context.put("key", "v0")
+            await mesh.kv.put("key", "v0")
 
             updates = []
 
             async def watcher():
-                async for value in mesh.context.watch("key"):
+                async for value in mesh.kv.watch("key"):
                     updates.append(value)
                     if value == "v2":
                         break
 
             async def updater():
                 await asyncio.sleep(0.05)
-                await mesh.context.put("key", "v1")
+                await mesh.kv.put("key", "v1")
                 await asyncio.sleep(0.05)
-                await mesh.context.put("key", "v2")
+                await mesh.kv.put("key", "v2")
 
             await asyncio.gather(
                 asyncio.wait_for(watcher(), timeout=5.0),
@@ -223,8 +213,6 @@ class TestErrors:
             async def fail(req: EchoInput) -> EchoOutput:
                 raise ValueError("intentional error")
 
-            await mesh.start()
-
             with pytest.raises(MeshError, match="intentional error"):
                 await mesh.call("fail", {"message": "boom"})
 
@@ -243,8 +231,6 @@ class TestMultipleAgents:
             async def lower(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message.lower())
 
-            await mesh.start()
-
             r1 = await mesh.call("upper", {"message": "Hello"})
             r2 = await mesh.call("lower", {"message": "Hello"})
 
@@ -257,8 +243,6 @@ class TestMultipleAgents:
             async def slow(req: EchoInput) -> EchoOutput:
                 await asyncio.sleep(0.1)
                 return EchoOutput(reply=req.message)
-
-            await mesh.start()
 
             results = await asyncio.gather(
                 mesh.call("slow", {"message": "a"}),
