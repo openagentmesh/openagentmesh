@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-17
-- **Status:** spec
+- **Status:** documented
 - **Supersedes:** ADR-0023b (type taxonomy portion only; single decorator decision stands)
 - **Source:** conversation (type taxonomy creates arbitrary classifications with confusing edge cases)
 

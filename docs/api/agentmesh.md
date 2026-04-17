@@ -83,7 +83,7 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 ```
 
-Capabilities are inferred from the handler shape at decoration time:
+Capabilities are inferred from the handler shape at decoration time. `AgentSpec` carries only human-authored metadata; `invocable` and `streaming` are never declared manually.
 
 | Handler shape | `invocable` | `streaming` | Consumer API |
 |---------------|-------------|-------------|--------------|
