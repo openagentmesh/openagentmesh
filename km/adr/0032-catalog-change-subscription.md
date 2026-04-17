@@ -2,7 +2,7 @@
 
 - **Type:** protocol
 - **Date:** 2026-04-17
-- **Status:** spec
+- **Status:** documented
 
 ## Context
 
