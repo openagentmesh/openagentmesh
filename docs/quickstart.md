@@ -10,10 +10,10 @@ pip install agentmesh
 
 ## Prerequisites
 
-Start a local NATS server in a separate terminal:
+Start a local development server in a separate terminal:
 
 ```bash
-agentmesh up
+oam mesh up
 ```
 
 ## Hello World
@@ -47,7 +47,7 @@ asyncio.run(main())
 ```
 
 !!! info "What just happened?"
-    `agentmesh up` started a local NATS server with JetStream and KV buckets. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
+    `oam mesh up` started a local development server with JetStream and KV buckets. The `@mesh.agent` decorator registered `echo` with a typed contract. `mesh.call()` discovered and invoked it, all through the message bus, not a direct function call.
 
 ## Two Separate Processes
 
@@ -142,7 +142,7 @@ Replace the default localhost connection with a connection string. Agent code is
 mesh = AgentMesh("nats://mesh.company.com:4222")
 ```
 
-> **Note:** `AgentMesh()` connects to `nats://localhost:4222` by default (your `agentmesh up` server). In staging and production, pass the connection string for your shared NATS deployment.
+> **Note:** `AgentMesh()` connects to `nats://localhost:4222` by default (your `oam mesh up` server). In staging and production, pass the connection string for your shared NATS deployment.
 
 ## Embed in an Existing App
 
@@ -238,5 +238,5 @@ contract.to_agent_card(url="https://api.company.com/agents/summarizer")
 
 | Command | Description |
 |---------|-------------|
-| `agentmesh up` | Start local NATS with JetStream and pre-created KV buckets |
-| `agentmesh status` | Show registered agents and health |
+| `oam mesh up` | Start local development server with JetStream and pre-created KV buckets |
+| `oam mesh catalog` | List registered agents |

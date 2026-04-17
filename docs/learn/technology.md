@@ -105,14 +105,14 @@ The key difference: service meshes route based on network rules (URLs, headers, 
 The agent code is identical whether you're running locally or across a multi-region cluster:
 
 ```python
-# Development: connect to agentmesh up
+# Development: connect to oam mesh up
 mesh = AgentMesh()
 
 # Production: shared NATS infrastructure
 mesh = AgentMesh("nats://mesh.company.com:4222")
 ```
 
-Run `agentmesh up` to start a local NATS server with JetStream and KV pre-configured. Your agent code doesn't change. Your interaction patterns don't change. The only thing that changes is the connection string.
+Run `oam mesh up` to start a local development server with JetStream and KV pre-configured. Your agent code doesn't change. Your interaction patterns don't change. The only thing that changes is the connection string.
 
 !!! info "Not two modes, one continuum"
     Local and production are endpoints on the same architecture. Moving from one developer experimenting locally to a team sharing a NATS cluster requires changing one line of code.

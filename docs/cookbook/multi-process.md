@@ -67,7 +67,7 @@ Start NATS, then the provider and consumer in separate terminals:
 
 ```bash
 # Terminal 1
-agentmesh up
+oam mesh up
 
 # Terminal 2
 python provider.py
@@ -85,7 +85,7 @@ AgentMesh connects agents over NATS. Ag
 
 ## How It Works
 
-Both processes connect to the NATS server started by `agentmesh up`. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
+Both processes connect to the server started by `oam mesh up`. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
 
 ```mermaid
 sequenceDiagram

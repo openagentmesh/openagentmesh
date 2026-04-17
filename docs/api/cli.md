@@ -1,29 +1,66 @@
 # CLI
 
-Command-line tools for local development.
+Command-line tools for local development and mesh interaction.
 
-## Commands
+## `oam mesh`
 
-### `mesh up`
+Manage the local mesh server.
 
-Start a local NATS server with JetStream enabled and pre-created KV buckets.
+### `oam mesh up`
+
+Start a local development server with JetStream enabled and pre-created KV buckets.
 
 ```bash
-mesh up
+oam mesh up
 ```
 
-Starts NATS on `localhost:4222` with:
+Starts on `localhost:4222` with:
 
 - JetStream enabled
 - `mesh-catalog` KV bucket
 - `mesh-registry` KV bucket
 
-### `mesh status`
+### `oam mesh down`
 
-Show registered agents and their health status.
+Stop the local development server.
 
 ```bash
-mesh status
+oam mesh down
 ```
 
-Output includes agent name, channel, health state, and last heartbeat.
+### `oam mesh catalog`
+
+List registered agents. Options mirror the Python `mesh.catalog()` API.
+
+```bash
+oam mesh catalog
+oam mesh catalog --channel finance
+```
+
+## `oam agent`
+
+Interact with individual agents.
+
+### `oam agent call`
+
+Invoke an agent and print the response.
+
+```bash
+oam agent call summarizer --data '{"text": "Hello world", "max_length": 50}'
+```
+
+### `oam agent inspect`
+
+Show an agent's full contract (schema, description, capabilities).
+
+```bash
+oam agent inspect summarizer
+```
+
+### `oam agent health`
+
+Check an agent's liveness status.
+
+```bash
+oam agent health summarizer
+```
