@@ -55,6 +55,15 @@ agents = await mesh.discover()
 agents = await mesh.discover(channel="nlp")
 ```
 
+## Catalog Cache
+
+The SDK maintains a local cache of the catalog, updated automatically via a background subscription to catalog changes. This enables:
+
+- **Pre-flight capability checks.** `mesh.call()` and `mesh.stream()` verify the target agent's capabilities before sending a request, avoiding a wasted round trip on capability mismatch.
+- **Fast `mesh.catalog()` reads.** No KV fetch on every call; the cache is always current within milliseconds.
+
+Local agents (registered on the same mesh instance) are seeded into the cache immediately on registration. Remote agents appear in the cache as soon as the catalog change subscription delivers the update.
+
 ## Design Rationale
 
 The two-tier approach avoids the common pitfalls:
@@ -62,3 +71,4 @@ The two-tier approach avoids the common pitfalls:
 - **No RAG needed.** The catalog is small enough for direct LLM consumption.
 - **No over-fetching.** You only pull full schemas for agents you intend to call.
 - **CAS consistency.** Concurrent registrations retry read-modify-write until the KV revision matches.
+- **Eventually consistent catalog.** The cache may be momentarily stale (milliseconds). Handler-side enforcement covers the gap for capability checks.

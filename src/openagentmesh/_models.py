@@ -139,3 +139,49 @@ class MeshError(Exception):
         import json
 
         return json.dumps(self.to_dict()).encode()
+
+
+class StreamingNotSupported(MeshError):
+    """Raised when ``mesh.stream()`` targets a buffered agent (ADR-0005)."""
+
+    def __init__(self, agent: str = "", request_id: str = ""):
+        super().__init__(
+            code="streaming_not_supported",
+            message=f"Agent '{agent}' does not support streaming",
+            agent=agent,
+            request_id=request_id,
+        )
+
+
+class BufferedNotSupported(MeshError):
+    """Raised when ``mesh.call()`` targets a streaming-only agent (ADR-0005)."""
+
+    def __init__(self, agent: str = "", request_id: str = ""):
+        super().__init__(
+            code="buffered_not_supported",
+            message=f"Agent '{agent}' is streaming-only; use mesh.stream() instead",
+            agent=agent,
+            request_id=request_id,
+        )
+
+
+class ChunkSequenceError(MeshError):
+    """Raised when stream chunks arrive out of order (ADR-0005)."""
+
+    def __init__(
+        self,
+        agent: str = "",
+        request_id: str = "",
+        details: dict[str, Any] | None = None,
+    ):
+        details = details or {}
+        super().__init__(
+            code="chunk_sequence_error",
+            message=(
+                f"Expected chunk seq {details.get('expected_seq', '?')}, "
+                f"got {details.get('got_seq', '?')}"
+            ),
+            agent=agent,
+            request_id=request_id,
+            details=details,
+        )
