@@ -58,3 +58,6 @@ site/
 
 # Git worktrees
 .worktrees/
+
+# CLI per-project mesh URL
+.oam-url

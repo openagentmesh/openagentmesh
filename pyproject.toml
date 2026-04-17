@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mesh = "openagentmesh.cli:app"
+oam = "openagentmesh.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.9.27,<0.10.0"]
