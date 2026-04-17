@@ -1,24 +1,30 @@
 # OpenAgentMesh
 
+> Service mesh for multi-agent architectures, with the simplicity of a REST endpoint
+
 ```python
+import asyncio
 from openagentmesh import AgentMesh
 from pydantic import BaseModel
-
-mesh = AgentMesh()
 
 class Summary(BaseModel):
     text: str
 
-@mesh.agent(name="summarizer", channel="nlp",
-            description="Summarizes text to a target length.")
-async def summarize(req: dict) -> Summary:
-    return Summary(text=req["content"][:100] + "...")
+async def main():
+    async with AgentMesh.local() as mesh:
 
-# From anywhere on the mesh:
-result = await mesh.call("summarizer", {"content": "A long document..."})
+        @mesh.agent(name="summarizer", channel="nlp",
+                    description="Summarizes text to a target length.")
+        async def summarize(req: dict) -> Summary:
+            return Summary(text=req["content"][:100] + "...")
+
+        await mesh.start()
+        result = await mesh.call("summarizer", {"content": "A long document..."})
+
+asyncio.run(main())
 ```
 
-Two agents. One shared bus. No imports between them, no HTTP servers, no shared packages. The `@mesh.agent` decorator registered a typed contract on a NATS message bus. Any agent on the mesh discovered it by name and called it. The caller never imported the provider's code; it only knew the name.
+Two agents. One embedded mesh server. No imports between them, no HTTP servers, no shared packages. `AgentMesh.local()` started an embedded server with everything pre-configured. The `@mesh.agent` decorator registered a typed contract. `mesh.call()` discovered the agent by name and invoked it. The caller never imported the provider's code; it only knew the name.
 
 ## Why OpenAgentMesh
 
@@ -48,10 +54,10 @@ async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
 
-**Same Code, Any Scale.** Run `agentmesh up` to start a local NATS server, then connect with `AgentMesh()`. Point at shared infrastructure with a connection string. The agent code is identical.
+**Same Code, Any Scale.** Run `oam mesh up` to start a local development server, then connect with `AgentMesh()`. Point at shared infrastructure with a connection string. The agent code is identical.
 
 ```python
-mesh = AgentMesh()                               # dev (after agentmesh up)
+mesh = AgentMesh()                               # dev (after oam mesh up)
 mesh = AgentMesh("nats://mesh.company.com:4222") # production
 ```
 
