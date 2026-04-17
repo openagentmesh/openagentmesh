@@ -39,3 +39,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0029](0029-async-callback-consumption-api.md) | Async callback consumption API | discussion | |
 | [ADR-0030](0030-agentspec-model-for-decorator.md) | `AgentSpec` Pydantic model as single decorator argument | documented | feature/core-sdk |
 | [ADR-0031](0031-capabilities-over-type-taxonomy.md) | Capabilities over type taxonomy (supersedes ADR-0023b type portion) | documented | feature/core-sdk |
+| [ADR-0032](0032-catalog-change-subscription.md) | Catalog change subscription for client-side capability cache | spec | feature/streaming-protocol |
