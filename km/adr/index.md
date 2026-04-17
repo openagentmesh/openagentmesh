@@ -28,12 +28,14 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0019](0019-differentiate-oam-from-mcp-on-topology.md) | Differentiate OAM from MCP on topology, not sync/async | documented | |
 | [ADR-0020](0020-distinguish-catalog-filtering-from-nats-wildcards.md) | Distinguish SDK catalog filtering from NATS subject wildcards | discussion | |
 | [ADR-0021](0021-consolidate-jetstream-bucket-specification.md) | Consolidate JetStream bucket specification | discussion | |
-| [ADR-0022](0022-local-as-async-context-manager.md) | Make `AgentMesh.local()` an async context manager for tests and demos | spec | |
+| [ADR-0022](0022-local-as-async-context-manager.md) | Make `AgentMesh.local()` an async context manager for tests and demos | spec | feature/core-sdk |
 | [ADR-0023](0023-llm-cost-model-and-usage-attribution.md) | LLM cost model and usage attribution | spec | |
-| [ADR-0023b](0023-single-decorator-with-type-taxonomy.md) | Single `@mesh.agent` decorator with type taxonomy _(numbering conflict, to be renumbered)_ | spec | |
-| [ADR-0024](0024-streaming-or-buffered-handler-contract.md) | Streaming or buffered as a per-agent handler choice, both typed | spec | |
+| [ADR-0023b](0023-single-decorator-with-type-taxonomy.md) | Single `@mesh.agent` decorator with type taxonomy _(numbering conflict, to be renumbered)_ | type taxonomy superseded by ADR-0031 | |
+| [ADR-0024](0024-streaming-or-buffered-handler-contract.md) | Streaming or buffered as a per-agent handler choice, both typed | spec | feature/core-sdk |
 | [ADR-0025](0025-public-api-for-shared-context-kv.md) | Public API for shared context KV (`mesh-context` bucket) | discussion | |
 | [ADR-0026](0026-handler-access-to-mesh-from-separate-modules.md) | Handler access to mesh services from separate modules | discussion | |
 | [ADR-0027](0027-object-store-workspace-lifecycle-and-scoping.md) | Object Store workspace lifecycle and scoping | discussion | |
-| [ADR-0028](0028-catalog-entry-pydantic-model.md) | `mesh.catalog()` returns typed `CatalogEntry` Pydantic models | spec | |
+| [ADR-0028](0028-catalog-entry-pydantic-model.md) | `mesh.catalog()` returns typed `CatalogEntry` Pydantic models | spec | feature/core-sdk |
 | [ADR-0029](0029-async-callback-consumption-api.md) | Async callback consumption API | discussion | |
+| [ADR-0030](0030-agentspec-model-for-decorator.md) | `AgentSpec` Pydantic model as single decorator argument | spec | feature/core-sdk |
+| [ADR-0031](0031-capabilities-over-type-taxonomy.md) | Capabilities over type taxonomy (supersedes ADR-0023b type portion) | spec | feature/core-sdk |
