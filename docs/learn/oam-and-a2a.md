@@ -13,8 +13,9 @@ from openagentmesh import AgentMesh
 mesh = AgentMesh("nats://mesh.company.com:4222")
 contract = await mesh.contract("summarizer")
 
-# Project to A2A Agent Card for external federation
-agent_card = contract.to_agent_card(url="https://api.company.com/agents/summarizer")
+# The contract is already A2A-compatible.
+# A future to_agent_card() method will project it
+# with a url injected at federation boundaries.
 ```
 
 ## Contract compatibility
@@ -38,30 +39,20 @@ OAM contracts are an **A2A-compatible superset**. The contract schema places A2A
     }
   ],
   "x-agentmesh": {
-    "type": "agent",
     "channel": "nlp",
     "subject": "mesh.agent.nlp.summarizer",
-    "sla": { "expected_latency_ms": 5000, "timeout_ms": 30000 }
+    "tags": ["text", "summarization"]
   }
 }
 ```
 
-The `to_agent_card()` method is a **thin projection**, not a conversion. It strips the `x-agentmesh` extension and injects the `url` field, the only A2A field that isn't stored in the OAM registry (it's gateway-provided at the federation boundary).
+The projection from OAM contract to A2A Agent Card is a **thin operation**: strip the `x-agentmesh` extension and inject the `url` field. The `url` is the only A2A field not stored in the OAM registry, because it's gateway-provided at the federation boundary.
 
 ## The `url` field
 
-Internally, agents are addressed by NATS subject (`mesh.agent.nlp.summarizer`). They don't have HTTP URLs. When you expose an agent externally via an A2A-compatible gateway, the gateway assigns the URL:
+Internally, agents are addressed by NATS subject (`mesh.agent.nlp.summarizer`). They don't have HTTP URLs. When you expose an agent externally via an A2A-compatible gateway, the gateway assigns the URL.
 
-```python
-# Internal: no URL needed
-contract = await mesh.contract("summarizer")
-
-# External: gateway provides the URL
-card = contract.to_agent_card(url="https://gateway.company.com/agents/summarizer")
-
-# Without a URL, the card is still valid -- just not routable over HTTP
-card_no_url = contract.to_agent_card()
-```
+The contract's `to_registry_json()` method already produces A2A-compatible JSON. A dedicated `to_agent_card()` convenience method is planned.
 
 ## When to use which
 
@@ -69,8 +60,8 @@ card_no_url = contract.to_agent_card()
 |----------|----------|
 | Agents within your team | OAM |
 | Agents across teams in the same org | OAM |
-| Agents exposed to partner organizations | A2A (via `to_agent_card()`) |
-| Agents on a public agent directory | A2A (via `to_agent_card()`) |
+| Agents exposed to partner organizations | A2A (via contract projection) |
+| Agents on a public agent directory | A2A (via contract projection) |
 
 !!! info "One contract, two protocols"
     You write one agent, register one contract, and project it to A2A format only at the boundary where internal meets external. No duplication, no drift.

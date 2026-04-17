@@ -19,6 +19,7 @@ Starts on `localhost:4222` with:
 - JetStream enabled
 - `mesh-catalog` KV bucket
 - `mesh-registry` KV bucket
+- `mesh-context` KV bucket
 
 ### `oam mesh down`
 

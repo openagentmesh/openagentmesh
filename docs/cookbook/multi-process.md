@@ -8,7 +8,7 @@ The most common deployment: one process provides an agent, another discovers and
 
 ```python
 from pydantic import BaseModel
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()
 
@@ -19,11 +19,13 @@ class SummarizeInput(BaseModel):
 class SummarizeOutput(BaseModel):
     summary: str
 
-@mesh.agent(
+spec = AgentSpec(
     name="summarizer",
     channel="nlp",
     description="Summarizes text to a target length. Input: raw text and optional max_length. Not for structured data extraction.",
 )
+
+@mesh.agent(spec)
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     # Your logic here -- call an LLM, run extractive summarization, anything.
     truncated = req.text[: req.max_length]
@@ -42,21 +44,18 @@ from openagentmesh import AgentMesh
 
 async def main():
     mesh = AgentMesh()
-    await mesh.start()
+    async with mesh:
+        # Browse the mesh
+        catalog = await mesh.catalog()
+        for entry in catalog:
+            print(f"{entry.name} - {entry.description}")
 
-    # Browse the mesh
-    catalog = await mesh.catalog()
-    for entry in catalog:
-        print(f"{entry['name']} - {entry['description']}")
-
-    # Call by name
-    result = await mesh.call(
-        "summarizer",
-        {"text": "AgentMesh connects agents over NATS. Agents register, discover, and invoke each other at runtime.", "max_length": 40},
-    )
-    print(result["summary"])
-
-    await mesh.stop()
+        # Call by name
+        result = await mesh.call(
+            "summarizer",
+            {"text": "AgentMesh connects agents over NATS. Agents register, discover, and invoke each other at runtime.", "max_length": 40},
+        )
+        print(result["summary"])
 
 asyncio.run(main())
 ```
@@ -97,7 +96,7 @@ sequenceDiagram
     Provider->>NATS: Subscribe to mesh.agent.nlp.summarizer
 
     Consumer->>NATS: mesh.catalog()
-    NATS-->>Consumer: [{name: "summarizer", ...}]
+    NATS-->>Consumer: [CatalogEntry(name="summarizer", ...)]
 
     Consumer->>NATS: mesh.call("summarizer", payload)
     NATS->>Provider: Deliver request

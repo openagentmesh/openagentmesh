@@ -32,7 +32,7 @@ When multiple instances of the same agent connect to the mesh, NATS automaticall
 
 ```python
 # Deploy 3 instances of the same agent -- NATS handles the rest
-@mesh.agent(name="summarizer", channel="nlp", description="...")
+@mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="..."))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 
@@ -55,7 +55,7 @@ class SummarizeOutput(BaseModel):
     summary: str
     token_count: int
 
-@mesh.agent(name="summarizer", channel="nlp", description="...")
+@mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="..."))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 # The decorator introspects type hints, generates JSON Schemas,

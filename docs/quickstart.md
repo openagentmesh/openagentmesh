@@ -5,7 +5,7 @@ Two agents discovering and calling each other in under 30 lines.
 ## Installation
 
 ```bash
-pip install agentmesh
+pip install openagentmesh
 ```
 
 ## Prerequisites
@@ -23,7 +23,7 @@ One file. Two agents. One calls the other.
 ```python
 import asyncio
 from pydantic import BaseModel
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()  # connects to localhost:4222
 
@@ -33,15 +33,16 @@ class EchoInput(BaseModel):
 class EchoOutput(BaseModel):
     reply: str
 
-@mesh.agent(name="echo", description="Echoes a message back.")
+spec = AgentSpec(name="echo", description="Echoes a message back.")
+
+@mesh.agent(spec)
 async def echo(req: EchoInput) -> EchoOutput:
     return EchoOutput(reply=f"Echo: {req.message}")
 
 async def main():
-    await mesh.start()
-    result = await mesh.call("echo", {"message": "hello"})
-    print(result["reply"])  # Echo: hello
-    await mesh.stop()
+    async with mesh:
+        result = await mesh.call("echo", {"message": "hello"})
+        print(result["reply"])  # Echo: hello
 
 asyncio.run(main())
 ```
@@ -57,7 +58,7 @@ The more realistic case: provider and consumer run independently.
 
 ```python
 from pydantic import BaseModel
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()
 
@@ -68,11 +69,13 @@ class SummarizeInput(BaseModel):
 class SummarizeOutput(BaseModel):
     summary: str
 
-@mesh.agent(
+spec = AgentSpec(
     name="summarizer",
     channel="nlp",
     description="Summarizes text to a target length. Input: raw text. Not for structured data.",
 )
+
+@mesh.agent(spec)
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     # Use any LLM framework, any model, any logic here.
     truncated = req.text[: req.max_length]
@@ -89,21 +92,18 @@ from openagentmesh import AgentMesh
 
 async def main():
     mesh = AgentMesh()
-    await mesh.start()
+    async with mesh:
+        # See what's on the mesh
+        catalog = await mesh.catalog()
+        for entry in catalog:
+            print(entry.name, "-", entry.description)
 
-    # See what's on the mesh
-    catalog = await mesh.catalog()
-    for entry in catalog:
-        print(entry["name"], "-", entry["description"])
-
-    # Call by name
-    result = await mesh.call(
-        "summarizer",
-        {"text": "AgentMesh is a protocol for agent-to-agent communication.", "max_length": 50},
-    )
-    print(result["summary"])
-
-    await mesh.stop()
+        # Call by name
+        result = await mesh.call(
+            "summarizer",
+            {"text": "AgentMesh is a protocol for agent-to-agent communication.", "max_length": 50},
+        )
+        print(result["summary"])
 
 asyncio.run(main())
 ```
@@ -120,8 +120,13 @@ python consumer.py
 Channels are namespace prefixes that group agents by domain or team.
 
 ```python
-@mesh.agent(name="scorer", channel="finance.risk",
-            description="Scores credit risk from a company profile.")
+spec = AgentSpec(
+    name="scorer",
+    channel="finance.risk",
+    description="Scores credit risk from a company profile.",
+)
+
+@mesh.agent(spec)
 async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
@@ -146,13 +151,12 @@ mesh = AgentMesh("nats://mesh.company.com:4222")
 
 ## Embed in an Existing App
 
-Use `await mesh.start()` / `await mesh.stop()` instead of `mesh.run()` to embed the mesh in an existing async application.
+Use `async with mesh:` instead of `mesh.run()` to embed the mesh in an existing async application.
 
 ```python
 async def lifespan(app):
-    await mesh.start()
-    yield
-    await mesh.stop()
+    async with mesh:
+        yield
 ```
 
 ## Async Callback Invocation
@@ -173,21 +177,26 @@ await mesh.send(
 
 ## LLM Tool Definitions
 
-Convert any agent contract to an LLM-ready tool definition.
+Fetch an agent's full contract and use its schemas for LLM tool injection.
 
 ```python
 contract = await mesh.contract("summarizer")
 
-contract.to_openai_tool()      # OpenAI function calling format
-contract.to_anthropic_tool()   # Anthropic tool use format
-contract.to_generic_tool()     # Generic JSON Schema format
-contract.to_agent_card()       # A2A Agent Card format
+# Access schemas directly
+contract.input_schema    # JSON Schema dict for the input model
+contract.output_schema   # JSON Schema dict for the output model
+contract.description     # LLM-consumable description
 ```
 
-Pass `url=` to `to_agent_card()` when exposing the agent at a federation boundary:
+Build tool definitions for your LLM provider:
 
 ```python
-contract.to_agent_card(url="https://api.company.com/agents/summarizer")
+# Example: construct an Anthropic tool definition
+tool = {
+    "name": contract.name,
+    "description": contract.description,
+    "input_schema": contract.input_schema,
+}
 ```
 
 ## Reference
@@ -200,39 +209,39 @@ contract.to_agent_card(url="https://api.company.com/agents/summarizer")
 | `AgentMesh()` | Connect to localhost:4222 (default) |
 | `async with AgentMesh.local() as mesh:` | Embedded NATS for tests and demos |
 | `mesh.run()` | Start event loop, block until interrupted |
-| `await mesh.start()` | Start non-blocking (for embedding) |
-| `await mesh.stop()` | Graceful shutdown: drain → deregister → disconnect |
+| `async with mesh:` | Connect, subscribe agents, and serve. Disconnects on exit. |
 
 ### Registration
 
 | Method | Description |
 |--------|-------------|
-| `@mesh.agent(name, description, channel=None, tags=[])` | Register an async function as a mesh agent |
-| `mesh.register(name, description, handler, input_model, output_model, channel=None)` | Imperative registration |
+| `@mesh.agent(spec)` | Register an async function as a mesh agent. `spec` is an `AgentSpec` instance. |
 
 ### Invocation
 
 | Method | Description |
 |--------|-------------|
-| `await mesh.call(name, payload, timeout=30.0)` | Synchronous request/reply |
+| `await mesh.call(name, payload, timeout=30.0)` | Synchronous request/reply. Returns `dict`. |
+| `async for chunk in mesh.stream(name, payload)` | Streaming request. Yields `dict` chunks. |
 | `await mesh.send(name, payload, reply_to)` | Async callback, non-blocking |
 
 ### Discovery
 
 | Method | Description |
 |--------|-------------|
-| `await mesh.catalog(channel=None, tags=None)` | Lightweight listing (name, description, version, tags) |
+| `await mesh.catalog(channel=None, tags=None)` | Returns `list[CatalogEntry]` (name, description, version, tags, invocable, streaming) |
 | `await mesh.discover(channel=None)` | Full `AgentContract` objects |
 | `await mesh.contract(name)` | Single agent's full contract (authoritative) |
 
-### AgentContract
+### AgentSpec
 
-| Method | Description |
-|--------|-------------|
-| `.to_openai_tool()` | OpenAI function calling format |
-| `.to_anthropic_tool()` | Anthropic tool use format |
-| `.to_generic_tool()` | Generic JSON Schema format |
-| `.to_agent_card(url=None)` | A2A Agent Card format |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | required | Agent name |
+| `description` | `str` | required | LLM-consumable description |
+| `channel` | `str \| None` | `None` | Namespace prefix |
+| `tags` | `list[str]` | `[]` | Searchable tags |
+| `version` | `str` | `"0.1.0"` | Semver version |
 
 ### CLI
 
