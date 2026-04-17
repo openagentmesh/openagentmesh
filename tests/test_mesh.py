@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, MeshError
+from openagentmesh._models import BufferedNotSupported, StreamingNotSupported
 
 
 # --- Test models ---
@@ -252,3 +253,144 @@ class TestMultipleAgents:
 
             replies = sorted(r["reply"] for r in results)
             assert replies == ["a", "b", "c"]
+
+
+# --- Capability enforcement (ADR-0005) ---
+
+
+class TestCapabilityEnforcement:
+    async def test_stream_buffered_agent_raises(self):
+        """mesh.stream() against a buffered agent raises StreamingNotSupported."""
+        spec = AgentSpec(name="buffered", description="Buffered agent")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def buffered(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            with pytest.raises(StreamingNotSupported):
+                async for chunk in mesh.stream("buffered", {"message": "hi"}):
+                    pass
+
+    async def test_call_streaming_agent_raises(self):
+        """mesh.call() against a streaming-only agent raises BufferedNotSupported."""
+        spec = AgentSpec(name="streamer", description="Streaming agent")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def streamer(req: SummarizeInput) -> SummarizeChunk:
+                for word in req.text.split():
+                    yield SummarizeChunk(delta=word)
+
+            with pytest.raises(BufferedNotSupported):
+                await mesh.call("streamer", {"text": "hello world"})
+
+
+# --- Streaming error propagation (ADR-0005) ---
+
+
+class TestStreamingErrors:
+    async def test_handler_error_during_streaming(self):
+        """Generator error mid-stream propagates to client as MeshError."""
+        spec = AgentSpec(name="failing-stream", description="Fails mid-stream")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def failing_stream(req: SummarizeInput) -> SummarizeChunk:
+                yield SummarizeChunk(delta="first")
+                raise ValueError("mid-stream failure")
+
+            chunks = []
+            with pytest.raises(MeshError, match="mid-stream failure"):
+                async for chunk in mesh.stream("failing-stream", {"text": "hello"}):
+                    chunks.append(chunk["delta"])
+
+            assert chunks == ["first"]
+
+
+# --- Catalog change subscription (ADR-0032) ---
+
+
+class TestCatalogSubscription:
+    async def test_cache_populated_on_connect(self):
+        """Local agents appear in _catalog_cache immediately after subscription."""
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(AgentSpec(name="echo", description="Echo"))
+            async def echo(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            # _subscribe_pending seeds cache synchronously for local agents
+            await mesh._subscribe_pending()
+
+            assert "echo" in mesh._catalog_cache
+            assert mesh._catalog_cache["echo"].streaming is False
+
+    async def test_remote_agent_appears_in_cache(self):
+        """Agent registered on mesh1 appears in mesh2's catalog cache."""
+        from openagentmesh._local import EmbeddedNats
+
+        embedded = EmbeddedNats()
+        await embedded.start()
+        try:
+            mesh1 = AgentMesh(url=embedded.url)
+            mesh2 = AgentMesh(url=embedded.url)
+
+            async with mesh1, mesh2:
+                @mesh1.agent(AgentSpec(name="remote-echo", description="Remote echo"))
+                async def remote_echo(req: EchoInput) -> EchoOutput:
+                    return EchoOutput(reply=req.message)
+
+                await mesh1._subscribe_pending()
+
+                # Wait for mesh2's watcher to pick up the catalog change
+                for _ in range(50):
+                    if "remote-echo" in mesh2._catalog_cache:
+                        break
+                    await asyncio.sleep(0.05)
+
+                assert "remote-echo" in mesh2._catalog_cache
+                assert mesh2._catalog_cache["remote-echo"].streaming is False
+        finally:
+            await embedded.stop()
+
+    async def test_catalog_reads_from_cache(self):
+        """mesh.catalog() returns entries from the cache."""
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(AgentSpec(name="a", channel="nlp", description="A"))
+            async def a(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            # catalog() calls _subscribe_pending() which seeds cache
+            entries = await mesh.catalog()
+            assert len(entries) == 1
+            assert entries[0].name == "a"
+
+    async def test_capability_check_uses_cache_for_remote(self):
+        """Pre-flight check works for agents only known via catalog cache."""
+        from openagentmesh._local import EmbeddedNats
+
+        embedded = EmbeddedNats()
+        await embedded.start()
+        try:
+            mesh1 = AgentMesh(url=embedded.url)
+            mesh2 = AgentMesh(url=embedded.url)
+
+            async with mesh1, mesh2:
+                @mesh1.agent(AgentSpec(name="remote-buf", description="Buffered"))
+                async def remote_buf(req: EchoInput) -> EchoOutput:
+                    return EchoOutput(reply=req.message)
+
+                await mesh1._subscribe_pending()
+
+                # Wait for cache
+                for _ in range(50):
+                    if "remote-buf" in mesh2._catalog_cache:
+                        break
+                    await asyncio.sleep(0.05)
+
+                # mesh2 knows remote-buf is buffered via cache
+                with pytest.raises(StreamingNotSupported):
+                    async for _ in mesh2.stream("remote-buf", {"message": "hi"}):
+                        pass
+        finally:
+            await embedded.stop()
