@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
@@ -24,8 +25,11 @@ from ._models import (
     CatalogEntry,
     ChunkSequenceError,
     MeshError,
+    MeshTimeout,
     StreamingNotSupported,
 )
+
+_log = logging.getLogger("openagentmesh")
 
 _CATALOG_BUCKET = "mesh-catalog"
 _REGISTRY_BUCKET = "mesh-registry"
@@ -532,6 +536,85 @@ class AgentMesh:
         finally:
             await sub.unsubscribe()
 
+    async def subscribe(
+        self,
+        *,
+        agent: str | None = None,
+        channel: str | None = None,
+        subject: str | None = None,
+        timeout: float | None = None,
+    ) -> AsyncIterator[dict]:
+        """Subscribe to events on a subject, agent, or channel.
+
+        Yields dicts parsed from incoming JSON messages. The generator
+        terminates when a message with ``X-Mesh-Stream-End: true`` arrives,
+        or when the caller breaks out of the loop.
+
+        Exactly one of *agent*, *channel*, or *subject* must be provided
+        (agent and channel can be combined to override the agent's default
+        channel).
+        """
+        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
+
+        # --- parameter validation ---
+        if agent and subject:
+            raise ValueError("'agent' and 'subject' are mutually exclusive")
+        if not agent and not channel and not subject:
+            raise ValueError("Provide 'agent', 'channel', or 'subject'")
+
+        # --- resolve target subject ---
+        if subject:
+            resolved = subject
+        elif agent:
+            resolved = self._resolve_event_subject(agent, channel)
+        else:
+            # channel only
+            resolved = f"mesh.agent.{channel}.>"
+
+        # --- queue-based async generator ---
+        items: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
+
+        async def _on_msg(msg: nats.aio.msg.Msg) -> None:
+            is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
+            is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
+
+            if is_error and msg.data:
+                err = json.loads(msg.data)
+                await items.put(MeshError(
+                    code=err.get("code", "unknown"),
+                    message=err.get("message", "Unknown error"),
+                    agent=err.get("agent", ""),
+                    request_id=err.get("request_id", ""),
+                    details=err.get("details", {}),
+                ))
+                return
+
+            if msg.data:
+                await items.put(json.loads(msg.data))
+
+            if is_end:
+                await items.put(None)
+
+        sub = await self._nc.subscribe(resolved, cb=_on_msg)
+
+        try:
+            while True:
+                if timeout is not None:
+                    try:
+                        item = await asyncio.wait_for(items.get(), timeout=timeout)
+                    except asyncio.TimeoutError:
+                        raise MeshTimeout(subject=resolved, timeout=timeout)
+                else:
+                    item = await items.get()
+
+                if item is None:
+                    break
+                if isinstance(item, MeshError):
+                    raise item
+                yield item
+        finally:
+            await sub.unsubscribe()
+
     async def send(
         self, name: str, payload: Any = None, reply_to: str | None = None
     ) -> None:
@@ -657,6 +740,24 @@ class AgentMesh:
             _, _, contract = self._agents[name]
             return contract.subject
         return f"mesh.agent.{name}"
+
+    def _resolve_event_subject(self, name: str, channel: str | None = None) -> str:
+        """Resolve an agent name to its event subject."""
+        if name in self._agents:
+            spec, _, _ = self._agents[name]
+            ch = channel or spec.channel
+            if ch:
+                return f"mesh.agent.{ch}.{name}.events"
+            return f"mesh.agent.{name}.events"
+
+        entry = self._catalog_cache.get(name)
+        if entry is not None:
+            ch = channel or entry.channel
+            if ch:
+                return f"mesh.agent.{ch}.{name}.events"
+            return f"mesh.agent.{name}.events"
+
+        raise MeshError(code="not_found", message=f"Agent '{name}' not found")
 
     @staticmethod
     def _serialize_payload(payload: Any) -> bytes:
