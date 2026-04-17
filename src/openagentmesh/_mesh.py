@@ -550,16 +550,16 @@ class AgentMesh:
         terminates when a message with ``X-Mesh-Stream-End: true`` arrives,
         or when the caller breaks out of the loop.
 
-        Exactly one of *agent*, *channel*, or *subject* must be provided
-        (agent and channel can be combined to override the agent's default
-        channel).
+        At least one of *agent*, *channel*, or *subject* must be provided.
+        *agent* and *subject* are mutually exclusive. *channel* can be
+        combined with *agent* to override the agent's registered channel.
         """
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
 
         # --- parameter validation ---
-        if agent and subject:
+        if agent is not None and subject is not None:
             raise ValueError("'agent' and 'subject' are mutually exclusive")
-        if not agent and not channel and not subject:
+        if agent is None and channel is None and subject is None:
             raise ValueError("Provide 'agent', 'channel', or 'subject'")
 
         # --- resolve target subject ---
