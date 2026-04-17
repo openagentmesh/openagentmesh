@@ -35,28 +35,30 @@ async with AgentMesh.local() as mesh:
 
 ## Lifecycle
 
+### `async with mesh:`
+
+Primary lifecycle pattern. Connects to NATS, subscribes registered agents, and disconnects on exit. Agents declared inside the block are lazily subscribed on first `call`/`catalog`.
+
+```python
+async with mesh:
+    result = await mesh.call("echo", {"message": "hello"})
+```
+
+Embedding in an existing async application (e.g. FastAPI lifespan):
+
+```python
+async def lifespan(app):
+    async with mesh:
+        yield
+```
+
 ### `mesh.run()`
 
-Start the event loop and block until interrupted. Similar to `uvicorn.run()`.
+Blocking alternative. Start the event loop and block until interrupted. Similar to `uvicorn.run()`.
 
 ```python
 mesh.run()
 ```
-
-### `await mesh.start()`
-
-Start in non-blocking mode. Use this to embed the mesh in an existing async application.
-
-```python
-async def lifespan(app):
-    await mesh.start()
-    yield
-    await mesh.stop()
-```
-
-### `await mesh.stop()`
-
-Graceful shutdown: unsubscribe, drain, deregister, disconnect.
 
 ## Registration
 
@@ -183,19 +185,19 @@ contract.streaming        # False
 
 Shared KV store for structured data exchange between agents.
 
-### `await mesh.context.put(key, value)`
+### `await mesh.kv.put(key, value)`
 
 Store a value.
 
-### `await mesh.context.get(key)`
+### `await mesh.kv.get(key)`
 
 Retrieve a value by key. Returns `str`.
 
-### `async with mesh.context.cas(key) as entry`
+### `async with mesh.kv.cas(key) as entry`
 
 Single-attempt compare-and-swap. Read `entry.value`, modify it, and the new value is written on exit with CAS semantics. For concurrent access, use `update()` instead.
 
-### `await mesh.context.update(key, fn)`
+### `await mesh.kv.update(key, fn)`
 
 CAS update with automatic retry. `fn` receives the current value and returns the new value. On revision conflict, the value is re-read and `fn` is called again.
 
@@ -203,9 +205,9 @@ CAS update with automatic retry. `fn` receives the current value and returns the
 def increment(value: str) -> str:
     return str(int(value) + 1)
 
-await mesh.context.update("counter", increment)
+await mesh.kv.update("counter", increment)
 ```
 
-### `async for value in mesh.context.watch(key)`
+### `async for value in mesh.kv.watch(key)`
 
 Watch a key for changes. Yields the new value on each update.

@@ -40,10 +40,9 @@ async def echo(req: EchoInput) -> EchoOutput:
     return EchoOutput(reply=f"Echo: {req.message}")
 
 async def main():
-    await mesh.start()
-    result = await mesh.call("echo", {"message": "hello"})
-    print(result["reply"])  # Echo: hello
-    await mesh.stop()
+    async with mesh:
+        result = await mesh.call("echo", {"message": "hello"})
+        print(result["reply"])  # Echo: hello
 
 asyncio.run(main())
 ```
@@ -93,21 +92,18 @@ from openagentmesh import AgentMesh
 
 async def main():
     mesh = AgentMesh()
-    await mesh.start()
+    async with mesh:
+        # See what's on the mesh
+        catalog = await mesh.catalog()
+        for entry in catalog:
+            print(entry.name, "-", entry.description)
 
-    # See what's on the mesh
-    catalog = await mesh.catalog()
-    for entry in catalog:
-        print(entry.name, "-", entry.description)
-
-    # Call by name
-    result = await mesh.call(
-        "summarizer",
-        {"text": "AgentMesh is a protocol for agent-to-agent communication.", "max_length": 50},
-    )
-    print(result["summary"])
-
-    await mesh.stop()
+        # Call by name
+        result = await mesh.call(
+            "summarizer",
+            {"text": "AgentMesh is a protocol for agent-to-agent communication.", "max_length": 50},
+        )
+        print(result["summary"])
 
 asyncio.run(main())
 ```
@@ -155,13 +151,12 @@ mesh = AgentMesh("nats://mesh.company.com:4222")
 
 ## Embed in an Existing App
 
-Use `await mesh.start()` / `await mesh.stop()` instead of `mesh.run()` to embed the mesh in an existing async application.
+Use `async with mesh:` instead of `mesh.run()` to embed the mesh in an existing async application.
 
 ```python
 async def lifespan(app):
-    await mesh.start()
-    yield
-    await mesh.stop()
+    async with mesh:
+        yield
 ```
 
 ## Async Callback Invocation
@@ -214,8 +209,7 @@ tool = {
 | `AgentMesh()` | Connect to localhost:4222 (default) |
 | `async with AgentMesh.local() as mesh:` | Embedded NATS for tests and demos |
 | `mesh.run()` | Start event loop, block until interrupted |
-| `await mesh.start()` | Start non-blocking (for embedding) |
-| `await mesh.stop()` | Graceful shutdown: drain, deregister, disconnect |
+| `async with mesh:` | Connect, subscribe agents, and serve. Disconnects on exit. |
 
 ### Registration
 

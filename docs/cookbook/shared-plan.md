@@ -56,7 +56,7 @@ async def worker(req: TaskClaim) -> TaskResult:
         task.assigned_to = "worker"
         return plan.model_dump_json()
 
-    await mesh.context.update("plan-001", claim)
+    await mesh.kv.update("plan-001", claim)
 
     # Simulate doing actual work
     await asyncio.sleep(0.1)
@@ -68,7 +68,7 @@ async def worker(req: TaskClaim) -> TaskResult:
         task.status = "complete"
         return plan.model_dump_json()
 
-    await mesh.context.update("plan-001", complete)
+    await mesh.kv.update("plan-001", complete)
 
     return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
 ```
@@ -83,7 +83,7 @@ coord_spec = AgentSpec(name="coordinator", channel="dev", description="Assigns p
 @mesh.agent(coord_spec)
 async def coordinator(req: Plan) -> Plan:
     while True:
-        raw = await mesh.context.get("plan-001")
+        raw = await mesh.kv.get("plan-001")
         current_plan = Plan.model_validate_json(raw)
 
         pending = current_plan.pending_tasks()
@@ -118,12 +118,10 @@ async def main():
                 Task(id="task-5", description="Review and refactor"),
             ],
         )
-        await mesh.context.put("plan-001", plan.model_dump_json())
+        await mesh.kv.put("plan-001", plan.model_dump_json())
 
         # Register worker and coordinator agents (shown above)
         # ...
-
-        await mesh.start()
 
         # Kick off coordination
         final_plan_data = await mesh.call("coordinator", plan)
@@ -137,9 +135,9 @@ asyncio.run(main())
 
 ## How It Works
 
-- **`context.update(key, fn)`** uses compare-and-swap with automatic retry. The mutation function receives the current value and returns the new value. If another agent updated the key between the read and write, the function is called again with the fresh value.
+- **`kv.update(key, fn)`** uses compare-and-swap with automatic retry. The mutation function receives the current value and returns the new value. If another agent updated the key between the read and write, the function is called again with the fresh value.
 - **Queue groups** mean multiple worker instances share the subscription. NATS distributes requests across them.
-- **`mesh.context.watch()`** lets an observer track task transitions in real time without polling.
+- **`mesh.kv.watch()`** lets an observer track task transitions in real time without polling.
 
 ## What This Proves
 

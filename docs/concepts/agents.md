@@ -29,7 +29,7 @@ The decorator:
 
 1. Inspects the handler shape to determine capabilities
 2. Builds an `AgentContract` from the spec and handler type hints
-3. On `mesh.start()`, subscribes to a NATS queue group at `mesh.agent.{channel}.{name}`
+3. On entering the context manager, subscribes to a NATS queue group at `mesh.agent.{channel}.{name}`
 4. Deserializes and validates input via Pydantic v2
 5. Calls your handler function
 6. Serializes the response and writes the contract to the registry
@@ -78,10 +78,10 @@ async def monitor_prices() -> PriceEvent:
 
 Agents follow a predictable lifecycle:
 
-1. **Start.** `mesh.run()` (blocking) or `await mesh.start()` (non-blocking)
+1. **Start.** `mesh.run()` (blocking) or `async with mesh:` (non-blocking context manager)
 2. **Register.** Subscribe to NATS subject, write contract to KV
 3. **Serve.** Handle incoming requests via queue group
-4. **Stop.** `await mesh.stop()`: unsubscribe, drain, deregister, disconnect
+4. **Stop.** Exiting the context manager: unsubscribe, drain, deregister, disconnect
 
 ## Queue Groups
 

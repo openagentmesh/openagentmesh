@@ -6,15 +6,15 @@ Every error on the mesh is structured. No raw tracebacks, no mystery strings.
 from openagentmesh import AgentMesh, MeshError
 
 mesh = AgentMesh("nats://localhost:4222")
-await mesh.start()
 
-try:
-    result = await mesh.call("summarizer", {"text": 42})  # wrong type
-except MeshError as e:
-    print(e.code)        # "validation_error"
-    print(e.message)     # "Field 'text' expected str, got int"
-    print(e.agent)       # "summarizer"
-    print(e.request_id)  # "a1b2c3..."
+async with mesh:
+    try:
+        result = await mesh.call("summarizer", {"text": 42})  # wrong type
+    except MeshError as e:
+        print(e.code)        # "validation_error"
+        print(e.message)     # "Field 'text' expected str, got int"
+        print(e.agent)       # "summarizer"
+        print(e.request_id)  # "a1b2c3..."
 ```
 
 ## Error Envelope
