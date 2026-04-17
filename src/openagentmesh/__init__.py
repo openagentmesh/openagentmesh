@@ -8,6 +8,7 @@ from ._models import (
     CatalogEntry,
     ChunkSequenceError,
     MeshError,
+    MeshTimeout,
     StreamingNotSupported,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "CatalogEntry",
     "ChunkSequenceError",
     "MeshError",
+    "MeshTimeout",
     "StreamingNotSupported",
 ]

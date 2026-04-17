@@ -3,7 +3,7 @@
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentSpec, CatalogEntry, MeshError
+from openagentmesh import AgentSpec, CatalogEntry, MeshError, MeshTimeout
 from openagentmesh._models import (
     BufferedNotSupported,
     ChunkSequenceError,
@@ -180,3 +180,23 @@ class TestErrorSubclasses:
 
         with pytest.raises(StreamingNotSupported):
             raise StreamingNotSupported(agent="echo")
+
+
+class TestMeshTimeout:
+    def test_inherits_mesh_error(self):
+        err = MeshTimeout(subject="mesh.results.abc", timeout=30.0)
+        assert isinstance(err, MeshError)
+
+    def test_code_is_timeout(self):
+        err = MeshTimeout(subject="mesh.results.abc", timeout=30.0)
+        assert err.code == "timeout"
+
+    def test_message_includes_subject_and_timeout(self):
+        err = MeshTimeout(subject="mesh.results.abc", timeout=30.0)
+        assert "mesh.results.abc" in str(err)
+        assert "30.0" in str(err)
+
+    def test_to_dict(self):
+        err = MeshTimeout(subject="mesh.results.abc", timeout=30.0)
+        d = err.to_dict()
+        assert d["code"] == "timeout"

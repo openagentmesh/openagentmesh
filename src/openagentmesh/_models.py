@@ -185,3 +185,15 @@ class ChunkSequenceError(MeshError):
             request_id=request_id,
             details=details,
         )
+
+
+class MeshTimeout(MeshError):
+    """Raised when no message arrives within the timeout window (ADR-0034)."""
+
+    def __init__(self, subject: str, timeout: float):
+        super().__init__(
+            code="timeout",
+            message=f"No message on {subject} within {timeout}s",
+        )
+        self.subject = subject
+        self.timeout = timeout
