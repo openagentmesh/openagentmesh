@@ -2,7 +2,7 @@
 
 ## Status
 
-spec
+documented
 
 ## Context
 
@@ -40,17 +40,16 @@ oam mesh listen <channel> [--json]  # tap a channel or wildcard, stream messages
 oam agent call <name> [payload]     # invoke; payload is JSON arg or stdin
 oam agent stream <name> [payload]   # invoke streaming; chunks to stdout
 oam agent inspect <name> [--json]   # dump the contract (A2A card + x-agentmesh)
-oam agent health <name> [--json]    # two-axis health: registered + responsive
 ```
 
-### Health semantics
+### Health is deferred
 
-`oam agent health <name>` reports two independent axes:
+An `oam agent health` command is intentionally **not** part of Phase 1. The two candidate signals — NATS disconnect advisories (ADR-0016) and synthetic invocation pings — answer different questions:
 
-- **registered:** whether the agent has an entry in the catalog KV bucket.
-- **responsive:** lightweight ping via a short-timeout invocation on the agent's subject.
+- Disconnect advisories are a negative signal: "this client is definitely gone." They can't positively confirm "it is responding right now."
+- A synthetic `call(name, None)` ping runs the user's handler with an empty payload, which is noisy and surprising.
 
-This avoids inventing a new health primitive. `registered` uses the existing catalog; `responsive` uses the existing invocation path. Disconnect advisories (ADR-0016) remain the internal liveness signal; `health` is a user-facing summary over observable state.
+The right solution is a framework-level ping subject handled by the runtime instead of the user's code. That belongs to a future ADR and is out of scope here.
 
 ### `oam mesh connect` semantics
 
@@ -62,6 +61,7 @@ This avoids inventing a new health primitive. `registered` uses the existing cat
 - `oam obj` subcommands (object store).
 - Adapter plugin system for non-NATS backends.
 - Credentials and auth for remote meshes.
+- Framework-level ping subject and the resulting `oam agent health` command.
 
 ## Code samples (DX contract)
 
@@ -95,7 +95,7 @@ Second bullet
 Third bullet
 ```
 
-Inspecting and probing:
+Inspecting a contract:
 
 ```bash
 $ oam agent inspect translator --json
@@ -106,10 +106,6 @@ $ oam agent inspect translator --json
   "x-agentmesh": {"type": "tool"},
   ...
 }
-
-$ oam agent health translator
-registered: yes
-responsive: yes (8 ms)
 ```
 
 Tapping the mesh:

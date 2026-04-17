@@ -1,0 +1,33 @@
+"""Output formatting helpers for the CLI."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+
+def as_json(obj: Any) -> str:
+    """Deterministic JSON output. Pydantic-friendly via model_dump()."""
+    if hasattr(obj, "model_dump"):
+        obj = obj.model_dump(mode="json")
+    elif isinstance(obj, list) and obj and hasattr(obj[0], "model_dump"):
+        obj = [item.model_dump(mode="json") for item in obj]
+    return json.dumps(obj, indent=2, sort_keys=True, default=str)
+
+
+def table(rows: list[list[str]], headers: list[str]) -> str:
+    """Plain text table with left-aligned columns and space padding."""
+    if not rows:
+        return "  ".join(headers) + "\n(empty)"
+
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(cell))
+
+    def fmt(cells: list[str]) -> str:
+        return "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(cells)).rstrip()
+
+    lines = [fmt(headers)]
+    lines.extend(fmt(row) for row in rows)
+    return "\n".join(lines)
