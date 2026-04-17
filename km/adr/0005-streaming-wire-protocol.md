@@ -2,7 +2,7 @@
 
 - **Type:** protocol
 - **Date:** 2026-04-11
-- **Status:** spec
+- **Status:** documented
 - **Source:** km/notes/20260411_On JSON-RPC and MCP bridges.md
 
 ## Context
