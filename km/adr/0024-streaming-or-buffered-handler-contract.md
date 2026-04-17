@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** discussion
+- **Status:** documented
 - **Source:** conversation (design discussion on streaming DX, typed chunks, and SDK enforcement)
 
 ## Context

@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** spec
+- **Status:** documented
 - **Source:** conversation (cookbook design discussion on catalog consumer DX)
 
 ## Context
@@ -40,12 +40,15 @@ tagged = await mesh.catalog(tags=["summarization"])
 ```python
 class CatalogEntry(BaseModel):
     name: str
-    channel: str | None = None
     description: str
-    version: str
+    channel: str | None = None
+    version: str = "0.1.0"
     tags: list[str] = []
-    type: str = "agent"   # "agent" | "tool" | "publisher" | "mcp_bridge"
+    invocable: bool = True
+    streaming: bool = False
 ```
+
+The `type` field from the original spec was replaced by `invocable` and `streaming` capability booleans (see ADR-0031). These are inferred from the handler shape at registration time.
 
 All fields match what is already stored in the `mesh-catalog` KV key. No additional data is fetched; the model is deserialized from the existing catalog payload.
 

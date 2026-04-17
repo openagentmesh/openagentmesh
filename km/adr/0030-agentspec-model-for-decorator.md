@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-17
-- **Status:** spec
+- **Status:** documented
 - **Source:** conversation (visual scanability of multiline decorators)
 
 ## Context

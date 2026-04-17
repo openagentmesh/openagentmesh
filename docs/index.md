@@ -4,7 +4,7 @@
 
 ```python
 import asyncio
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 from pydantic import BaseModel
 
 class Summary(BaseModel):
@@ -13,8 +13,10 @@ class Summary(BaseModel):
 async def main():
     async with AgentMesh.local() as mesh:
 
-        @mesh.agent(name="summarizer", channel="nlp",
-                    description="Summarizes text to a target length.")
+        spec = AgentSpec(name="summarizer", channel="nlp",
+                         description="Summarizes text to a target length.")
+
+        @mesh.agent(spec)
         async def summarize(req: dict) -> Summary:
             return Summary(text=req["content"][:100] + "...")
 
