@@ -35,9 +35,21 @@ async with AgentMesh.local() as mesh:
 
 ## Lifecycle
 
+Two lifecycle models, one for each [participation pattern](../concepts/participation.md).
+
+### `mesh.run()`
+
+Blocking lifecycle for providers and hybrids. Connects to NATS, subscribes all registered agents, and blocks until interrupted. Similar to `uvicorn.run()`.
+
+```python
+mesh.run()
+```
+
+This is the standard entry point for any process that registers agents with `@mesh.agent`.
+
 ### `async with mesh:`
 
-Primary lifecycle pattern. Connects to NATS, subscribes registered agents, and disconnects on exit. Agents declared inside the block are lazily subscribed on first `call`/`catalog`.
+Scoped lifecycle for consumers. Connects on entry, disconnects on exit. No agent registration; used by scripts, notebooks, and orchestrators that only discover and call agents.
 
 ```python
 async with mesh:
@@ -50,14 +62,6 @@ Embedding in an existing async application (e.g. FastAPI lifespan):
 async def lifespan(app):
     async with mesh:
         yield
-```
-
-### `mesh.run()`
-
-Blocking alternative. Start the event loop and block until interrupted. Similar to `uvicorn.run()`.
-
-```python
-mesh.run()
 ```
 
 ## Registration
@@ -93,6 +97,8 @@ Capabilities are inferred from the handler shape at decoration time. `AgentSpec`
 
 ## Invocation
 
+Four interaction modes. See [Invocation](../concepts/invocation.md) for patterns and semantics.
+
 ### `await mesh.call(name, payload, *, timeout=30.0)`
 
 Synchronous request/reply. Blocks until the agent responds or times out.
@@ -117,15 +123,59 @@ Streaming request. Yields response chunks as dicts.
 
 **Yields:** `dict` chunks.
 
-### `await mesh.send(name, payload, *, reply_to)`
+### `await mesh.send(name, payload, *, on_reply, on_error, reply_to, timeout)`
 
-Async callback invocation. Fire-and-forget with a reply subject.
+Async callback invocation. Three modes: fire-and-forget, managed callback, or manual reply subject.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
 | `payload` | `dict \| BaseModel` | required | Input payload |
-| `reply_to` | `str \| None` | `None` | Subject for the response |
+| `on_reply` | `Callable[[dict], Awaitable[None]] \| None` | `None` | Callback for each reply message |
+| `on_error` | `Callable[[MeshError], Awaitable[None]] \| None` | `None` | Callback for timeout or error |
+| `reply_to` | `str \| None` | `None` | Manual reply subject (mutually exclusive with `on_reply`) |
+| `timeout` | `float` | `60.0` | Inactivity timeout (only applies with `on_reply`) |
+
+```python
+# Managed callback
+await mesh.send("summarizer", payload, on_reply=handle, on_error=on_err, timeout=30.0)
+
+# Fire-and-forget
+await mesh.send("summarizer", payload)
+
+# Manual reply subject
+await mesh.send("summarizer", payload, reply_to="mesh.results.abc")
+```
+
+## Subscription
+
+### `async for msg in mesh.subscribe(*, agent, channel, subject, timeout)`
+
+Subscribe to events on a subject, agent, or channel. Returns an async generator yielding dicts.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `agent` | `str \| None` | `None` | Agent name (resolves to event subject) |
+| `channel` | `str \| None` | `None` | Channel name (wildcard for all events) |
+| `subject` | `str \| None` | `None` | Raw NATS subject |
+| `timeout` | `float \| None` | `None` | Inactivity timeout in seconds |
+
+At least one of `agent`, `channel`, or `subject` must be provided. `agent` and `subject` are mutually exclusive. `channel` can accompany `agent` to override the default channel.
+
+```python
+# Subscribe to an agent's event stream
+async for event in mesh.subscribe(agent="price-feed"):
+    print(event["symbol"], event["price"])
+
+# Subscribe to all events in a channel
+async for event in mesh.subscribe(channel="finance"):
+    print(event)
+
+# Subscribe to a raw subject
+async for msg in mesh.subscribe(subject="mesh.results.abc123", timeout=30.0):
+    print(msg)
+    break
+```
 
 ## Discovery
 
@@ -181,7 +231,7 @@ contract.invocable        # True
 contract.streaming        # False
 ```
 
-## Context
+## KV Store
 
 Shared KV store for structured data exchange between agents.
 
