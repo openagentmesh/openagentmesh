@@ -12,7 +12,7 @@ import time
 import pytest
 from pydantic import BaseModel
 
-from agentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 
 # --- Shared models (same as docs/cookbook/shared-plan.md) ---
@@ -74,12 +74,14 @@ class TestConcurrentCASUpdates:
             await mesh.context.put("plan-001", plan.model_dump_json())
 
             async def claim_task(task_id: str, agent_name: str):
-                async with mesh.context.cas("plan-001") as entry:
-                    p = Plan.model_validate_json(entry.value)
+                def mutate(value: str) -> str:
+                    p = Plan.model_validate_json(value)
                     task = next(t for t in p.tasks if t.id == task_id)
                     task.status = "in-progress"
                     task.assigned_to = agent_name
-                    entry.value = p.model_dump_json()
+                    return p.model_dump_json()
+
+                await mesh.context.update("plan-001", mutate)
 
             # Two agents claim different tasks at the same time
             await asyncio.gather(
@@ -175,24 +177,28 @@ class TestSharedPlanCoordination:
 
             completed_by: dict[str, str] = {}
 
-            @mesh.agent(name="worker", channel="dev", description="Completes plan tasks")
+            @mesh.agent(AgentSpec(name="worker", channel="dev", description="Completes plan tasks"))
             async def worker(req: TaskClaim) -> TaskResult:
                 # Claim
-                async with mesh.context.cas("plan-001") as entry:
-                    p = Plan.model_validate_json(entry.value)
+                def claim(value: str) -> str:
+                    p = Plan.model_validate_json(value)
                     task = next(t for t in p.tasks if t.id == req.task_id)
                     task.status = "in-progress"
                     task.assigned_to = "worker"
-                    entry.value = p.model_dump_json()
+                    return p.model_dump_json()
+
+                await mesh.context.update("plan-001", claim)
 
                 await asyncio.sleep(0.1)  # simulate work
 
                 # Complete
-                async with mesh.context.cas("plan-001") as entry:
-                    p = Plan.model_validate_json(entry.value)
+                def complete(value: str) -> str:
+                    p = Plan.model_validate_json(value)
                     task = next(t for t in p.tasks if t.id == req.task_id)
                     task.status = "complete"
-                    entry.value = p.model_dump_json()
+                    return p.model_dump_json()
+
+                await mesh.context.update("plan-001", complete)
 
                 completed_by[req.task_id] = "worker"
                 return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
@@ -225,14 +231,16 @@ class TestSharedPlanCoordination:
             plan = make_plan(5)
             await mesh.context.put("plan-001", plan.model_dump_json())
 
-            @mesh.agent(name="worker", channel="dev", description="Completes plan tasks")
+            @mesh.agent(AgentSpec(name="worker", channel="dev", description="Completes plan tasks"))
             async def worker(req: TaskClaim) -> TaskResult:
-                async with mesh.context.cas("plan-001") as entry:
-                    p = Plan.model_validate_json(entry.value)
+                def mark_complete(value: str) -> str:
+                    p = Plan.model_validate_json(value)
                     task = next(t for t in p.tasks if t.id == req.task_id)
                     task.status = "complete"
                     task.assigned_to = "worker"
-                    entry.value = p.model_dump_json()
+                    return p.model_dump_json()
+
+                await mesh.context.update("plan-001", mark_complete)
 
                 await asyncio.sleep(0.1)  # 100ms of "work" per task
                 return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
