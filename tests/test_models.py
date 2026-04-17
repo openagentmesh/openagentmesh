@@ -3,7 +3,12 @@
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentSpec, CatalogEntry
+from openagentmesh import AgentSpec, CatalogEntry, MeshError
+from openagentmesh._models import (
+    BufferedNotSupported,
+    ChunkSequenceError,
+    StreamingNotSupported,
+)
 from openagentmesh._handler import inspect_handler
 
 
@@ -138,3 +143,40 @@ class TestHandlerInspection:
 
         with pytest.raises(TypeError, match="invocable or streaming"):
             inspect_handler(handler)
+
+
+# --- Error subclasses (ADR-0005) ---
+
+
+class TestErrorSubclasses:
+    def test_streaming_not_supported_is_mesh_error(self):
+        err = StreamingNotSupported(agent="echo")
+        assert isinstance(err, MeshError)
+        assert err.code == "streaming_not_supported"
+        assert "echo" in str(err)
+
+    def test_buffered_not_supported_is_mesh_error(self):
+        err = BufferedNotSupported(agent="streamer")
+        assert isinstance(err, MeshError)
+        assert err.code == "buffered_not_supported"
+        assert "streamer" in str(err)
+
+    def test_chunk_sequence_error_is_mesh_error(self):
+        err = ChunkSequenceError(
+            agent="streamer",
+            details={"expected_seq": 3, "got_seq": 5},
+        )
+        assert isinstance(err, MeshError)
+        assert err.code == "chunk_sequence_error"
+        assert err.details["expected_seq"] == 3
+        assert err.details["got_seq"] == 5
+
+    def test_catch_specific_subclass(self):
+        """Callers can except StreamingNotSupported without catching all MeshErrors."""
+        try:
+            raise StreamingNotSupported(agent="echo")
+        except StreamingNotSupported:
+            pass  # caught by subclass
+
+        with pytest.raises(StreamingNotSupported):
+            raise StreamingNotSupported(agent="echo")
