@@ -1,11 +1,11 @@
 # AgentMesh
 
-The central class. Manages NATS connection, agent subscriptions, heartbeat loops, and lifecycle.
+The central class. Manages NATS connection, agent subscriptions, and lifecycle.
 
 ## Construction
 
 ```python
-from agentmesh import AgentMesh
+from openagentmesh import AgentMesh
 
 # Connect to an existing NATS server
 mesh = AgentMesh("nats://localhost:4222")
@@ -35,76 +35,61 @@ async with AgentMesh.local() as mesh:
 
 ## Lifecycle
 
+### `async with mesh:`
+
+Primary lifecycle pattern. Connects to NATS, subscribes registered agents, and disconnects on exit. Agents declared inside the block are lazily subscribed on first `call`/`catalog`.
+
+```python
+async with mesh:
+    result = await mesh.call("echo", {"message": "hello"})
+```
+
+Embedding in an existing async application (e.g. FastAPI lifespan):
+
+```python
+async def lifespan(app):
+    async with mesh:
+        yield
+```
+
 ### `mesh.run()`
 
-Start the event loop and block until interrupted. Similar to `uvicorn.run()`.
+Blocking alternative. Start the event loop and block until interrupted. Similar to `uvicorn.run()`.
 
 ```python
 mesh.run()
 ```
 
-### `await mesh.start()`
-
-Start in non-blocking mode. Use this to embed the mesh in an existing async application.
-
-```python
-async def lifespan(app):
-    await mesh.start()
-    yield
-    await mesh.stop()
-```
-
-### `await mesh.stop()`
-
-Graceful shutdown: unsubscribe → drain → deregister → disconnect.
-
 ## Registration
 
-### `@mesh.agent()`
+### `@mesh.agent(spec)`
 
-Decorator to register an async function as a mesh agent.
+Decorator to register an async function as a mesh agent. Takes a single `AgentSpec` instance.
 
 ```python
-@mesh.agent(
+from openagentmesh import AgentMesh, AgentSpec
+
+mesh = AgentMesh()
+
+spec = AgentSpec(
     name="summarizer",
     channel="nlp",
     description="Summarizes text to a target length.",
     tags=["text", "summarization"],
 )
+
+@mesh.agent(spec)
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | `str` | required | Unique agent name |
-| `description` | `str` | required | LLM-consumable description |
-| `channel` | `str \| None` | `None` | Hierarchical namespace |
-| `tags` | `list[str]` | `[]` | Searchable tags |
+Capabilities are inferred from the handler shape at decoration time:
 
-### `mesh.register()`
-
-Imperative registration for cases where decorators don't fit.
-
-```python
-mesh.register(
-    name="summarizer",
-    description="Summarizes text to a target length.",
-    handler=summarize_handler,
-    input_model=SummarizeInput,
-    output_model=SummarizeOutput,
-    channel="nlp",
-)
-```
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `name` | `str` | required | Unique agent name |
-| `description` | `str` | required | LLM-consumable description |
-| `handler` | `Callable` | required | Async handler function |
-| `input_model` | `type[BaseModel]` | required | Pydantic v2 input model |
-| `output_model` | `type[BaseModel]` | required | Pydantic v2 output model |
-| `channel` | `str \| None` | `None` | Hierarchical namespace |
+| Handler shape | `invocable` | `streaming` | Consumer API |
+|---------------|-------------|-------------|--------------|
+| `async def f(req) -> Out: return ...` | `True` | `False` | `mesh.call()` |
+| `async def f(req) -> Chunk: yield ...` | `True` | `True` | `mesh.stream()` |
+| `async def f() -> Event: yield ...` | `False` | `True` | `mesh.subscribe()` |
 
 ## Invocation
 
@@ -115,10 +100,22 @@ Synchronous request/reply. Blocks until the agent responds or times out.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
-| `payload` | `dict` | required | JSON-serializable input |
+| `payload` | `dict \| BaseModel` | required | Input payload (dict or Pydantic model) |
 | `timeout` | `float` | `30.0` | Timeout in seconds |
 
-**Returns:** `dict`: deserialized response payload.
+**Returns:** `dict` with the deserialized response payload.
+
+### `async for chunk in mesh.stream(name, payload, *, timeout=60.0)`
+
+Streaming request. Yields response chunks as dicts.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | `str` | required | Agent name |
+| `payload` | `dict \| BaseModel` | required | Input payload |
+| `timeout` | `float` | `60.0` | Total stream timeout in seconds |
+
+**Yields:** `dict` chunks.
 
 ### `await mesh.send(name, payload, *, reply_to)`
 
@@ -127,31 +124,30 @@ Async callback invocation. Fire-and-forget with a reply subject.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
-| `payload` | `dict` | required | JSON-serializable input |
-| `reply_to` | `str` | required | Subject for the response |
+| `payload` | `dict \| BaseModel` | required | Input payload |
+| `reply_to` | `str \| None` | `None` | Subject for the response |
 
 ## Discovery
 
-### `await mesh.catalog(*, channel=None, tags=None)`
+### `await mesh.catalog(*, channel=None, tags=None, streaming=None, invocable=None)`
 
-Lightweight listing of registered agents.
+Lightweight listing of registered agents. Returns typed `CatalogEntry` objects.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `channel` | `str \| None` | `None` | Filter by channel prefix |
-| `tags` | `list[str] \| None` | `None` | Filter by tags |
+| `channel` | `str \| None` | `None` | Filter by channel |
+| `tags` | `list[str] \| None` | `None` | Filter by tags (all must match) |
+| `streaming` | `bool \| None` | `None` | Filter by streaming capability |
+| `invocable` | `bool \| None` | `None` | Filter by invocable capability |
 
-**Returns:** `list[dict]`: entries with `name`, `description`, `version`, `tags`.
+**Returns:** `list[CatalogEntry]`
 
 ```python
 catalog = await mesh.catalog(channel="nlp")
 
-# [
-#   {"name": "summarizer", "channel": "nlp", "description": "Summarizes text to a target length.",
-#    "version": "1.0.0", "tags": ["text", "summarization"]},
-#   {"name": "sentiment", "channel": "nlp", "description": "Classifies sentiment of input text.",
-#    "version": "1.2.0", "tags": ["text", "classification"]},
-# ]
+for entry in catalog:
+    print(entry.name, "-", entry.description)
+    # entry.invocable, entry.streaming, entry.version, entry.tags also available
 ```
 
 ### `await mesh.discover(*, channel=None)`
@@ -160,18 +156,9 @@ Full `AgentContract` objects for all matching agents.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `channel` | `str \| None` | `None` | Filter by channel prefix |
+| `channel` | `str \| None` | `None` | Filter by channel |
 
 **Returns:** `list[AgentContract]`
-
-```python
-agents = await mesh.discover(channel="nlp")
-
-# [
-#   AgentContract(name="summarizer", channel="nlp", version="1.0.0", ...),
-#   AgentContract(name="sentiment", channel="nlp", version="1.2.0", ...),
-# ]
-```
 
 ### `await mesh.contract(name)`
 
@@ -186,12 +173,41 @@ Fetch a single agent's full contract. This is the authoritative source.
 ```python
 contract = await mesh.contract("summarizer")
 
-# AgentContract(
-#   name="summarizer",
-#   description="Summarizes text to a target length.",
-#   version="1.0.0",
-#   capabilities={"streaming": False, "pushNotifications": True},
-#   skills=[Skill(id="summarizer", tags=["text", "summarization"], ...)],
-#   x_agentmesh={"type": "agent", "channel": "nlp", "sla": {...}},
-# )
+contract.name             # "summarizer"
+contract.description      # "Summarizes text..."
+contract.input_schema     # JSON Schema dict
+contract.output_schema    # JSON Schema dict
+contract.invocable        # True
+contract.streaming        # False
 ```
+
+## Context
+
+Shared KV store for structured data exchange between agents.
+
+### `await mesh.kv.put(key, value)`
+
+Store a value.
+
+### `await mesh.kv.get(key)`
+
+Retrieve a value by key. Returns `str`.
+
+### `async with mesh.kv.cas(key) as entry`
+
+Single-attempt compare-and-swap. Read `entry.value`, modify it, and the new value is written on exit with CAS semantics. For concurrent access, use `update()` instead.
+
+### `await mesh.kv.update(key, fn)`
+
+CAS update with automatic retry. `fn` receives the current value and returns the new value. On revision conflict, the value is re-read and `fn` is called again.
+
+```python
+def increment(value: str) -> str:
+    return str(int(value) + 1)
+
+await mesh.kv.update("counter", increment)
+```
+
+### `async for value in mesh.kv.watch(key)`
+
+Watch a key for changes. Yields the new value on each update.

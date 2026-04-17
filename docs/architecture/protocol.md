@@ -29,7 +29,9 @@ Single KV key containing a JSON array of lightweight entries:
     "channel": "nlp",
     "description": "Summarizes text to a target length.",
     "version": "1.0.0",
-    "tags": ["text", "summarization"]
+    "tags": ["text", "summarization"],
+    "invocable": true,
+    "streaming": false
   }
 ]
 ```
