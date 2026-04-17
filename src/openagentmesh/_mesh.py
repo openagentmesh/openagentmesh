@@ -707,21 +707,63 @@ class AgentMesh:
             await sub.unsubscribe()
 
     async def send(
-        self, name: str, payload: Any = None, reply_to: str | None = None
+        self,
+        name: str,
+        payload: Any = None,
+        *,
+        on_reply: Any = None,
+        on_error: Any = None,
+        reply_to: str | None = None,
+        timeout: float = 60.0,
     ) -> None:
-        """Fire-and-forget invocation with optional reply subject."""
+        """Fire-and-forget invocation with optional managed callback (ADR-0034).
+
+        Three modes:
+
+        - No ``on_reply``, no ``reply_to``: pure fire-and-forget.
+        - ``reply_to="subject"``: legacy manual reply subject.
+        - ``on_reply=callback``: SDK manages request ID, subscription, and cleanup.
+          Optional ``on_error=callback`` fires on timeout or handler error.
+        """
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
+
+        if on_reply is not None and reply_to is not None:
+            raise ValueError("'on_reply' and 'reply_to' are mutually exclusive")
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
         data = self._serialize_payload(payload)
 
-        headers: dict[str, str] = {"X-Mesh-Request-Id": request_id}
-        if reply_to:
-            headers["X-Mesh-Reply-To"] = reply_to
+        if on_reply is not None:
+            # Managed callback: SDK handles reply subscription
+            reply_subject = f"mesh.results.{request_id}"
 
-        await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")
+            async def _callback_task() -> None:
+                try:
+                    async for msg in self.subscribe(subject=reply_subject, timeout=timeout):
+                        await on_reply(msg)
+                except MeshTimeout as e:
+                    if on_error is not None:
+                        await on_error(e)
+                    else:
+                        _log.warning("send('%s') reply timed out: %s", name, e)
+                except MeshError as e:
+                    if on_error is not None:
+                        await on_error(e)
+                    else:
+                        _log.warning("send('%s') reply error: %s", name, e)
+
+            asyncio.create_task(_callback_task())
+
+            headers: dict[str, str] = {"X-Mesh-Request-Id": request_id}
+            await self._nc.publish(subject, data, headers=headers, reply=reply_subject)
+        else:
+            # Fire-and-forget or manual reply_to
+            headers = {"X-Mesh-Request-Id": request_id}
+            if reply_to:
+                headers["X-Mesh-Reply-To"] = reply_to
+            await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")
 
     # --- Discovery ---
 
