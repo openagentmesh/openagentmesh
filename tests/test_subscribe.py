@@ -185,7 +185,11 @@ class TestSubscribeValidation:
 
 class TestSubscribeAgentResolution:
     async def test_subscribe_by_agent_name(self):
-        """subscribe(agent=...) resolves to the agent's event subject."""
+        """subscribe(agent=...) resolves to the agent's event subject.
+
+        Publisher emission (ADR-0034) runs the handler automatically;
+        subscribe() receives the yielded events.
+        """
         async with AgentMesh.local() as mesh:
             spec = AgentSpec(
                 name="price-feed",
@@ -198,37 +202,20 @@ class TestSubscribeAgentResolution:
                 yield PriceEvent(symbol="AAPL", price=150.0)
                 yield PriceEvent(symbol="GOOG", price=2800.0)
 
-            # Manually publish to the event subject (publisher emission not yet implemented)
-            event_subject = "mesh.agent.finance.price-feed.events"
             received = []
+            async for event in mesh.subscribe(agent="price-feed", timeout=2.0):
+                received.append(event)
 
-            async def publisher():
-                await asyncio.sleep(0.05)
-                await mesh._nc.publish(
-                    event_subject,
-                    json.dumps({"symbol": "AAPL", "price": 150.0}).encode(),
-                    headers={"X-Mesh-Stream-End": "false"},
-                )
-                await asyncio.sleep(0.02)
-                await mesh._nc.publish(
-                    event_subject,
-                    b"",
-                    headers={"X-Mesh-Stream-End": "true"},
-                )
-
-            async def subscriber():
-                async for event in mesh.subscribe(agent="price-feed"):
-                    received.append(event)
-
-            await asyncio.gather(
-                asyncio.wait_for(subscriber(), timeout=5.0),
-                publisher(),
-            )
-
-            assert received == [{"symbol": "AAPL", "price": 150.0}]
+            assert received == [
+                {"symbol": "AAPL", "price": 150.0},
+                {"symbol": "GOOG", "price": 2800.0},
+            ]
 
     async def test_subscribe_by_agent_name_no_channel(self):
-        """subscribe(agent=...) works for agents without a channel."""
+        """subscribe(agent=...) works for agents without a channel.
+
+        Publisher emission (ADR-0034) runs the handler automatically.
+        """
         async with AgentMesh.local() as mesh:
             spec = AgentSpec(name="heartbeat", description="Heartbeat events")
 
@@ -236,25 +223,9 @@ class TestSubscribeAgentResolution:
             async def heartbeat() -> EchoOutput:
                 yield EchoOutput(reply="beat")
 
-            event_subject = "mesh.agent.heartbeat.events"
             received = []
-
-            async def publisher():
-                await asyncio.sleep(0.05)
-                await mesh._nc.publish(
-                    event_subject,
-                    json.dumps({"reply": "beat"}).encode(),
-                    headers={"X-Mesh-Stream-End": "true"},
-                )
-
-            async def subscriber():
-                async for event in mesh.subscribe(agent="heartbeat"):
-                    received.append(event)
-
-            await asyncio.gather(
-                asyncio.wait_for(subscriber(), timeout=5.0),
-                publisher(),
-            )
+            async for event in mesh.subscribe(agent="heartbeat", timeout=2.0):
+                received.append(event)
 
             assert received == [{"reply": "beat"}]
 
