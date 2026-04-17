@@ -42,25 +42,33 @@ class TaskResult(BaseModel):
 Claims a task via CAS, does the work, marks it complete. Multiple instances run in the same queue group for load balancing.
 
 ```python
-@mesh.agent(name="worker", channel="dev", description="Picks and completes plan tasks")
+from openagentmesh import AgentSpec
+
+spec = AgentSpec(name="worker", channel="dev", description="Picks and completes plan tasks")
+
+@mesh.agent(spec)
 async def worker(req: TaskClaim) -> TaskResult:
-    # CAS loop: read plan, update task status, write back atomically
-    async with mesh.context.cas("plan-001") as entry:
-        current_plan = Plan.model_validate_json(entry.value)
-        task = next(t for t in current_plan.tasks if t.id == req.task_id)
+    # CAS update: read plan, update task status, write back atomically
+    def claim(value: str) -> str:
+        plan = Plan.model_validate_json(value)
+        task = next(t for t in plan.tasks if t.id == req.task_id)
         task.status = "in-progress"
         task.assigned_to = "worker"
-        entry.value = current_plan.model_dump_json()
+        return plan.model_dump_json()
+
+    await mesh.context.update("plan-001", claim)
 
     # Simulate doing actual work
     await asyncio.sleep(0.1)
 
     # Mark complete via another CAS update
-    async with mesh.context.cas("plan-001") as entry:
-        current_plan = Plan.model_validate_json(entry.value)
-        task = next(t for t in current_plan.tasks if t.id == req.task_id)
+    def complete(value: str) -> str:
+        plan = Plan.model_validate_json(value)
+        task = next(t for t in plan.tasks if t.id == req.task_id)
         task.status = "complete"
-        entry.value = current_plan.model_dump_json()
+        return plan.model_dump_json()
+
+    await mesh.context.update("plan-001", complete)
 
     return TaskResult(plan_id=req.plan_id, task_id=req.task_id, status="complete")
 ```
@@ -70,7 +78,9 @@ async def worker(req: TaskClaim) -> TaskResult:
 Scans for pending tasks, dispatches to workers concurrently.
 
 ```python
-@mesh.agent(name="coordinator", channel="dev", description="Assigns plan tasks to workers")
+coord_spec = AgentSpec(name="coordinator", channel="dev", description="Assigns plan tasks to workers")
+
+@mesh.agent(coord_spec)
 async def coordinator(req: Plan) -> Plan:
     while True:
         raw = await mesh.context.get("plan-001")
@@ -127,7 +137,7 @@ asyncio.run(main())
 
 ## How It Works
 
-- **CAS (Compare-And-Swap)** on the plan KV entry prevents two agents from clobbering each other's updates. If two agents try to update the same key simultaneously, one retries automatically.
+- **`context.update(key, fn)`** uses compare-and-swap with automatic retry. The mutation function receives the current value and returns the new value. If another agent updated the key between the read and write, the function is called again with the fresh value.
 - **Queue groups** mean multiple worker instances share the subscription. NATS distributes requests across them.
 - **`mesh.context.watch()`** lets an observer track task transitions in real time without polling.
 

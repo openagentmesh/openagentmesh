@@ -4,11 +4,11 @@ An agent is an async function registered on the mesh. It receives typed input, d
 
 ## Registering an Agent
 
-Use the `@mesh.agent` decorator:
+Define an `AgentSpec` with the agent's metadata, then apply `@mesh.agent`:
 
 ```python
 from pydantic import BaseModel
-from agentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()
 
@@ -18,31 +18,60 @@ class EchoInput(BaseModel):
 class EchoOutput(BaseModel):
     reply: str
 
-@mesh.agent(name="echo", description="Echoes a message back.")
+spec = AgentSpec(name="echo", description="Echoes a message back.")
+
+@mesh.agent(spec)
 async def echo(req: EchoInput) -> EchoOutput:
     return EchoOutput(reply=f"Echo: {req.message}")
 ```
 
 The decorator:
 
-1. Subscribes to a NATS queue group at `mesh.agent.{channel}.{name}`
-2. Deserializes and validates input via Pydantic v2
-3. Calls your handler function
-4. Serializes the response
-5. Writes the contract to the registry on startup
+1. Inspects the handler shape to determine capabilities
+2. Builds an `AgentContract` from the spec and handler type hints
+3. On `mesh.start()`, subscribes to a NATS queue group at `mesh.agent.{channel}.{name}`
+4. Deserializes and validates input via Pydantic v2
+5. Calls your handler function
+6. Serializes the response and writes the contract to the registry
 
-## Imperative Registration
+## Handler Shapes
 
-For cases where decorators don't fit:
+The SDK infers capabilities from the handler's signature at decoration time. No explicit `type` or capability flags needed.
+
+| Pattern | Handler shape | Capabilities |
+|---------|--------------|--------------|
+| Buffered | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
+| Streaming | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
+| Event emitter | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
+
+### Streaming agent
 
 ```python
-mesh.register(
-    name="echo",
-    description="Echoes a message back.",
-    handler=echo_handler,
-    input_model=EchoInput,
-    output_model=EchoOutput,
-)
+class SummarizeChunk(BaseModel):
+    delta: str
+
+spec = AgentSpec(name="summarizer", channel="nlp", description="Streams a summary.")
+
+@mesh.agent(spec)
+async def summarize(req: SummarizeInput) -> SummarizeChunk:
+    async for token in call_llm_stream(req.text):
+        yield SummarizeChunk(delta=token)
+```
+
+### Event emitter
+
+```python
+class PriceEvent(BaseModel):
+    symbol: str
+    price: float
+
+spec = AgentSpec(name="price-feed", channel="finance", description="Emits price events.")
+
+@mesh.agent(spec)
+async def monitor_prices() -> PriceEvent:
+    while True:
+        yield PriceEvent(symbol="AAPL", price=await fetch_price())
+        await asyncio.sleep(1)
 ```
 
 ## Lifecycle

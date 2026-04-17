@@ -5,11 +5,13 @@ Channels are hierarchical namespace prefixes that group agents by domain or team
 ## Usage
 
 ```python
-@mesh.agent(
+spec = AgentSpec(
     name="scorer",
     channel="finance.risk",
     description="Scores credit risk from a company profile.",
 )
+
+@mesh.agent(spec)
 async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
@@ -56,7 +58,7 @@ These are NATS-native wildcards, not SDK features. The SDK's `mesh.catalog(chann
 Agents without a channel register at the root and are invoked by name alone:
 
 ```python
-@mesh.agent(name="echo", description="Echoes a message back.")
+@mesh.agent(AgentSpec(name="echo", description="Echoes a message back."))
 async def echo(req: EchoInput) -> EchoOutput:
     ...
 ```

@@ -10,14 +10,12 @@ from openagentmesh import AgentMesh
 mesh = AgentMesh("nats://localhost:4222")
 contract = await mesh.contract("summarizer")
 
-# Use with Anthropic's Claude
-anthropic_tool = contract.to_anthropic_tool()
-
-# Use with OpenAI
-openai_tool = contract.to_openai_tool()
-
-# Framework-agnostic format
-generic_tool = contract.to_generic_tool()
+# Build tool definitions from the contract's schemas
+tool = {
+    "name": contract.name,
+    "description": contract.description,
+    "input_schema": contract.input_schema,
+}
 ```
 
 So where does OAM add value? In three areas where MCP alone runs into friction at enterprise scale.
@@ -65,7 +63,9 @@ With OAM, discovery is automatic:
 
 ```python
 # Team A registers an agent -- no announcement needed
-@mesh.agent(name="risk-scorer", channel="finance", description="...", tags=["risk"])
+spec = AgentSpec(name="risk-scorer", channel="finance", description="...", tags=["risk"])
+
+@mesh.agent(spec)
 async def score_risk(req: RiskInput) -> RiskOutput:
     ...
 
@@ -80,7 +80,7 @@ No Slack messages. No configuration PRs. No "did you add the new MCP server?" co
 
 | Concern | MCP | OAM |
 |---------|-----|-----|
-| LLM-to-tool invocation | Native | Via `to_anthropic_tool()` / `to_openai_tool()` |
+| LLM-to-tool invocation | Native | Via contract schemas (`input_schema`, `output_schema`) |
 | Tool discovery | Manual configuration | Automatic runtime discovery |
 | Interaction model | Client-initiated, single tool, streamed response | Agent-to-agent: sync, async callback, pub/sub |
 | Load balancing | Not supported | NATS queue groups (built-in) |

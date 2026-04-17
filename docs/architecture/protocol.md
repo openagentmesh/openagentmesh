@@ -29,7 +29,9 @@ Single KV key containing a JSON array of lightweight entries:
     "channel": "nlp",
     "description": "Summarizes text to a target length.",
     "version": "1.0.0",
-    "tags": ["text", "summarization"]
+    "tags": ["text", "summarization"],
+    "invocable": true,
+    "streaming": false
   }
 ]
 ```
@@ -42,7 +44,7 @@ Full contract with JSON Schemas, SLA metadata, and error schema. This is the aut
 
 ## JetStream Buckets
 
-The protocol requires four JetStream buckets, pre-created on startup by `agentmesh up` (or `AgentMesh.local()` in test contexts).
+The protocol requires four JetStream buckets, pre-created on startup by `oam mesh up` (or `AgentMesh.local()` in test contexts).
 
 ### KV Stores
 

@@ -4,12 +4,12 @@ Command-line tools for local development.
 
 ## Commands
 
-### `mesh up`
+### `oam mesh up`
 
 Start a local NATS server with JetStream enabled and pre-created KV buckets.
 
 ```bash
-mesh up
+oam mesh up
 ```
 
 Starts NATS on `localhost:4222` with:
@@ -17,13 +17,14 @@ Starts NATS on `localhost:4222` with:
 - JetStream enabled
 - `mesh-catalog` KV bucket
 - `mesh-registry` KV bucket
+- `mesh-context` KV bucket
 
-### `mesh status`
+### `oam mesh catalog`
 
-Show registered agents and their health status.
+List registered agents.
 
 ```bash
-mesh status
+oam mesh catalog
 ```
 
-Output includes agent name, channel, health state, and last heartbeat.
+Output includes agent name, channel, capabilities, and version.

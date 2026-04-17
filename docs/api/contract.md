@@ -2,49 +2,44 @@
 
 Represents a registered agent's full contract. Retrieved via `mesh.contract()` or `mesh.discover()`.
 
-## LLM Tool Conversion
+The contract schema is a superset of the A2A Agent Card format. A2A fields at the top level; OAM-specific fields under `x-agentmesh` when serialized.
 
-### `.to_openai_tool()`
+## Using Contracts for LLM Tool Injection
 
-Returns the contract in OpenAI function calling format.
+Contracts carry the schemas needed to build LLM tool definitions.
 
 ```python
 contract = await mesh.contract("summarizer")
-tool = contract.to_openai_tool()
-# Pass to OpenAI's tools parameter
+
+# Build a tool definition for your LLM provider
+tool = {
+    "name": contract.name,
+    "description": contract.description,
+    "input_schema": contract.input_schema,
+}
+
+# For streaming agents, chunk_schema describes each yielded chunk
+if contract.streaming:
+    print(contract.chunk_schema)
 ```
 
-### `.to_anthropic_tool()`
+### Two-step discovery for LLM tool selection
 
-Returns the contract in Anthropic tool use format.
+Use `catalog()` for lightweight browsing (20-30 tokens per agent), then `contract()` for the full schema of the selected agent:
 
 ```python
-tool = contract.to_anthropic_tool()
-# Pass to Anthropic's tools parameter
+# Step 1: lightweight listing for LLM to pick from
+catalog = await mesh.catalog(channel="nlp")
+options = [{"name": e.name, "description": e.description} for e in catalog]
+
+# Step 2: full schema for the selected agent
+contract = await mesh.contract(selected_name)
+tool_def = {
+    "name": contract.name,
+    "description": contract.description,
+    "input_schema": contract.input_schema,
+}
 ```
-
-### `.to_generic_tool()`
-
-Returns a generic JSON Schema tool definition.
-
-```python
-tool = contract.to_generic_tool()
-```
-
-### `.to_agent_card(url=None)`
-
-Projects the contract to A2A Agent Card format. A thin projection; injects `url` if provided.
-
-```python
-card = contract.to_agent_card()
-
-# At a federation boundary, provide the external URL
-card = contract.to_agent_card(url="https://api.company.com/agents/summarizer")
-```
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `url` | `str \| None` | `None` | External URL for federation |
 
 ## Properties
 
@@ -55,7 +50,29 @@ card = contract.to_agent_card(url="https://api.company.com/agents/summarizer")
 | `version` | `str` | Semantic version |
 | `channel` | `str \| None` | Channel namespace |
 | `tags` | `list[str]` | Searchable tags |
-| `input_schema` | `dict` | JSON Schema for input |
-| `output_schema` | `dict` | JSON Schema for output |
-| `capabilities` | `dict` | Capability flags |
-| `sla` | `dict` | SLA metadata |
+| `invocable` | `bool` | Whether the agent accepts requests |
+| `streaming` | `bool` | Whether the agent streams responses |
+| `input_schema` | `dict \| None` | JSON Schema for input model |
+| `output_schema` | `dict \| None` | JSON Schema for output model (buffered agents) |
+| `chunk_schema` | `dict \| None` | JSON Schema for chunk model (streaming agents) |
+| `capabilities` | `dict` | Capability flags (`streaming`, `invocable`) |
+| `subject` | `str` | NATS invocation subject |
+
+## Methods
+
+### `.to_catalog_entry()`
+
+Project to a lightweight `CatalogEntry`.
+
+```python
+entry = contract.to_catalog_entry()
+# CatalogEntry(name="summarizer", description="...", invocable=True, streaming=False)
+```
+
+### `.to_registry_json()`
+
+Serialize to the registry JSON format (A2A-compatible with `x-agentmesh` namespace).
+
+```python
+json_str = contract.to_registry_json()
+```
