@@ -79,12 +79,14 @@ class AgentMesh:
         self._subscriptions: list[Any] = []
         self._embedded: EmbeddedNats | None = None
         self._catalog_cache: dict[str, CatalogEntry] = {}
+        self._catalog_watcher_task: asyncio.Task | None = None
 
     # --- Async context manager ---
 
     async def __aenter__(self) -> AgentMesh:
         await self._connect()
         await self._ensure_buckets()
+        self._start_catalog_watcher()
         await self._subscribe_pending()
         return self
 
@@ -125,9 +127,41 @@ class AgentMesh:
                 await self._subscribe_agent(name, info, contract)
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
+                self._catalog_cache[name] = contract.to_catalog_entry()
                 self._subscribed.add(name)
 
+    def _start_catalog_watcher(self) -> None:
+        """Start background task that watches the catalog KV for changes (ADR-0032)."""
+        assert self._catalog_kv is not None
+
+        async def _watch() -> None:
+            try:
+                watcher = await self._catalog_kv.watchall()
+                async for entry in watcher:
+                    if entry is None or entry.value is None:
+                        continue
+                    if entry.key != _CATALOG_KEY:
+                        continue
+                    entries = json.loads(entry.value)
+                    self._catalog_cache = {
+                        e["name"]: CatalogEntry.model_validate(e) for e in entries
+                    }
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        self._catalog_watcher_task = asyncio.create_task(_watch())
+
     async def _shutdown(self) -> None:
+        if self._catalog_watcher_task is not None:
+            self._catalog_watcher_task.cancel()
+            try:
+                await self._catalog_watcher_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._catalog_watcher_task = None
+
         for sub in self._subscriptions:
             try:
                 await sub.unsubscribe()
@@ -524,15 +558,10 @@ class AgentMesh:
         streaming: bool | None = None,
         invocable: bool | None = None,
     ) -> list[CatalogEntry]:
-        """Lightweight agent listing from the catalog KV (ADR-0028)."""
-        assert self._catalog_kv is not None
+        """Lightweight agent listing from the catalog cache (ADR-0028, ADR-0032)."""
         await self._subscribe_pending()
 
-        try:
-            entry = await self._catalog_kv.get(_CATALOG_KEY)
-            entries = [CatalogEntry.model_validate(e) for e in json.loads(entry.value)]
-        except Exception:
-            return []
+        entries = list(self._catalog_cache.values())
 
         if channel is not None:
             entries = [e for e in entries if e.channel == channel]
