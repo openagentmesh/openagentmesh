@@ -8,7 +8,7 @@ The most common deployment: one process provides an agent, another discovers and
 
 ```python
 from pydantic import BaseModel
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()
 
@@ -19,11 +19,13 @@ class SummarizeInput(BaseModel):
 class SummarizeOutput(BaseModel):
     summary: str
 
-@mesh.agent(
+spec = AgentSpec(
     name="summarizer",
     channel="nlp",
     description="Summarizes text to a target length. Input: raw text and optional max_length. Not for structured data extraction.",
 )
+
+@mesh.agent(spec)
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     # Your logic here -- call an LLM, run extractive summarization, anything.
     truncated = req.text[: req.max_length]
@@ -47,7 +49,7 @@ async def main():
     # Browse the mesh
     catalog = await mesh.catalog()
     for entry in catalog:
-        print(f"{entry['name']} - {entry['description']}")
+        print(f"{entry.name} - {entry.description}")
 
     # Call by name
     result = await mesh.call(
@@ -67,7 +69,7 @@ Start NATS, then the provider and consumer in separate terminals:
 
 ```bash
 # Terminal 1
-agentmesh up
+oam mesh up
 
 # Terminal 2
 python provider.py
@@ -85,7 +87,7 @@ AgentMesh connects agents over NATS. Ag
 
 ## How It Works
 
-Both processes connect to the NATS server started by `agentmesh up`. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
+Both processes connect to the NATS server started by `oam mesh up`. The provider registers its contract (name, schema, description) in the mesh registry. The consumer reads the catalog and invokes the agent by name. No import of the provider's code required.
 
 ```mermaid
 sequenceDiagram
@@ -97,7 +99,7 @@ sequenceDiagram
     Provider->>NATS: Subscribe to mesh.agent.nlp.summarizer
 
     Consumer->>NATS: mesh.catalog()
-    NATS-->>Consumer: [{name: "summarizer", ...}]
+    NATS-->>Consumer: [CatalogEntry(name="summarizer", ...)]
 
     Consumer->>NATS: mesh.call("summarizer", payload)
     NATS->>Provider: Deliver request

@@ -1,7 +1,7 @@
 # OpenAgentMesh
 
 ```python
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 from pydantic import BaseModel
 
 mesh = AgentMesh()
@@ -9,8 +9,10 @@ mesh = AgentMesh()
 class Summary(BaseModel):
     text: str
 
-@mesh.agent(name="summarizer", channel="nlp",
-            description="Summarizes text to a target length.")
+spec = AgentSpec(name="summarizer", channel="nlp",
+                 description="Summarizes text to a target length.")
+
+@mesh.agent(spec)
 async def summarize(req: dict) -> Summary:
     return Summary(text=req["content"][:100] + "...")
 
@@ -42,16 +44,18 @@ contract = await mesh.contract("summarizer")
 **Type Safety.** Input and output models are Pydantic v2. Contracts carry JSON Schemas generated from your type hints. Validation happens before your handler runs, and errors are structured, not stack traces.
 
 ```python
-@mesh.agent(name="scorer", channel="finance",
-            description="Scores credit risk for a company.")
+spec = AgentSpec(name="scorer", channel="finance",
+                 description="Scores credit risk for a company.")
+
+@mesh.agent(spec)
 async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
 
-**Same Code, Any Scale.** Run `agentmesh up` to start a local NATS server, then connect with `AgentMesh()`. Point at shared infrastructure with a connection string. The agent code is identical.
+**Same Code, Any Scale.** Run `oam mesh up` to start a local NATS server, then connect with `AgentMesh()`. Point at shared infrastructure with a connection string. The agent code is identical.
 
 ```python
-mesh = AgentMesh()                               # dev (after agentmesh up)
+mesh = AgentMesh()                               # dev (after oam mesh up)
 mesh = AgentMesh("nats://mesh.company.com:4222") # production
 ```
 
@@ -67,7 +71,7 @@ OpenAgentMesh is the **intra-system fabric**: agents within a team or platform t
 | **MCP** | LLM-to-tool communication (calling specific tools) |
 | **A2A** | Cross-organization agent federation |
 
-OpenAgentMesh contracts are a superset of the A2A Agent Card format. Agents on the mesh can be projected to A2A-compatible endpoints at the boundary with a single method call.
+OpenAgentMesh contracts are a superset of the A2A Agent Card format. Agents on the mesh can be projected to A2A-compatible endpoints at the boundary.
 
 ## Next Steps
 
