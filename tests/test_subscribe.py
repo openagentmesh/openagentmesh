@@ -8,9 +8,19 @@ import asyncio
 import json
 
 import pytest
+from pydantic import BaseModel
 
-from openagentmesh import AgentMesh, MeshError
+from openagentmesh import AgentMesh, AgentSpec, MeshError
 from openagentmesh._models import MeshTimeout
+
+
+class EchoOutput(BaseModel):
+    reply: str
+
+
+class PriceEvent(BaseModel):
+    symbol: str
+    price: float
 
 
 # --- Raw subject subscription ---
@@ -168,3 +178,132 @@ class TestSubscribeValidation:
             with pytest.raises(ValueError, match="mutually exclusive"):
                 async for _ in mesh.subscribe(agent="x", subject="y"):
                     pass
+
+
+# --- Agent name resolution ---
+
+
+class TestSubscribeAgentResolution:
+    async def test_subscribe_by_agent_name(self):
+        """subscribe(agent=...) resolves to the agent's event subject."""
+        async with AgentMesh.local() as mesh:
+            spec = AgentSpec(
+                name="price-feed",
+                channel="finance",
+                description="Price events",
+            )
+
+            @mesh.agent(spec)
+            async def price_feed() -> PriceEvent:
+                yield PriceEvent(symbol="AAPL", price=150.0)
+                yield PriceEvent(symbol="GOOG", price=2800.0)
+
+            # Manually publish to the event subject (publisher emission not yet implemented)
+            event_subject = "mesh.agent.finance.price-feed.events"
+            received = []
+
+            async def publisher():
+                await asyncio.sleep(0.05)
+                await mesh._nc.publish(
+                    event_subject,
+                    json.dumps({"symbol": "AAPL", "price": 150.0}).encode(),
+                    headers={"X-Mesh-Stream-End": "false"},
+                )
+                await asyncio.sleep(0.02)
+                await mesh._nc.publish(
+                    event_subject,
+                    b"",
+                    headers={"X-Mesh-Stream-End": "true"},
+                )
+
+            async def subscriber():
+                async for event in mesh.subscribe(agent="price-feed"):
+                    received.append(event)
+
+            await asyncio.gather(
+                asyncio.wait_for(subscriber(), timeout=5.0),
+                publisher(),
+            )
+
+            assert received == [{"symbol": "AAPL", "price": 150.0}]
+
+    async def test_subscribe_by_agent_name_no_channel(self):
+        """subscribe(agent=...) works for agents without a channel."""
+        async with AgentMesh.local() as mesh:
+            spec = AgentSpec(name="heartbeat", description="Heartbeat events")
+
+            @mesh.agent(spec)
+            async def heartbeat() -> EchoOutput:
+                yield EchoOutput(reply="beat")
+
+            event_subject = "mesh.agent.heartbeat.events"
+            received = []
+
+            async def publisher():
+                await asyncio.sleep(0.05)
+                await mesh._nc.publish(
+                    event_subject,
+                    json.dumps({"reply": "beat"}).encode(),
+                    headers={"X-Mesh-Stream-End": "true"},
+                )
+
+            async def subscriber():
+                async for event in mesh.subscribe(agent="heartbeat"):
+                    received.append(event)
+
+            await asyncio.gather(
+                asyncio.wait_for(subscriber(), timeout=5.0),
+                publisher(),
+            )
+
+            assert received == [{"reply": "beat"}]
+
+    async def test_subscribe_unknown_agent_raises(self):
+        """subscribe(agent=...) for unknown agent raises MeshError."""
+        async with AgentMesh.local() as mesh:
+            with pytest.raises(MeshError, match="not found"):
+                async for _ in mesh.subscribe(agent="nonexistent"):
+                    pass
+
+
+# --- Channel wildcard ---
+
+
+class TestSubscribeChannelWildcard:
+    async def test_subscribe_channel_receives_all_events(self):
+        """subscribe(channel=...) gets events from all agents in that channel."""
+        async with AgentMesh.local() as mesh:
+            received = []
+
+            async def publisher():
+                await asyncio.sleep(0.05)
+                await mesh._nc.publish(
+                    "mesh.agent.finance.stock-feed.events",
+                    json.dumps({"source": "stock"}).encode(),
+                    headers={"X-Mesh-Stream-End": "false"},
+                )
+                await asyncio.sleep(0.02)
+                await mesh._nc.publish(
+                    "mesh.agent.finance.bond-feed.events",
+                    json.dumps({"source": "bond"}).encode(),
+                    headers={"X-Mesh-Stream-End": "false"},
+                )
+                await asyncio.sleep(0.02)
+                await mesh._nc.publish(
+                    "mesh.agent.finance.stock-feed.events",
+                    b"",
+                    headers={"X-Mesh-Stream-End": "true"},
+                )
+
+            async def subscriber():
+                async for event in mesh.subscribe(channel="finance"):
+                    received.append(event)
+
+            await asyncio.gather(
+                asyncio.wait_for(subscriber(), timeout=5.0),
+                publisher(),
+            )
+
+            sources = [e["source"] for e in received]
+            assert "stock" in sources
+            assert "bond" in sources
