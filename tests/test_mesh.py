@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, MeshError
+from openagentmesh._models import BufferedNotSupported, StreamingNotSupported
 
 
 # --- Test models ---
@@ -252,3 +253,56 @@ class TestMultipleAgents:
 
             replies = sorted(r["reply"] for r in results)
             assert replies == ["a", "b", "c"]
+
+
+# --- Capability enforcement (ADR-0005) ---
+
+
+class TestCapabilityEnforcement:
+    async def test_stream_buffered_agent_raises(self):
+        """mesh.stream() against a buffered agent raises StreamingNotSupported."""
+        spec = AgentSpec(name="buffered", description="Buffered agent")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def buffered(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            with pytest.raises(StreamingNotSupported):
+                async for chunk in mesh.stream("buffered", {"message": "hi"}):
+                    pass
+
+    async def test_call_streaming_agent_raises(self):
+        """mesh.call() against a streaming-only agent raises BufferedNotSupported."""
+        spec = AgentSpec(name="streamer", description="Streaming agent")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def streamer(req: SummarizeInput) -> SummarizeChunk:
+                for word in req.text.split():
+                    yield SummarizeChunk(delta=word)
+
+            with pytest.raises(BufferedNotSupported):
+                await mesh.call("streamer", {"text": "hello world"})
+
+
+# --- Streaming error propagation (ADR-0005) ---
+
+
+class TestStreamingErrors:
+    async def test_handler_error_during_streaming(self):
+        """Generator error mid-stream propagates to client as MeshError."""
+        spec = AgentSpec(name="failing-stream", description="Fails mid-stream")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def failing_stream(req: SummarizeInput) -> SummarizeChunk:
+                yield SummarizeChunk(delta="first")
+                raise ValueError("mid-stream failure")
+
+            chunks = []
+            with pytest.raises(MeshError, match="mid-stream failure"):
+                async for chunk in mesh.stream("failing-stream", {"text": "hello"}):
+                    chunks.append(chunk["delta"])
+
+            assert chunks == ["first"]

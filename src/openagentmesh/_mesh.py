@@ -17,7 +17,15 @@ from pydantic import BaseModel
 from ._context import ContextStore
 from ._handler import HandlerInfo, inspect_handler
 from ._local import EmbeddedNats
-from ._models import AgentContract, AgentSpec, CatalogEntry, MeshError
+from ._models import (
+    AgentContract,
+    AgentSpec,
+    BufferedNotSupported,
+    CatalogEntry,
+    ChunkSequenceError,
+    MeshError,
+    StreamingNotSupported,
+)
 
 _CATALOG_BUCKET = "mesh-catalog"
 _REGISTRY_BUCKET = "mesh-registry"
@@ -70,6 +78,7 @@ class AgentMesh:
         self._subscribed: set[str] = set()
         self._subscriptions: list[Any] = []
         self._embedded: EmbeddedNats | None = None
+        self._catalog_cache: dict[str, CatalogEntry] = {}
 
     # --- Async context manager ---
 
@@ -263,19 +272,42 @@ class AgentMesh:
 
         async def handler(msg: nats.aio.msg.Msg) -> None:
             request_id = ""
+            wants_stream = False
             if msg.headers:
                 request_id = msg.headers.get("X-Mesh-Request-Id", "")
+                wants_stream = msg.headers.get("X-Mesh-Stream") == "true"
 
             try:
+                # Defense-in-depth capability enforcement (ADR-0005)
+                if wants_stream and not info.streaming:
+                    raise StreamingNotSupported(agent=name, request_id=request_id)
+                if not wants_stream and info.streaming:
+                    raise BufferedNotSupported(agent=name, request_id=request_id)
+
                 if info.streaming:
                     await self._handle_streaming(msg, info, name, request_id)
                 else:
                     await self._handle_buffered(msg, info, name, request_id)
             except Exception as e:
-                error = MeshError(
-                    code="handler_error", message=str(e), agent=name, request_id=request_id
+                error = (
+                    e if isinstance(e, MeshError)
+                    else MeshError(
+                        code="handler_error", message=str(e),
+                        agent=name, request_id=request_id,
+                    )
                 )
-                if msg.reply:
+                if wants_stream:
+                    stream_subject = f"mesh.stream.{request_id}"
+                    await self._nc.publish(
+                        stream_subject,
+                        error.to_json(),
+                        headers={
+                            "X-Mesh-Stream-End": "true",
+                            "X-Mesh-Status": "error",
+                            "X-Mesh-Request-Id": request_id,
+                        },
+                    )
+                elif msg.reply:
                     await self._nc.publish(
                         msg.reply,
                         error.to_json(),
@@ -367,6 +399,7 @@ class AgentMesh:
         """Synchronous request/reply. Returns the response as a dict."""
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
+        self._check_buffered(name)
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
@@ -399,18 +432,44 @@ class AgentMesh:
         """Streaming request. Yields response chunks as dicts."""
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
+        self._check_streaming(name)
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
         stream_subject = f"mesh.stream.{request_id}"
 
-        chunks: asyncio.Queue[dict | None] = asyncio.Queue()
+        chunks: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
+        expected_seq = [0]
 
         async def chunk_handler(msg: nats.aio.msg.Msg) -> None:
             is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
+            is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
+
+            if is_error and msg.data:
+                err = json.loads(msg.data)
+                await chunks.put(MeshError(
+                    code=err.get("code", "handler_error"),
+                    message=err.get("message", "Unknown streaming error"),
+                    agent=err.get("agent", name),
+                    request_id=request_id,
+                    details=err.get("details", {}),
+                ))
+                return
+
             if is_end:
                 await chunks.put(None)
-            elif msg.data:
+                return
+
+            if msg.data and msg.headers:
+                seq = int(msg.headers.get("X-Mesh-Stream-Seq", "-1"))
+                if seq != expected_seq[0]:
+                    await chunks.put(ChunkSequenceError(
+                        agent=name,
+                        request_id=request_id,
+                        details={"expected_seq": expected_seq[0], "got_seq": seq},
+                    ))
+                    return
+                expected_seq[0] += 1
                 await chunks.put(json.loads(msg.data))
 
         sub = await self._nc.subscribe(stream_subject, cb=chunk_handler)
@@ -433,6 +492,8 @@ class AgentMesh:
                 chunk = await asyncio.wait_for(chunks.get(), timeout=remaining)
                 if chunk is None:
                     break
+                if isinstance(chunk, MeshError):
+                    raise chunk
                 yield chunk
         finally:
             await sub.unsubscribe()
@@ -535,6 +596,30 @@ class AgentMesh:
             except MeshError:
                 continue
         return contracts
+
+    # --- Capability checks (ADR-0005) ---
+
+    def _check_streaming(self, name: str) -> None:
+        """Raise StreamingNotSupported if agent does not stream."""
+        if name in self._agents:
+            _, _, contract = self._agents[name]
+            if not contract.streaming:
+                raise StreamingNotSupported(agent=name)
+            return
+        entry = self._catalog_cache.get(name)
+        if entry is not None and not entry.streaming:
+            raise StreamingNotSupported(agent=name)
+
+    def _check_buffered(self, name: str) -> None:
+        """Raise BufferedNotSupported if agent is streaming-only."""
+        if name in self._agents:
+            _, _, contract = self._agents[name]
+            if contract.streaming:
+                raise BufferedNotSupported(agent=name)
+            return
+        entry = self._catalog_cache.get(name)
+        if entry is not None and entry.streaming:
+            raise BufferedNotSupported(agent=name)
 
     # --- Internal helpers ---
 
