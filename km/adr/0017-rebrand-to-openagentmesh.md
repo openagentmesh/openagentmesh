@@ -2,7 +2,7 @@
 
 - **Type:** strategy
 - **Date:** 2026-04-13
-- **Status:** discussion
+- **Status:** documented
 - **Source:** km/notes/Docs structure.md, direct user confirmation
 
 ## Context

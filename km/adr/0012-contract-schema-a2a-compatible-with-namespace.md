@@ -2,7 +2,7 @@
 
 - **Type:** protocol
 - **Date:** 2026-04-03
-- **Status:** accepted
+- **Status:** documented
 - **Source:** .specstory/history/2026-04-03_22-03-07Z.md
 
 ## Context

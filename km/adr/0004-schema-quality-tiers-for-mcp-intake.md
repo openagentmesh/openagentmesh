@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-11
-- **Status:** accepted
+- **Status:** discussion
 - **Source:** km/notes/20260411_On JSON-RPC and MCP bridges.md
 
 ## Context
