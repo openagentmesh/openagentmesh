@@ -104,8 +104,8 @@ def _free_port() -> int:
 class EmbeddedNats:
     """Manages an embedded NATS server subprocess with JetStream."""
 
-    def __init__(self) -> None:
-        self.port: int = 0
+    def __init__(self, port: int = 0) -> None:
+        self.port: int = port
         self.url: str = ""
         self._process: subprocess.Popen | None = None
         self._data_dir: Path | None = None
@@ -115,7 +115,8 @@ class EmbeddedNats:
         if not binary:
             binary = await download_nats_server()
 
-        self.port = _free_port()
+        if self.port == 0:
+            self.port = _free_port()
         self.url = f"nats://127.0.0.1:{self.port}"
         self._data_dir = AGENTMESH_DIR / "data" / f"embedded-{self.port}"
         self._data_dir.mkdir(parents=True, exist_ok=True)
