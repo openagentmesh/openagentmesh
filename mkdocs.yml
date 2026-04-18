@@ -1,7 +1,7 @@
 site_name: OpenAgentMesh
 site_url: https://openagentmesh.dev/
 site_description: Python SDK for agent-to-agent communication over NATS
-repo_url: https://github.com/luca/openagentmesh
+repo_url: https://github.com/openagentmesh/openagentmesh
 repo_name: openagentmesh
 
 theme:
