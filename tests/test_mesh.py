@@ -60,6 +60,19 @@ class TestHelloWorld:
             result = await mesh.call("echo", EchoInput(message="world"))
             assert result["reply"] == "Echo: world"
 
+    async def test_instance_local(self):
+        """Instance-level local() reuses handlers registered before entering."""
+        mesh = AgentMesh()
+        spec = AgentSpec(name="echo", description="Echoes messages")
+
+        @mesh.agent(spec)
+        async def echo(req: EchoInput) -> EchoOutput:
+            return EchoOutput(reply=f"Echo: {req.message}")
+
+        async with mesh.local():
+            result = await mesh.call("echo", {"message": "instance"})
+            assert result["reply"] == "Echo: instance"
+
 
 # --- Capability inference (ADR-0031) ---
 

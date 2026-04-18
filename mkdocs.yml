@@ -87,6 +87,7 @@ nav:
   - Cookbook:
       - cookbook/index.md
       - Multi-Process Agents: cookbook/multi-process.md
+      - Multi-Module Projects: cookbook/multi-module.md
       - Shared Plan Coordination: cookbook/shared-plan.md
   - API Reference:
       - api/index.md

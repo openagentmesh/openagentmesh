@@ -54,7 +54,7 @@ class CASContext:
         await self._entry._commit()
 
 
-class ContextStore:
+class KVStore:
     """Public API for the ``mesh-context`` KV bucket."""
 
     def __init__(self, kv: KeyValue):

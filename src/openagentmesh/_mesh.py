@@ -15,7 +15,7 @@ from nats.js import JetStreamContext
 from nats.js.kv import KeyValue
 from pydantic import BaseModel
 
-from ._context import ContextStore
+from ._context import KVStore
 from ._handler import HandlerInfo, inspect_handler
 from ._local import EmbeddedNats
 from ._models import (
@@ -75,7 +75,7 @@ class AgentMesh:
         self._catalog_kv: KeyValue | None = None
         self._registry_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
-        self.kv: ContextStore | None = None
+        self.kv: KVStore | None = None
 
         # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
@@ -123,7 +123,7 @@ class AgentMesh:
         except Exception:
             self._context_kv = await self._js.create_key_value(bucket=_CONTEXT_BUCKET)
 
-        self.kv = ContextStore(self._context_kv)
+        self.kv = KVStore(self._context_kv)
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""
@@ -220,29 +220,58 @@ class AgentMesh:
 
     # --- local() ---
 
-    @classmethod
+    @staticmethod
     @asynccontextmanager
-    async def local(cls) -> AsyncIterator[AgentMesh]:
-        """Embedded NATS for tests and demos.
-
-        Starts a NATS subprocess, connects, creates KV buckets,
-        and tears everything down on exit::
-
-            async with AgentMesh.local() as mesh:
-                @mesh.agent(spec)
-                async def echo(req: EchoInput) -> EchoOutput:
-                    ...
-                result = await mesh.call("echo", {"message": "hi"})
-        """
+    async def _new_local() -> AsyncIterator[AgentMesh]:
         embedded = EmbeddedNats()
         await embedded.start()
-        mesh = cls(url=embedded.url)
+        mesh = AgentMesh(url=embedded.url)
         mesh._embedded = embedded
         try:
             async with mesh:
                 yield mesh
         finally:
             await embedded.stop()
+
+    @asynccontextmanager
+    async def _instance_local(self) -> AsyncIterator[AgentMesh]:
+        original_url = self._url
+        embedded = EmbeddedNats()
+        await embedded.start()
+        self._url = embedded.url
+        self._embedded = embedded
+        try:
+            async with self:
+                yield self
+        finally:
+            self._embedded = None
+            self._url = original_url
+            await embedded.stop()
+
+    def local(self_or_cls=None) -> AsyncIterator[AgentMesh]:
+        """Embedded NATS for tests and demos.
+
+        Works as both a classmethod (creates a new instance) and an
+        instance method (reuses the existing instance with all registered
+        agents)::
+
+            # Classmethod: new instance, single-file scripts
+            async with AgentMesh.local() as mesh:
+                @mesh.agent(spec)
+                async def echo(req: EchoInput) -> EchoOutput: ...
+                result = await mesh.call("echo", {"message": "hi"})
+
+            # Instance method: reuses existing instance and its agents
+            mesh = AgentMesh()
+            @mesh.agent(spec)
+            async def echo(req: EchoInput) -> EchoOutput: ...
+
+            async with mesh.local():
+                result = await mesh.call("echo", {"message": "hi"})
+        """
+        if self_or_cls is None or isinstance(self_or_cls, type):
+            return AgentMesh._new_local()
+        return self_or_cls._instance_local()
 
     # --- Registration ---
 
