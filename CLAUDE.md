@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OpenAgentMesh (OAM) is a protocol and Python SDK for multi-agent interation. Agents register on a shared message bus, publish typed contracts, and discover/invoke each other at runtime without direct coupling. Analogous to a service mesh (Istio/Linkerd) but for AI agents.
 
-**Positioning:** "The LAN of agents" -- internal fabric (vs. MCP for tools, A2A for cross-org federation).
+**Positioning:** "The fabric for multi-agent architectures, with the simplicity of a REST endpoint". Internal fabric (vs. MCP for tools, A2A for cross-org federation).
 
 **Naming convention:** Project/brand is "OpenAgentMesh" / "OAM". Code class name stays `AgentMesh` for ergonomics (`from openagentmesh import AgentMesh`).
 

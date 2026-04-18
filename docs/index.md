@@ -1,6 +1,16 @@
 # OpenAgentMesh
 
-> Service mesh for multi-agent architectures, with the simplicity of a REST endpoint
+> Connect agents like you'd call an API
+
+OpenAgentMesh is the fabric for multi-agent systems. It makes coding complex interaction patterns as simple as writing REST endpoints. 
+
+It's an SDK with batteries included:
+
+- Request/reply, pub/sub, and event streaming
+- Typed contracts with self-discovery
+- Shared KV and Object stores
+
+No hardcoded interactions, full decoupling.
 
 ```python
 import asyncio
