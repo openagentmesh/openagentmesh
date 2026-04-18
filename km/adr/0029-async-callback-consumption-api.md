@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** discussion
+- **Status:** superseded by ADR-0034
 - **Source:** conversation (cookbook design discussion on async pipeline use cases)
 
 ## Context
