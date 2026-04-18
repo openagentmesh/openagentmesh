@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-06
-- **Status:** accepted
+- **Status:** documented
 - **Source:** .specstory/history/2026-04-06_19-28-01Z.md
 
 ## Context

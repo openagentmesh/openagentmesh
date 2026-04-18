@@ -2,7 +2,7 @@
 
 - **Type:** strategy
 - **Date:** 2026-04-04
-- **Status:** accepted
+- **Status:** documented
 - **Source:** .specstory/history/2026-04-04_09-46-15Z.md
 
 ## Context

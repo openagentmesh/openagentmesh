@@ -2,7 +2,7 @@
 
 - **Type:** dx
 - **Date:** 2026-04-04
-- **Status:** accepted
+- **Status:** implemented
 - **Source:** .specstory/history/2026-04-04_09-50-29Z.md
 
 ## Context

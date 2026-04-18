@@ -2,7 +2,7 @@
 
 - **Type:** tooling
 - **Date:** 2026-04-04
-- **Status:** accepted
+- **Status:** documented
 - **Source:** .specstory/history/2026-04-04_14-27-58Z-i-want-to-use.md
 
 ## Context

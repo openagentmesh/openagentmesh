@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** discussion
+- **Status:** superseded by ADR-0031
 - **Source:** conversation (design discussion on agent vs tool distinction and decorator naming)
 
 ## Context
