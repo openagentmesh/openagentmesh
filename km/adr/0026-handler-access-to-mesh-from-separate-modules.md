@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** discussion
+- **Status:** documented
 - **Source:** conversation (cookbook design discussion on multi-agent coordination use cases)
 
 ## Context
@@ -85,8 +85,35 @@ async def research(req: ResearchInput) -> ResearchOutput:
 
 Downside: pollutes the domain model (`ResearchInput`) with infrastructure. A Pydantic model carrying a `mesh` attribute is unexpected and won't validate cleanly. This would require `ResearchInput` to allow extra fields or a separate injection mechanism, making it more magical than Option B.
 
+## Decision
+
+**Option A: singleton import pattern.** The developer creates `mesh = AgentMesh()` in a dedicated module (e.g., `mesh.py` or `app.py`) and imports it wherever handlers are defined. No SDK changes required.
+
+```python
+# mesh.py (no agent imports)
+from openagentmesh import AgentMesh
+mesh = AgentMesh()
+
+# agents/researcher.py
+from mesh import mesh
+
+@mesh.agent(spec)
+async def research(req: Input) -> Output:
+    data = await mesh.kv.get("tasks")  # closure over mesh; works at call time
+    ...
+
+# main.py
+from mesh import mesh
+import agents.researcher  # side-effect: registers handler
+mesh.run()
+```
+
+No circular imports. Handlers close over the module-level `mesh` instance. At decoration time, `@mesh.agent` stores metadata only. At call time (after `mesh.run()` or `async with mesh:`), all services (`mesh.kv`, `mesh.call`, etc.) are available.
+
+**Test composability:** `AgentMesh.local()` must be made to work as an instance method so the module-level singleton can be pointed at an embedded NATS for testing. Current `local()` is a static method that creates a new instance; handlers registered on the singleton are not available on it. Fixing this is a prerequisite for the pattern to work end-to-end.
+
+**Router pattern deferred.** A FastAPI-style `AgentRouter` with group defaults (shared channel, tags) is organizational sugar, not a structural requirement. If demand arises, it can be added as a separate ADR without breaking the singleton pattern.
+
 ## Open Questions
 
-- Is the shared singleton (Option A) sufficient for the real-world use cases, or will test isolation be a practical blocker?
-- Does Option B's `MeshContext` parameter conflict with the "one parameter, typed input" DX that the quickstart and cookbook recipes establish?
-- Should agent-to-agent calls from inside a handler (`mesh.call("other-agent", ...)`) be available on `MeshContext`, or is that always via the global `mesh`?
+- Exact API shape for instance-level `local()`: `async with mesh.local():` vs. `mesh.configure(url=embedded.url)` vs. other.

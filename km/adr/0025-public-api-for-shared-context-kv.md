@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-14
-- **Status:** discussion
+- **Status:** documented
 - **Source:** conversation (cookbook design discussion on dynamic task lists use case)
 
 ## Context
@@ -87,9 +87,17 @@ content = await mesh.workspace.get(key)
 
 Fewer namespaces on `mesh`, but the two backends have meaningfully different semantics (max size, content type, watch behavior, CAS vs. revision). Unifying them may create a leaky abstraction.
 
-## Open Questions
+## Resolution
 
-- Should `mesh.context` be a separate namespace from `mesh.workspace`, or a sub-accessor on the same object?
-- Should the CAS retry loop be automatic (Option B's `update()`) or explicit (Option A)?
-- Should typed Pydantic models be first-class (Option B) or opt-in via `model=` parameter?
-- Is the `update()` context manager the right CAS abstraction, or does it hide too much?
+Implemented as `mesh.kv` (`KVStore` class) with a blend of Options A and B:
+
+- **Accessor name:** `mesh.kv`. Short, obvious, no ambiguity with workspace/object store.
+- **API:** `get(key)`, `put(key, value)`, `cas(key)` context manager for single CAS attempt, `update(key, fn)` with automatic retry on conflict, `watch(key)` async iterator, `delete(key)`.
+- **CAS:** Both explicit (`cas()` context manager) and automatic (`update()` with retry). Covers simple and concurrent cases.
+- **Typing:** String-level get/put. Pydantic model round-tripping is the caller's responsibility (serialize before put, parse after get). Keeps the KV layer thin.
+
+Class name is `KVStore` (not `ContextStore`). The `update()` retry loop handles `KeyWrongLastSequenceError` up to `max_retries` (default 10).
+
+Remaining gaps for future work:
+- Typed Pydantic model get/put (Option B's `model=` parameter) could be added as convenience methods.
+- `update()` currently takes `Callable[[str], str]`; a context-manager variant (Option B's `async with mesh.kv.update(key, model=T) as state:`) could be added later.
