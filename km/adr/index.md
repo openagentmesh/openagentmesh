@@ -40,5 +40,5 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0030](0030-agentspec-model-for-decorator.md) | `AgentSpec` Pydantic model as single decorator argument | documented | feature/core-sdk |
 | [ADR-0031](0031-capabilities-over-type-taxonomy.md) | Capabilities over type taxonomy (supersedes ADR-0023b type portion) | documented | feature/core-sdk |
 | [ADR-0032](0032-catalog-change-subscription.md) | Catalog change subscription for client-side capability cache | documented | feature/streaming-protocol |
-| [ADR-0033](0033-cli-surface-and-phase-1-scope.md) | CLI surface and Phase 1 scope | spec | worktree-oam-cli |
+| [ADR-0033](0033-cli-surface-and-phase-1-scope.md) | CLI surface and Phase 1 scope | documented | worktree-oam-cli |
 | [ADR-0034](0034-subscribe-pubsub-and-managed-async-callback.md) | Subscribe primitive, publisher emission, and managed async callback | documented | |
