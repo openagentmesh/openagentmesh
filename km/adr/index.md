@@ -43,3 +43,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0033](0033-cli-surface-and-phase-1-scope.md) | CLI surface and Phase 1 scope | documented | worktree-oam-cli |
 | [ADR-0034](0034-subscribe-pubsub-and-managed-async-callback.md) | Subscribe primitive, publisher emission, and managed async callback | documented | |
 | [ADR-0035](0035-control-plane-for-agent-channel-scoping.md) | Control plane for agent and channel scoping | discussion | |
+| [ADR-0036](0036-orchestration-declarative-workflows-and-checkpointing.md) | Orchestration: declarative workflows and checkpointing | discussion | |
