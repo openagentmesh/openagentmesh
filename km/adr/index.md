@@ -42,3 +42,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0032](0032-catalog-change-subscription.md) | Catalog change subscription for client-side capability cache | documented | feature/streaming-protocol |
 | [ADR-0033](0033-cli-surface-and-phase-1-scope.md) | CLI surface and Phase 1 scope | documented | worktree-oam-cli |
 | [ADR-0034](0034-subscribe-pubsub-and-managed-async-callback.md) | Subscribe primitive, publisher emission, and managed async callback | documented | |
+| [ADR-0035](0035-control-plane-for-agent-channel-scoping.md) | Control plane for agent and channel scoping | discussion | |
