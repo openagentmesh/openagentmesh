@@ -45,4 +45,4 @@ One agent, one embedded mesh, no config. For real deployments, run `oam mesh up`
 
 ## Documentation
 
-Full docs at [openagentmesh.dev](https://openagentmesh.dev) (or run `uv run zensical serve` locally).
+[See the full docs here](https://openagentmesh.github.io/openagentmesh/) (or run `uv run zensical serve` locally).
