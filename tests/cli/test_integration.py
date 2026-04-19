@@ -53,7 +53,7 @@ async def test_catalog_inspect_call_health_end_to_end():
         assert any(e["name"] == "echo" for e in entries)
 
         inspect = await asyncio.to_thread(
-            _run_cli, ["agent", "inspect", "echo"], mesh._url
+            _run_cli, ["agent", "contract", "echo"], mesh._url
         )
         assert inspect.returncode == 0, inspect.stderr
         contract = json.loads(inspect.stdout)

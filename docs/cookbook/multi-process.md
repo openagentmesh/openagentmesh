@@ -104,7 +104,7 @@ sequenceDiagram
     NATS-->>Consumer: {"summary": "..."}
 ```
 
-## Moving to Shared NATS
+## Moving to production clusters
 
 Replace the default connection with a connection string in both files. Nothing else changes.
 

@@ -1,24 +1,20 @@
 # Quickstart
 
-Two agents discovering and calling each other in under 30 lines.
-
 ## Installation
 
 ```bash
 pip install openagentmesh
 ```
 
-## Prerequisites
+## Hello World
 
-Start a local development server in a separate terminal:
+Start a local development server:
 
 ```bash
 oam mesh up
 ```
 
-## Hello World
-
-One file. One agent. Registered and serving.
+Register an agent (`agent.py`):
 
 ```python
 from pydantic import BaseModel
@@ -32,23 +28,74 @@ class EchoInput(BaseModel):
 class EchoOutput(BaseModel):
     reply: str
 
-spec = AgentSpec(name="echo", description="Echoes a message back.")
-
-@mesh.agent(spec)
+@mesh.agent(AgentSpec(name="echo", description="Echoes a message back."))
 async def echo(req: EchoInput) -> EchoOutput:
     return EchoOutput(reply=f"Echo: {req.message}")
 
 mesh.run()  # blocks, like uvicorn.run()
 ```
 
+```bash
+python agent.py
+```
+
+Now discover and call it from the terminal:
+
+```bash
+oam mesh catalog                          # list registered agents
+oam agent contract echo                   # view the full contract and input schema
+oam agent call echo '{"message": "hi"}'  # invoke it
+```
+
 !!! info "What just happened?"
-    `oam mesh up` started a local development server with JetStream and KV buckets. `@mesh.agent` registered `echo` with a typed contract. `mesh.run()` connects to the bus, publishes the contract, and serves requests until interrupted.
+    `oam mesh up` started a local development server with JetStream and KV buckets. `@mesh.agent` registered `echo` with a typed contract derived from the function signature. `mesh.run()` connects to the bus, publishes the contract, and serves requests until interrupted. The CLI discovered `echo` from the catalog without knowing its address.
+
+## Agent-to-Agent Calls
+
+The fabric's value shows when agents call each other. One file, two agents: `editor` calls `writer` by name, with no import and no address.
+
+```python
+from pydantic import BaseModel
+from openagentmesh import AgentMesh, AgentSpec
+
+mesh = AgentMesh()
+
+class DraftInput(BaseModel):
+    topic: str
+
+class DraftOutput(BaseModel):
+    text: str
+
+class EditInput(BaseModel):
+    topic: str
+
+class EditOutput(BaseModel):
+    polished: str
+
+@mesh.agent(AgentSpec(name="writer", description="Drafts text on a given topic."))
+async def writer(req: DraftInput) -> DraftOutput:
+    return DraftOutput(text=f"A draft about {req.topic}.")
+
+@mesh.agent(AgentSpec(name="editor", description="Polishes a draft by calling writer."))
+async def editor(req: EditInput) -> EditOutput:
+    draft = await mesh.call("writer", {"topic": req.topic})
+    return EditOutput(polished=draft["text"].upper())
+
+mesh.run()
+```
+
+```bash
+python app.py &
+oam agent call editor '{"topic": "meshes"}'
+```
+
+`editor` discovers and calls `writer` through the mesh. The same code works whether `writer` runs in the same process or on a different machine.
 
 ## Two Separate Processes
 
-The more realistic case: provider and consumer run independently.
+The more realistic deployment: each agent runs independently.
 
-**provider.py.** Registers the agent and keeps it running:
+**writer.py:**
 
 ```python
 from pydantic import BaseModel
@@ -63,19 +110,15 @@ class SummarizeInput(BaseModel):
 class SummarizeOutput(BaseModel):
     summary: str
 
-spec = AgentSpec(
+@mesh.agent(AgentSpec(
     name="summarizer",
     channel="nlp",
     description="Summarizes text to a target length. Input: raw text. Not for structured data.",
-)
-
-@mesh.agent(spec)
+))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
-    # Use any LLM framework, any model, any logic here.
-    truncated = req.text[: req.max_length]
-    return SummarizeOutput(summary=truncated)
+    return SummarizeOutput(summary=req.text[: req.max_length])
 
-mesh.run()  # blocks, like uvicorn.run()
+mesh.run()
 ```
 
 **consumer.py.** Discovers the agent and calls it:
@@ -87,25 +130,21 @@ from openagentmesh import AgentMesh
 async def main():
     mesh = AgentMesh()
     async with mesh:
-        # See what's on the mesh
         catalog = await mesh.catalog()
         for entry in catalog:
             print(entry.name, "-", entry.description)
 
-        # Call by name
         result = await mesh.call(
             "summarizer",
-            {"text": "OpenAgentMesh makes coding multi-agent systems as easy as writing REST endpoint", "max_length": 50},
+            {"text": "OpenAgentMesh makes coding multi-agent systems as easy as writing a REST endpoint", "max_length": 50},
         )
         print(result["summary"])
 
 asyncio.run(main())
 ```
 
-Run the provider first, then the consumer:
-
 ```bash
-python provider.py &
+python writer.py &
 python consumer.py
 ```
 
