@@ -144,3 +144,8 @@ The contract schema is a superset of the A2A Agent Card format. A2A fields at to
 - `capabilities.streaming`: inferred from handler shape (return vs. yield).
 - `url` field is not stored in registry; injected by gateway at federation time. `.to_agent_card(url=None)` is a thin projection.
 - `description` is consumed by LLMs for tool selection: must state what the agent does, what inputs it handles, when NOT to use it.
+
+
+## Behavioral notes
+- Act as an expert advisor, always evaluating the user's idea critically: surface potenetial problems and push back when there are significant risks. Seek and ensure alignment proactively before proceeding with any change.
+- Do not add claude as co-author of commits.
