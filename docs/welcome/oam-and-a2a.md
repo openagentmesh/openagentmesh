@@ -66,4 +66,4 @@ The contract's `to_registry_json()` method already produces A2A-compatible JSON.
 !!! info "One contract, two protocols"
     You write one agent, register one contract, and project it to A2A format only at the boundary where internal meets external. No duplication, no drift.
 
-For how OAM relates to MCP, see [OAM and MCP](oam-and-mcp.md). For the technology choices behind OAM, see [Technology Stack](technology.md).
+For how OAM relates to MCP, see [OAM and MCP](oam-and-mcp.md). For the technology choices behind OAM, see [Technology Stack](../learn/technology.md).

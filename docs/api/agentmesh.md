@@ -35,7 +35,7 @@ async with AgentMesh.local() as mesh:
 
 ## Lifecycle
 
-Two lifecycle models, one for each [participation pattern](../concepts/participation.md).
+Two lifecycle models, one for each [participation pattern](../learn/concepts/participation.md).
 
 ### `mesh.run()`
 
@@ -97,7 +97,7 @@ Capabilities are inferred from the handler shape at decoration time. `AgentSpec`
 
 ## Invocation
 
-Four interaction modes. See [Invocation](../concepts/invocation.md) for patterns and semantics.
+Four interaction modes. See [Invocation](../learn/concepts/invocation.md) for patterns and semantics.
 
 ### `await mesh.call(name, payload, *, timeout=30.0)`
 

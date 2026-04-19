@@ -2,9 +2,11 @@
 
 An agent is an async function registered on the mesh. It receives typed input, does work, and returns typed output.
 
+In practice, **any async function can be registered as an agent**, not just LLM-driven code: deterministic tools, data transformers, event publishers, or anything else that fits the function shape. The library was designed primarily for multi-agent systems, so the "agent" name stuck in the API even though the abstraction is more general.
+
 ## Registering an Agent
 
-Define an `AgentSpec` with the agent's metadata, then apply `@mesh.agent`:
+Define an `AgentSpec` with the agent's metadata, then apply `@mesh.agent`. This first example uses a **non-streaming** handler (the most common shape): take input, return one output.
 
 ```python
 from pydantic import BaseModel
@@ -40,9 +42,11 @@ The SDK infers capabilities from the handler's signature at decoration time. No 
 
 | Pattern | Handler shape | Capabilities |
 |---------|--------------|--------------|
-| Buffered | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
+| Non-streaming | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
 | Streaming | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
-| Event emitter | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
+| Publisher | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
+
+The non-streaming pattern is the one shown in the [registration example above](#registering-an-agent). The two yielding patterns are below.
 
 ### Streaming agent
 
@@ -58,7 +62,7 @@ async def summarize(req: SummarizeInput) -> SummarizeChunk:
         yield SummarizeChunk(delta=token)
 ```
 
-### Event emitter
+### Publisher
 
 ```python
 class PriceEvent(BaseModel):

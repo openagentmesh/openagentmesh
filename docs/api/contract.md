@@ -53,7 +53,7 @@ tool_def = {
 | `invocable` | `bool` | Whether the agent accepts requests |
 | `streaming` | `bool` | Whether the agent streams responses |
 | `input_schema` | `dict \| None` | JSON Schema for input model |
-| `output_schema` | `dict \| None` | JSON Schema for output model (buffered agents) |
+| `output_schema` | `dict \| None` | JSON Schema for output model (non-streaming agents) |
 | `chunk_schema` | `dict \| None` | JSON Schema for chunk model (streaming agents) |
 | `capabilities` | `dict` | Capability flags (`streaming`, `invocable`) |
 | `subject` | `str` | NATS invocation subject |

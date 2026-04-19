@@ -5,3 +5,4 @@ Practical recipes for common AgentMesh patterns. Each recipe is self-contained w
 - [Multi-Process Agents](multi-process.md): Run provider and consumer as separate processes
 - [Multi-Module Projects](multi-module.md): Organize agents across multiple files with a shared mesh instance
 - [Shared Plan Coordination](shared-plan.md): Two agents coordinate on a shared plan via CAS
+- [LLM-Driven Tool Selection](llm-tool-selection.md): Discover agents at runtime and expose them as tools to an LLM
