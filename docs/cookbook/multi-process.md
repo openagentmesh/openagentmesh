@@ -2,6 +2,8 @@
 
 The most common deployment: one process provides an agent, another discovers and calls it. No shared imports, no shared memory. Just NATS.
 
+This recipe is the canonical pairing of the [Provider and Consumer participation patterns](../learn/concepts/participation.md), each in its own process.
+
 ## Provider
 
 **provider.py** registers a summarizer agent and blocks:

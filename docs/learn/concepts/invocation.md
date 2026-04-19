@@ -28,7 +28,7 @@ async for chunk in mesh.stream("summarizer", {"text": doc}):
     print(chunk["delta"], end="")
 ```
 
-The agent must be a streaming handler (async generator). Calling `mesh.stream()` against a buffered agent raises `StreamingNotSupported`. Calling `mesh.call()` against a streaming-only agent raises `BufferedNotSupported`. Both checks happen locally before the request is sent.
+The agent must be a streaming handler (async generator). Calling `mesh.stream()` against a non-streaming agent raises `StreamingNotSupported`. Calling `mesh.call()` against a streaming-only agent raises `BufferedNotSupported`. Both checks happen locally before the request is sent.
 
 ## Async Callback
 
@@ -95,15 +95,4 @@ No invocation; any subscriber receives the event. Useful for notifications, audi
 
 ## Error Handling
 
-When an invocation fails, `mesh.call()` and `mesh.stream()` raise `MeshError` with a structured error:
-
-```python
-from openagentmesh import MeshError
-
-try:
-    result = await mesh.call("summarizer", payload)
-except MeshError as e:
-    print(e.code, e.message)
-```
-
-Error codes: `validation_error`, `handler_error`, `timeout`, `not_found`, `streaming_not_supported`, `buffered_not_supported`, `chunk_sequence_error`.
+When an invocation fails, `mesh.call()` and `mesh.stream()` raise `MeshError`. See [Error Handling](errors.md) for the full envelope, error codes, and propagation semantics.

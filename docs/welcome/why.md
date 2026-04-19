@@ -84,4 +84,4 @@ A service mesh gives microservices discovery, load balancing, and observability 
 !!! info "One architecture, not two modes"
     The same agent code runs against a local NATS server during development and a multi-region cluster in production. The only thing that changes is the connection string: `AgentMesh()` becomes `AgentMesh("nats://mesh.company.com:4222")`.
 
-For a deeper look at the technology choices, see [Technology Stack](technology.md).
+For a deeper look at the technology choices, see [Technology Stack](../learn/technology.md).

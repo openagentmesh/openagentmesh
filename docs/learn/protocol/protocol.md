@@ -60,7 +60,7 @@ The protocol requires four JetStream buckets, pre-created on startup by `oam mes
 |--------|---------|-------|
 | `mesh-artifacts` | Binary artifacts shared between agents | For files, images, large payloads. Uses JetStream Object Store API |
 
-Bucket names use hyphens, not dots (NATS KV naming constraint; see [ADR-0013](../adr/0013-hyphenated-kv-bucket-names.md)).
+Bucket names use hyphens, not dots (NATS KV naming constraint).
 
 ## Consistency Model
 
