@@ -14,34 +14,46 @@ No hardcoded interactions, full decoupling.
 
 ## Quickstart
 
-```python
-import asyncio
-from openagentmesh import AgentMesh, AgentSpec
-from pydantic import BaseModel
+**1. Start the mesh:**
 
-class Input(BaseModel):
-    content: str
-
-class Summary(BaseModel):
-    text: str
-
-async def main():
-    async with AgentMesh.local() as mesh:
-
-        spec = AgentSpec(name="summarizer", channel="nlp",
-                         description="Summarizes text to a target length.")
-
-        @mesh.agent(spec)
-        async def summarize(req: Input) -> Summary:
-            return Summary(text=req.content[:100] + "...")
-
-        result = await mesh.call("summarizer", {"content": "A long document..."})
-        print(result)  # {"text": "A long document..."}
-
-asyncio.run(main())
+```bash
+oam mesh up
 ```
 
-One agent, one embedded mesh, no config. For real deployments, run `oam mesh up` and use `AgentMesh()` with `mesh.run()`.
+**2. Register an agent** (`agent.py`):
+
+```python
+from pydantic import BaseModel
+from openagentmesh import AgentMesh, AgentSpec
+
+mesh = AgentMesh()
+
+class EchoInput(BaseModel):
+    message: str
+
+class EchoOutput(BaseModel):
+    reply: str
+
+@mesh.agent(AgentSpec(name="echo", description="Echoes a message back."))
+async def echo(req: EchoInput) -> EchoOutput:
+    return EchoOutput(reply=f"Echo: {req.message}")
+
+mesh.run()
+```
+
+```bash
+python agent.py
+```
+
+**3. Discover and call it from the terminal:**
+
+```bash
+oam mesh catalog
+oam agent contract echo
+oam agent call echo '{"message": "hello"}'
+```
+
+No hardcoded addresses. The CLI discovers `echo` from the mesh, reads its contract, and calls it.
 
 ## Documentation
 

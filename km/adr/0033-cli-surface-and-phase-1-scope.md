@@ -39,7 +39,7 @@ oam mesh catalog [--json]           # list registered agents (wraps mesh.catalog
 oam mesh listen <channel> [--json]  # tap a channel or wildcard, stream messages to stdout
 oam agent call <name> [payload]     # invoke; payload is JSON arg or stdin
 oam agent stream <name> [payload]   # invoke streaming; chunks to stdout
-oam agent inspect <name> [--json]   # dump the contract (A2A card + x-agentmesh)
+oam agent contract <name> [--json]  # dump the contract (A2A card + x-agentmesh)
 ```
 
 ### Health is deferred
@@ -98,7 +98,7 @@ Third bullet
 Inspecting a contract:
 
 ```bash
-$ oam agent inspect translator --json
+$ oam agent contract translator --json
 {
   "name": "translator",
   "description": "...",

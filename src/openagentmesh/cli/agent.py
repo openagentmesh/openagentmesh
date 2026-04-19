@@ -15,7 +15,7 @@ from ._output import as_json
 
 agent_app = typer.Typer(
     name="agent",
-    help="Invoke and inspect individual agents on the mesh.",
+    help="Invoke and query contracts of individual agents on the mesh.",
     no_args_is_help=True,
 )
 
@@ -103,8 +103,8 @@ def stream(
         raise typer.Exit(1) from exc
 
 
-@agent_app.command("inspect")
-def inspect(
+@agent_app.command("contract")
+def contract(
     name: str = typer.Argument(..., help="Agent name."),
     url_flag: str | None = typer.Option(None, "--url", help="Override mesh URL."),
     json_out: bool = typer.Option(True, "--json/--text", help="JSON (default) or text summary."),

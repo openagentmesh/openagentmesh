@@ -103,13 +103,13 @@ Same as `call`, but for streaming agents. Each chunk is printed as it arrives.
 oam agent stream summarizer '{"text": "long document..."}'
 ```
 
-### `oam agent inspect`
+### `oam agent contract`
 
 Fetch and display an agent's contract (A2A card plus OAM fields).
 
 ```bash
-oam agent inspect translator              # JSON (default)
-oam agent inspect translator --text       # compact text summary
+oam agent contract translator              # JSON (default)
+oam agent contract translator --text       # compact text summary
 ```
 
 !!! note "Agent health is not yet exposed"
