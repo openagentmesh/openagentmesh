@@ -4,7 +4,7 @@ from ._mesh import AgentMesh
 from ._models import (
     AgentContract,
     AgentSpec,
-    BufferedNotSupported,
+    StreamingRequired,
     CatalogEntry,
     ChunkSequenceError,
     MeshError,
@@ -16,7 +16,7 @@ __all__ = [
     "AgentMesh",
     "AgentSpec",
     "AgentContract",
-    "BufferedNotSupported",
+    "StreamingRequired",
     "CatalogEntry",
     "ChunkSequenceError",
     "MeshError",
