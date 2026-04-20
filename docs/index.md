@@ -103,4 +103,4 @@ OpenAgentMesh contracts are a superset of the A2A Agent Card format. Agents on t
 
 - **[Quickstart](welcome/quickstart.md)**: Two agents talking in under 30 lines
 - **[Why OpenAgentMesh](welcome/why.md)**: The problem in depth and how OAM solves it
-- **[Concepts](learn/concepts/index.md)**: Contracts, channels, discovery, and invocation patterns
+- **[Concepts](concepts/participation.md)**: Contracts, channels, discovery, and invocation patterns

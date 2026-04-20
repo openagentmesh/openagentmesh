@@ -1,5 +1,7 @@
 # Technology Stack
 
+The choices behind OpenAgentMesh: why NATS as the single infrastructure dependency, why Pydantic for contracts, and how the architecture maps to patterns you already know from service meshes.
+
 ## Why NATS
 
 Most agent frameworks cobble together separate systems for messaging, service discovery, and state management. OAM uses **NATS**, a single deployment that provides everything the mesh needs:
@@ -116,5 +118,3 @@ Run `oam mesh up` to start a local development server with JetStream and KV pre-
 
 !!! info "Not two modes, one continuum"
     Local and production are endpoints on the same architecture. Moving from one developer experimenting locally to a team sharing a NATS cluster requires changing one line of code.
-
-For how OAM fits in the broader multi-agent ecosystem, see [The Multi-Agent Landscape](enterprise-landscape.md).

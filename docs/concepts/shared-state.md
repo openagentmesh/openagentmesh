@@ -2,6 +2,9 @@
 
 Agents on the mesh share structured data through the **KV Store** and binary artifacts through the **Workspace**. Both are backed by NATS JetStream and provisioned automatically when the mesh starts.
 
+!!! warning "Not a database"
+    KV Store and Workspace are coordination primitives, not long-term storage. They are designed for in-flight state, intermediate artifacts, and session-scoped context. NATS JetStream does not provide the durability guarantees (backup/restore, replication policies, ACID transactions) of a database or cloud object storage. Persist anything that must survive beyond the current workflow to a proper datastore.
+
 ## KV Store (`mesh.kv`)
 
 A key-value store for structured data (JSON strings, counters, configuration). Backed by the `mesh-context` JetStream KV bucket.
@@ -61,7 +64,7 @@ async for value in mesh.kv.watch("plan-001"):
         break
 ```
 
-The watcher receives the new value on every update. Useful for dashboards, progress monitors, or agents that react to state changes. See the [Reactive Pipeline](../../cookbook/reactive-pipeline.md) recipe for a full example of building an orchestrator-free pipeline with `watch()`.
+The watcher receives the new value on every update. Useful for dashboards, progress monitors, or agents that react to state changes. See the [Reactive Pipeline](../cookbook/reactive-pipeline.md) recipe for a full example of building an orchestrator-free pipeline with `watch()`.
 
 Wildcard watching matches keys by pattern. Use `.` as the key separator to enable this, since NATS treats `.` as a token delimiter:
 
@@ -116,7 +119,7 @@ await mesh.workspace.put("pipeline/step-1/output.json", result_bytes)
 data = await mesh.workspace.get("pipeline/step-1/output.json")
 ```
 
-This pattern is central to the [Parallel RAG Indexing](../../cookbook/parallel-rag-indexing.md) recipe, where an orchestrator uploads a document and multiple indexer agents read it concurrently.
+This pattern is central to the [Parallel RAG Indexing](../cookbook/parallel-rag-indexing.md) recipe, where an orchestrator uploads a document and multiple indexer agents read it concurrently.
 
 ## When to use which
 

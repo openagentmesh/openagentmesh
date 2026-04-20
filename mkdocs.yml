@@ -72,28 +72,23 @@ nav:
       - Why OpenAgentMesh: welcome/why.md
       - OAM and MCP: welcome/oam-and-mcp.md
       - OAM and A2A: welcome/oam-and-a2a.md
+      - Technology Stack: welcome/technology.md
       - Getting Help: welcome/help.md
-  - Learn:
-      - learn/index.md
-      - Technology Stack: learn/technology.md
-      - The Protocol:
-          - learn/protocol/index.md
-          - Wire Protocol: learn/protocol/protocol.md
-          - Subject Naming: learn/protocol/subjects.md
-          - Message Envelope: learn/protocol/envelope.md
-      - Concepts:
-          - learn/concepts/index.md
-          - Participation: learn/concepts/participation.md
-          - Agents: learn/concepts/agents.md
-          - Channels: learn/concepts/channels.md
-          - Contracts: learn/concepts/contracts.md
-          - Discovery: learn/concepts/discovery.md
-          - Invocation: learn/concepts/invocation.md
-          - Shared State: learn/concepts/shared-state.md
-          - Error Handling: learn/concepts/errors.md
-          - Usage Attribution: learn/concepts/usage.md
+  - Protocol:
+      - Wire Protocol: protocol/protocol.md
+      - Subject Naming: protocol/subjects.md
+      - Message Envelope: protocol/envelope.md
+  - Concepts:
+      - Participation: concepts/participation.md
+      - Agents: concepts/agents.md
+      - Channels: concepts/channels.md
+      - Contracts: concepts/contracts.md
+      - Discovery: concepts/discovery.md
+      - Invocation: concepts/invocation.md
+      - Shared State: concepts/shared-state.md
+      - Error Handling: concepts/errors.md
+      - Usage Attribution: concepts/usage.md
   - Cookbook:
-      - cookbook/index.md
       - Multi-Process Agents: cookbook/multi-process.md
       - Multi-Module Projects: cookbook/multi-module.md
       - Shared Plan Coordination: cookbook/shared-plan.md
@@ -103,7 +98,6 @@ nav:
       - Reactive Pipeline: cookbook/reactive-pipeline.md
       - Parallel RAG Indexing: cookbook/parallel-rag-indexing.md
   - API Reference:
-      - api/index.md
       - AgentMesh: api/agentmesh.md
       - AgentContract: api/contract.md
       - CLI: api/cli.md
