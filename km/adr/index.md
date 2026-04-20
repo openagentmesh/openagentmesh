@@ -16,7 +16,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0007](0007-use-plain-pydantic-not-pydanticai.md) | Use plain Pydantic, not PydanticAI | documented | |
 | [ADR-0008](0008-dx-first-development-strategy.md) | DX-first development strategy | documented | |
 | [ADR-0009](0009-catalog-as-sole-discovery-primitive.md) | Catalog as sole discovery primitive | documented | |
-| [ADR-0010](0010-pull-object-store-into-phase-1.md) | Pull object store into Phase 1 | deferred | |
+| [ADR-0010](0010-pull-object-store-into-phase-1.md) | Pull object store into Phase 1 | documented | feature/object-store |
 | [ADR-0011](0011-use-uv-with-ruff-and-ty.md) | Use uv with ruff and ty | documented | |
 | [ADR-0012](0012-contract-schema-a2a-compatible-with-namespace.md) | Contract schema: A2A-compatible with namespace | documented | |
 | [ADR-0013](0013-hyphenated-kv-bucket-names.md) | Hyphenated KV bucket names | documented | |
@@ -47,3 +47,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0037](0037-oam-scope-per-agent-visibility-and-reachability.md) | OAM scope: per-agent visibility and reachability | spec | |
 | [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | spec | |
 | [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
+| [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | discussion | |
