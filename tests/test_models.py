@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from openagentmesh import AgentSpec, CatalogEntry, MeshError, MeshTimeout
 from openagentmesh._models import (
-    BufferedNotSupported,
+    StreamingRequired,
     ChunkSequenceError,
     StreamingNotSupported,
 )
@@ -93,8 +93,8 @@ class TestCatalogEntry:
 
 
 class TestHandlerInspection:
-    def test_buffered_handler(self):
-        """Buffered: invocable=True, streaming=False."""
+    def test_responder_handler(self):
+        """Responder: invocable=True, streaming=False."""
 
         async def handler(req: EchoInput) -> EchoOutput:
             return EchoOutput(reply=req.message)
@@ -170,10 +170,10 @@ class TestErrorSubclasses:
         assert err.code == "streaming_not_supported"
         assert "echo" in str(err)
 
-    def test_buffered_not_supported_is_mesh_error(self):
-        err = BufferedNotSupported(agent="streamer")
+    def test_streaming_required_is_mesh_error(self):
+        err = StreamingRequired(agent="streamer")
         assert isinstance(err, MeshError)
-        assert err.code == "buffered_not_supported"
+        assert err.code == "streaming_required"
         assert "streamer" in str(err)
 
     def test_chunk_sequence_error_is_mesh_error(self):

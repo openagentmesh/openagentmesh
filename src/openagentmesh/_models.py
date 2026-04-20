@@ -250,7 +250,7 @@ class MeshError(Exception):
 
 
 class StreamingNotSupported(MeshError):
-    """Raised when ``mesh.stream()`` targets a buffered agent (ADR-0005)."""
+    """Raised when ``mesh.stream()`` targets a responder agent (ADR-0005)."""
 
     def __init__(self, agent: str = "", request_id: str = ""):
         super().__init__(
@@ -261,12 +261,12 @@ class StreamingNotSupported(MeshError):
         )
 
 
-class BufferedNotSupported(MeshError):
-    """Raised when ``mesh.call()`` targets a streaming-only agent (ADR-0005)."""
+class StreamingRequired(MeshError):
+    """Raised when ``mesh.call()`` targets a streaming-only agent (ADR-0005, ADR-0044)."""
 
     def __init__(self, agent: str = "", request_id: str = ""):
         super().__init__(
-            code="buffered_not_supported",
+            code="streaming_required",
             message=f"Agent '{agent}' is streaming-only; use mesh.stream() instead",
             agent=agent,
             request_id=request_id,

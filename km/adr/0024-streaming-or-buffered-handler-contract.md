@@ -1,4 +1,6 @@
-# ADR-0024: Streaming or buffered as a per-agent handler choice, both typed
+# ADR-0024: Streamer or responder as a per-agent handler choice, both typed
+
+> **Note:** The pattern names "Buffered" and "Streaming" used in the original ADR were renamed to "Responder" and "Streamer" respectively by ADR-0044.
 
 - **Type:** api-design
 - **Date:** 2026-04-14
@@ -23,9 +25,9 @@ The core insight that resolves the tension: **LLM API clients are already either
 
 ## Decision
 
-In v1, an agent is either buffered or streaming. Not both. Both modes produce typed, validated output. The handler's return-vs-yield behavior determines the mode; the SDK enforces it at registration time.
+In v1, an agent is either a responder or a streamer. Not both. Both modes produce typed, validated output. The handler's return-vs-yield behavior determines the mode; the SDK enforces it at registration time.
 
-### Buffered agents
+### Responder agents
 
 The handler is a standard async function that returns a typed Pydantic model:
 
@@ -39,9 +41,9 @@ async def classify(req: ClassifyInput) -> ClassifyOutput:
 - `capabilities.streaming: false` set in contract
 - Return type annotation validated against `output_schema` at registration
 - Consumer invokes with `mesh.call()`, receives typed `ClassifyOutput`
-- `mesh.stream()` against this agent returns `streaming_not_supported` error
+- `mesh.stream()` against this agent returns `streaming_not_supported` error (raise `StreamingNotSupported`)
 
-### Streaming agents
+### Streamer agents
 
 The handler is an async generator function that yields typed chunk models:
 
@@ -58,25 +60,25 @@ async def summarize(req: SummarizeInput) -> SummarizeChunk:
 - `capabilities.streaming: true` set in contract
 - Yield type annotation validated against `chunk_schema` at registration
 - Consumer invokes with `mesh.stream()`, receives a typed async generator of `SummarizeChunk`
-- `mesh.call()` against this agent returns `streaming_not_supported` error
+- `mesh.call()` against this agent returns `streaming_required` error (raise `StreamingRequired`)
 - Chunk schema is published in the contract under `x-agentmesh.chunk_schema`
 
 ### SDK enforcement at registration time
 
 The SDK inspects the handler at `@mesh.agent` decoration time:
 
-1. `inspect.isasyncgenfunction(handler)` → streaming agent
-2. Not an async generator → buffered agent
+1. `inspect.isasyncgenfunction(handler)` → streamer agent
+2. Not an async generator → responder agent
 3. Return annotation required in both cases. Missing annotation raises `RegistrationError`.
-4. For buffered agents: return type must be a `BaseModel` subclass.
-5. For streaming agents: yield type must be a `BaseModel` subclass.
+4. For responder agents: return type must be a `BaseModel` subclass.
+5. For streamer agents: yield type must be a `BaseModel` subclass.
 6. `capabilities.streaming` in the contract is set automatically based on (1)/(2). Manual override is permitted but discouraged.
 
 ### Handler signature summary
 
 ```
-Buffered agent:   async def handler(req: Input) -> Output      # return, streaming: false
-Streaming agent:  async def handler(req: Input) -> Chunk       # yield, streaming: true
+Responder agent:  async def handler(req: Input) -> Output      # return, streaming: false
+Streamer agent:   async def handler(req: Input) -> Chunk       # yield, streaming: true
 Publisher:        async def handler() -> Event                 # yield, no request, type="publisher"
 ```
 
@@ -85,21 +87,21 @@ The return annotation in Python cannot distinguish `-> Chunk` (return) from `-> 
 ### Consumer side
 
 ```python
-# Buffered
+# Responder
 result = await mesh.call("classifier", payload)
 # result is ClassifyOutput, validated against output_schema
 
-# Streaming
+# Streamer
 async for chunk in mesh.stream("summarizer", payload):
     print(chunk.delta, end="")
 # chunk is SummarizeChunk, validated against chunk_schema
 ```
 
-`mesh.call()` and `mesh.stream()` are not interchangeable. Calling the wrong one returns a `MeshError` with `code: "streaming_not_supported"` (ADR-0005 enforcement already covers the request-side check; this ADR adds the registration-time enforcement on the provider side).
+`mesh.call()` and `mesh.stream()` are not interchangeable. Calling the wrong one returns a `MeshError` with `code: "streaming_not_supported"` or `code: "streaming_required"` (ADR-0005 enforcement already covers the request-side check; this ADR adds the registration-time enforcement on the provider side).
 
 ### Contract schema additions
 
-The contract gains a `chunk_schema` field under `x-agentmesh` for streaming agents:
+The contract gains a `chunk_schema` field under `x-agentmesh` for streamer agents:
 
 ```json
 {
@@ -116,11 +118,11 @@ The contract gains a `chunk_schema` field under `x-agentmesh` for streaming agen
 }
 ```
 
-`output_schema` (in `skills[0]`) is still present but reflects the final aggregated output type if known, or is omitted for streaming-only agents that have no declared aggregate output.
+`output_schema` (in `skills[0]`) is still present but reflects the final aggregated output type if known, or is omitted for streamer-only agents that have no declared aggregate output.
 
 ## Future: dual-mode agents (v2)
 
-A common real-world need: an LLM agent that can serve both streaming and buffered callers from the same registration. The natural extension is a sub-decorator that declares an aggregator:
+A common real-world need: an LLM agent that can serve both streamer and responder callers from the same registration. The natural extension is a sub-decorator that declares an aggregator:
 
 ```python
 @mesh.agent(name="summarizer", channel="nlp", description="...")
@@ -136,14 +138,14 @@ def assemble(chunks: list[SummarizeChunk]) -> SummarizeOutput:
 
 When `@summarize.aggregate` is declared:
 - `mesh.stream()` routes to the generator
-- `mesh.call()` runs the generator, collects all chunks, passes them to the assembler, returns the typed `SummarizeOutput`
+- `mesh.call()` runs the generator, collects all chunks, passes them to the assembler, returns the typed `SummarizeOutput` (responder path)
 - Both `chunk_schema` and `output_schema` are published in the contract
 
 This is deferred to v2. The v1 constraint (pick one mode) is intentional: it keeps the implementation surface small and forces the common case to be explicit.
 
 ## Alternatives Considered
 
-**`mesh.call()` auto-buffers streaming agents.** The SDK could silently collect all chunks and return them assembled when `mesh.call()` is used against a streaming agent. Rejected: the assembly logic is domain-specific (text concatenation, JSON merging, last-chunk-wins) and cannot be inferred generically. Silent buffering would produce garbage for non-text chunk types.
+**`mesh.call()` auto-collects from streamer agents.** The SDK could silently collect all chunks and return them assembled when `mesh.call()` is used against a streamer agent. Rejected: the assembly logic is domain-specific (text concatenation, JSON merging, last-chunk-wins) and cannot be inferred generically. Silent buffering would produce garbage for non-text chunk types.
 
 **Untyped streaming (raw string/bytes chunks).** Chunks could be untyped strings rather than Pydantic models. Simpler for the LLM token streaming case (each chunk is just a string delta). Rejected: typed chunks enable consumer-side validation, contract introspection, and multi-field chunk models (e.g., a chunk with `delta`, `model`, `finish_reason`). The overhead of a single-field Pydantic model is negligible.
 
@@ -151,6 +153,6 @@ This is deferred to v2. The v1 constraint (pick one mode) is intentional: it kee
 
 ## Risks and Implications
 
-- Consumers must know whether an agent is streaming or buffered before calling it. This is visible in the contract (`capabilities.streaming`) and the catalog entry, so runtime discovery is sufficient. Documentation should emphasize checking the contract before invoking.
-- The `streaming_not_supported` error from a mismatched `mesh.call()` / `mesh.stream()` invocation may be confusing if the consumer assumed the SDK would adapt. Documentation and error messages must make the strict mode/method pairing clear.
-- v1's hard split means an LLM-powered agent that wants to serve both streaming and non-streaming consumers must register two separate agents (e.g., `summarizer` and `summarizer-buffered`). This is an acknowledged limitation to be resolved by the v2 aggregator pattern.
+- Consumers must know whether an agent is a streamer or responder before calling it. This is visible in the contract (`capabilities.streaming`) and the catalog entry, so runtime discovery is sufficient. Documentation should emphasize checking the contract before invoking.
+- The `streaming_not_supported` / `streaming_required` error from a mismatched `mesh.call()` / `mesh.stream()` invocation may be confusing if the consumer assumed the SDK would adapt. Documentation and error messages must make the strict mode/method pairing clear.
+- v1's hard split means an LLM-powered agent that wants to serve both streaming and non-streaming consumers must register two separate agents (e.g., `summarizer` and `summarizer-responder`). This is an acknowledged limitation to be resolved by the v2 aggregator pattern.

@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, MeshError
-from openagentmesh._models import BufferedNotSupported, StreamingNotSupported
+from openagentmesh._models import StreamingRequired, StreamingNotSupported
 
 
 # --- Test models ---
@@ -78,9 +78,9 @@ class TestHelloWorld:
 
 
 class TestCapabilityInference:
-    async def test_buffered_agent_catalog(self):
-        """Buffered handler: invocable=True, streaming=False in catalog."""
-        spec = AgentSpec(name="buf", channel="test", description="Buffered")
+    async def test_responder_agent_catalog(self):
+        """Responder handler: invocable=True, streaming=False in catalog."""
+        spec = AgentSpec(name="buf", channel="test", description="Responder")
 
         async with AgentMesh.local() as mesh:
             @mesh.agent(spec)
@@ -272,21 +272,21 @@ class TestMultipleAgents:
 
 
 class TestCapabilityEnforcement:
-    async def test_stream_buffered_agent_raises(self):
-        """mesh.stream() against a buffered agent raises StreamingNotSupported."""
-        spec = AgentSpec(name="buffered", description="Buffered agent")
+    async def test_stream_responder_agent_raises(self):
+        """mesh.stream() against a responder agent raises StreamingNotSupported."""
+        spec = AgentSpec(name="responder", description="Responder agent")
 
         async with AgentMesh.local() as mesh:
             @mesh.agent(spec)
-            async def buffered(req: EchoInput) -> EchoOutput:
+            async def responder(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
             with pytest.raises(StreamingNotSupported):
-                async for chunk in mesh.stream("buffered", {"message": "hi"}):
+                async for chunk in mesh.stream("responder", {"message": "hi"}):
                     pass
 
     async def test_call_streaming_agent_raises(self):
-        """mesh.call() against a streaming-only agent raises BufferedNotSupported."""
+        """mesh.call() against a streaming-only agent raises StreamingRequired."""
         spec = AgentSpec(name="streamer", description="Streaming agent")
 
         async with AgentMesh.local() as mesh:
@@ -295,7 +295,7 @@ class TestCapabilityEnforcement:
                 for word in req.text.split():
                     yield SummarizeChunk(delta=word)
 
-            with pytest.raises(BufferedNotSupported):
+            with pytest.raises(StreamingRequired):
                 await mesh.call("streamer", {"text": "hello world"})
 
 
@@ -389,7 +389,7 @@ class TestCatalogSubscription:
             mesh2 = AgentMesh(url=embedded.url)
 
             async with mesh1, mesh2:
-                @mesh1.agent(AgentSpec(name="remote-buf", description="Buffered"))
+                @mesh1.agent(AgentSpec(name="remote-buf", description="Responder"))
                 async def remote_buf(req: EchoInput) -> EchoOutput:
                     return EchoOutput(reply=req.message)
 
@@ -401,7 +401,7 @@ class TestCatalogSubscription:
                         break
                     await asyncio.sleep(0.05)
 
-                # mesh2 knows remote-buf is buffered via cache
+                # mesh2 knows remote-buf is a responder via cache
                 with pytest.raises(StreamingNotSupported):
                     async for _ in mesh2.stream("remote-buf", {"message": "hi"}):
                         pass

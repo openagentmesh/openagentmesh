@@ -26,7 +26,7 @@ catalog = await mesh.catalog(tags=["summarization"])
 
 # By capability
 streaming_agents = await mesh.catalog(streaming=True)
-buffered_agents = await mesh.catalog(streaming=False)
+responder_agents = await mesh.catalog(streaming=False)
 event_emitters = await mesh.catalog(invocable=False)
 ```
 

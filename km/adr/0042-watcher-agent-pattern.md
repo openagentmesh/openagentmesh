@@ -34,8 +34,8 @@ Allow a fourth handler shape: `invocable=false, streaming=false`. This represent
 
 | Pattern | Handler shape | Capabilities |
 |---------|--------------|--------------|
-| Buffered | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
-| Streaming | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
+| Responder | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
+| Streamer | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
 | Publisher | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
 | **Watcher** | **`async def f() -> None: ...`** | **`invocable=False, streaming=False`** |
 

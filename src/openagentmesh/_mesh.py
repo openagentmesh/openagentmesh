@@ -22,7 +22,7 @@ from ._local import EmbeddedNats
 from ._models import (
     AgentContract,
     AgentSpec,
-    BufferedNotSupported,
+    StreamingRequired,
     CatalogEntry,
     ChunkSequenceError,
     MeshError,
@@ -403,12 +403,12 @@ class AgentMesh:
                 if wants_stream and not info.streaming:
                     raise StreamingNotSupported(agent=name, request_id=request_id)
                 if not wants_stream and info.streaming:
-                    raise BufferedNotSupported(agent=name, request_id=request_id)
+                    raise StreamingRequired(agent=name, request_id=request_id)
 
                 if info.streaming:
                     await self._handle_streaming(msg, info, name, request_id)
                 else:
-                    await self._handle_buffered(msg, info, name, request_id)
+                    await self._handle_responder(msg, info, name, request_id)
             except Exception as e:
                 error = (
                     e if isinstance(e, MeshError)
@@ -443,7 +443,7 @@ class AgentMesh:
         sub = await self._nc.subscribe(subject, queue=queue, cb=handler)
         self._subscriptions.append(sub)
 
-    async def _handle_buffered(
+    async def _handle_responder(
         self,
         msg: nats.aio.msg.Msg,
         info: HandlerInfo,
@@ -608,7 +608,7 @@ class AgentMesh:
         """Synchronous request/reply. Returns the response as a dict."""
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
-        self._check_buffered(name)
+        self._check_responder(name)
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
@@ -938,16 +938,16 @@ class AgentMesh:
         if entry is not None and not entry.streaming:
             raise StreamingNotSupported(agent=name)
 
-    def _check_buffered(self, name: str) -> None:
-        """Raise BufferedNotSupported if agent is streaming-only."""
+    def _check_responder(self, name: str) -> None:
+        """Raise StreamingRequired if agent is streaming-only."""
         if name in self._agents:
             _, _, contract = self._agents[name]
             if contract.streaming:
-                raise BufferedNotSupported(agent=name)
+                raise StreamingRequired(agent=name)
             return
         entry = self._catalog_cache.get(name)
         if entry is not None and entry.streaming:
-            raise BufferedNotSupported(agent=name)
+            raise StreamingRequired(agent=name)
 
     # --- Internal helpers ---
 

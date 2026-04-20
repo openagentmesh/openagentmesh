@@ -619,11 +619,11 @@
     python
     
     ```python
-    # Buffered — bridge waits for all chunks, returns complete result
+    # Responder — bridge waits for all chunks, returns complete result
     # Caller sees nothing until done. Simple. Loses streaming benefit.
     result = await mesh.call("tools.github.search", payload, timeout=30.0)
     
-    # Streaming — caller receives chunks as they arrive
+    # Streamer — caller receives chunks as they arrive
     async for chunk in mesh.stream("tools.github.search", payload, timeout=30.0):
         print(chunk.delta)
     ```

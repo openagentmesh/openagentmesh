@@ -79,7 +79,7 @@ Then `mesh.run()` starts the event loop — analogous to `uvicorn.run()` in Fast
 
 The flagship experience. Inspired by FastAPI's route decorators. The developer writes a function; the framework handles everything else.
 
-**Buffered agent** — for deterministic or fast functions that return a complete typed response:
+**Responder agent** — for deterministic or fast functions that return a complete typed response:
 
 ```python
 from openagentmesh import AgentMesh
@@ -107,7 +107,7 @@ async def classify(req: ClassifyInput) -> ClassifyOutput:
 mesh.run()
 ```
 
-**Streaming agent** — for LLM-powered agents that produce incremental output:
+**Streamer agent** — for LLM-powered agents that produce incremental output:
 
 ```python
 from openagentmesh import AgentMesh
@@ -215,12 +215,12 @@ mesh = AgentMesh()                    # connect to localhost:4222 (default)
 ### 5.2 Provider Side (Registering Agents)
 
 ```python
-# Buffered agent (type="tool" inferred — returns value)
+# Responder agent (type="tool" inferred — returns value)
 @mesh.agent(name=..., channel=..., description=...)
 async def handler(req: InputModel) -> OutputModel:
     return OutputModel(...)
 
-# Streaming agent (type="agent" inferred — yields chunks)
+# Streamer agent (type="agent" inferred — yields chunks)
 @mesh.agent(name=..., channel=..., description=...)
 async def handler(req: InputModel) -> ChunkModel:
     async for item in produce_output(req):
@@ -241,8 +241,8 @@ mesh.register(name=..., channel=..., description=...,
 
 | Shape | Inferred type | `capabilities.streaming` | Consumer method |
 |---|---|---|---|
-| `async def f(req: I) -> O: return ...` | `"tool"` | `false` | `mesh.call()` |
-| `async def f(req: I) -> C: yield ...` | `"agent"` | `true` | `mesh.stream()` |
+| `async def f(req: I) -> O: return ...` (Responder) | `"tool"` | `false` | `mesh.call()` |
+| `async def f(req: I) -> C: yield ...` (Streamer) | `"agent"` | `true` | `mesh.stream()` |
 | `async def f() -> E: yield ...` | `"publisher"` | n/a | `mesh.subscribe()` |
 
 ### 5.3 Consumer Side (Using the Mesh)
@@ -255,10 +255,10 @@ catalog = await mesh.catalog()                     # lightweight listing
 catalog = await mesh.catalog(channel="nlp")        # filtered lightweight listing
 contract = await mesh.contract("summarizer")       # single agent's full details
 
-# Invocation — buffered (capabilities.streaming: false)
+# Invocation — responder (capabilities.streaming: false)
 result = await mesh.call("classifier", payload, timeout=10.0)
 
-# Invocation — streaming (capabilities.streaming: true)
+# Invocation — streamer (capabilities.streaming: true)
 async for chunk in mesh.stream("summarizer", payload, timeout=60.0):
     print(chunk.delta, end="")
 

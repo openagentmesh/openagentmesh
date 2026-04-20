@@ -30,7 +30,7 @@ async with AgentMesh.local() as mesh:
 - `__aenter__` starts a background task that watches the `mesh-catalog` KV key.
 - Each catalog update (agent register/deregister) replaces the entire cache (the catalog is a single denormalized JSON array).
 - `mesh.catalog()` reads from the cache instead of hitting KV on every call.
-- `_check_streaming()` and `_check_buffered()` use the cache for remote agents.
+- `_check_streaming()` and `_check_responder()` use the cache for remote agents.
 - `__aexit__` cancels the background watcher task.
 
 ### Language

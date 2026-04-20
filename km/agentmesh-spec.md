@@ -169,8 +169,8 @@ Each agent publishes a contract to the `mesh.registry.{name}` KV bucket. The con
 - `description` (top-level and in `skills[0]`) must be written for LLM consumption. It should clearly state what the agent does, what input formats it handles, and when it should or should not be invoked.
 - `version` follows semver. Breaking changes to input/output schemas require a major version bump.
 - `x-agentmesh.sla` is critical for callers to set appropriate timeouts. Agents with wildly different latency profiles (2ms deterministic function vs. 30s LLM agent) cannot be treated identically. SLA defaults differ by type: `"tool"` agents default to `expected_latency_ms: 1000`, `retry_policy: "idempotent"`; `"agent"` types default to `expected_latency_ms: 30000`, `retry_policy: "none"`.
-- `x-agentmesh.type` describes the agent's behavior profile. Values: `"agent"` (LLM-powered, streaming by default), `"tool"` (deterministic function, buffered by default), `"publisher"` (emits events to `.events` subject, not invocable), `"subscriber"` (reserved, not yet designed). See ADR-0023.
-- `x-agentmesh.chunk_schema` is present for streaming agents (`capabilities.streaming: true`). It is the JSON Schema of the typed chunk model yielded by the handler. Absent for buffered agents. See ADR-0024.
+- `x-agentmesh.type` describes the agent's behavior profile. Values: `"agent"` (LLM-powered, streaming by default), `"tool"` (deterministic function, responder by default), `"publisher"` (emits events to `.events` subject, not invocable), `"subscriber"` (reserved, not yet designed). See ADR-0023.
+- `x-agentmesh.chunk_schema` is present for streaming agents (`capabilities.streaming: true`). It is the JSON Schema of the typed chunk model yielded by the handler. Absent for responder agents. See ADR-0024.
 - `capabilities.streaming` is set automatically by the SDK based on the handler shape (yields → `true`, returns → `false`). Manual override is permitted.
 - `url` is not stored in the registry — it is context-dependent (gateway hostname, external routing). An A2A-compliant gateway injects it when serving the card externally.
 
@@ -217,7 +217,7 @@ When `X-Mesh-Status: error`, the body conforms to:
 ```
 
 Error codes:
-- `streaming_not_supported` — caller sent `X-Mesh-Stream: true` to a buffered agent, or called `mesh.stream()` against an agent with `capabilities.streaming: false`.
+- `streaming_not_supported` — caller sent `X-Mesh-Stream: true` to a responder agent, or called `mesh.stream()` against an agent with `capabilities.streaming: false`.
 - `not_invocable` — caller attempted to invoke a `"publisher"` or `"subscriber"` type agent via `mesh.call()` or `mesh.stream()`.
 
 This is a first-class contract. Every reply is either a valid `output_schema` payload or a `MeshError`. The caller side must handle both.
@@ -285,24 +285,24 @@ The mesh provides the primitives; the contract defines the protocol for a specif
 
 ### 4.5.1 Streaming Protocol
 
-Streaming is a first-class invocation pattern for agents that produce incremental output (LLM token streams, progressive results). In v1, an agent is either buffered or streaming — not both. See ADR-0024.
+Streaming is a first-class invocation pattern for agents that produce incremental output (LLM token streams, progressive results). In v1, an agent is either a responder or a streamer — not both. See ADR-0024.
 
 #### Handler shapes
 
 ```python
-# Buffered agent — returns typed response
+# Responder agent — returns typed response
 @mesh.agent(name="classifier", channel="nlp", description="...")
 async def classify(req: ClassifyInput) -> ClassifyOutput:
     return ClassifyOutput(label="positive", confidence=0.95)
 
-# Streaming agent — yields typed chunks
+# Streamer agent — yields typed chunks
 @mesh.agent(name="summarizer", channel="nlp", description="...")
 async def summarize(req: SummarizeInput) -> SummarizeChunk:
     async for token in call_llm_stream(req.text):
         yield SummarizeChunk(delta=token)
 ```
 
-The SDK infers `capabilities.streaming` from the handler shape at registration time: `inspect.isasyncgenfunction(handler)` → `true`; plain async function → `false`. Return type annotation is always required and validated against `output_schema` (buffered) or `chunk_schema` (streaming).
+The SDK infers `capabilities.streaming` from the handler shape at registration time: `inspect.isasyncgenfunction(handler)` → `true`; plain async function → `false`. Return type annotation is always required and validated against `output_schema` (responder) or `chunk_schema` (streamer).
 
 #### Streaming Subject Convention
 ```
@@ -313,7 +313,7 @@ The caller sends a request to the agent's invocation subject with the header `X-
 - `X-Mesh-Stream-Seq: N` (0-indexed sequence number)
 - `X-Mesh-Stream-End: true|false` (final chunk indicator)
 
-The caller subscribes to `mesh.stream.{request_id}` before sending the request and consumes chunks as an async generator via `mesh.stream()`. The agent must declare `capabilities.streaming: true`. Agents without the capability reject streaming requests with `code: "streaming_not_supported"`. Calling `mesh.call()` against a streaming agent also returns `code: "streaming_not_supported"` — modes are strict and non-interchangeable in v1.
+The caller subscribes to `mesh.stream.{request_id}` before sending the request and consumes chunks as an async generator via `mesh.stream()`. The agent must declare `capabilities.streaming: true`. Agents without the capability reject streaming requests with `code: "streaming_not_supported"`. Calling `mesh.call()` against a streamer agent also returns `code: "streaming_required"` — modes are strict and non-interchangeable in v1.
 
 See ADR-0005 (wire protocol), ADR-0024 (handler contract).
 
