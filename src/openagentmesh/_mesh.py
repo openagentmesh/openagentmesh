@@ -95,6 +95,7 @@ class AgentMesh:
         self._catalog_cache: dict[str, CatalogEntry] = {}
         self._catalog_watcher_task: asyncio.Task | None = None
         self._publisher_tasks: dict[str, asyncio.Task] = {}
+        self._watcher_tasks: dict[str, asyncio.Task] = {}
 
     # --- Async context manager ---
 
@@ -150,13 +151,18 @@ class AgentMesh:
             if name not in self._subscribed:
                 if info.invocable:
                     await self._subscribe_agent(name, info, contract)
-                else:
+                elif info.streaming:
                     # Publisher agent: launch emission task (ADR-0034)
                     if name not in self._publisher_tasks:
                         task = asyncio.create_task(
                             self._emit_publisher_events(name, spec, info)
                         )
                         self._publisher_tasks[name] = task
+                else:
+                    # Watcher agent: launch handler as background task (ADR-0042)
+                    if name not in self._watcher_tasks:
+                        task = asyncio.create_task(self._run_watcher(name, info))
+                        self._watcher_tasks[name] = task
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
@@ -193,6 +199,16 @@ class AgentMesh:
             except (asyncio.CancelledError, Exception):
                 pass
             self._catalog_watcher_task = None
+
+        # Cancel watcher tasks (ADR-0042)
+        for task in self._watcher_tasks.values():
+            task.cancel()
+        for task in self._watcher_tasks.values():
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._watcher_tasks.clear()
 
         # Cancel publisher tasks (ADR-0034)
         for task in self._publisher_tasks.values():
@@ -502,6 +518,15 @@ class AgentMesh:
                 "X-Mesh-Request-Id": request_id,
             },
         )
+
+    # --- Watcher execution (ADR-0042) ---
+
+    async def _run_watcher(self, name: str, info: HandlerInfo) -> None:
+        """Run a watcher handler as a background task."""
+        try:
+            await info.func()
+        except asyncio.CancelledError:
+            pass
 
     # --- Publisher emission (ADR-0034) ---
 

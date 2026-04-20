@@ -23,10 +23,12 @@ class HandlerInfo:
 def inspect_handler(func: Any) -> HandlerInfo:
     """Inspect an async handler to determine capabilities and type models.
 
-    Rules (ADR-0031):
-    - async def with request param and return  -> invocable=True,  streaming=False
-    - async generator with request param       -> invocable=True,  streaming=True
-    - async generator without request param    -> invocable=False, streaming=True
+    Rules (ADR-0031, ADR-0042, ADR-0043):
+    - async def with request param and return   -> invocable=True,  streaming=False
+    - async generator with request param        -> invocable=True,  streaming=True
+    - async def without request param, returns  -> invocable=True,  streaming=False (trigger)
+    - async generator without request param     -> invocable=False, streaming=True  (publisher)
+    - async def without request param, no return -> invocable=False, streaming=False (watcher)
     """
     if not (inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func)):
         raise TypeError(
@@ -54,13 +56,7 @@ def inspect_handler(func: Any) -> HandlerInfo:
     if return_type is not None and isinstance(return_type, type) and issubclass(return_type, BaseModel):
         output_model = return_type
 
-    invocable = input_model is not None
-
-    if not invocable and not streaming:
-        raise TypeError(
-            f"Handler '{func.__name__}' has no request parameter and does not yield. "
-            f"At least one of invocable or streaming must be true."
-        )
+    invocable = input_model is not None or (output_model is not None and not streaming)
 
     return HandlerInfo(
         func=func,

@@ -44,9 +44,11 @@ The SDK infers capabilities from the handler's signature at decoration time. No 
 |---------|--------------|--------------|
 | Non-streaming | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
 | Streaming | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
+| Trigger | `async def f() -> Out: return ...` | `invocable=True, streaming=False` |
 | Publisher | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
+| Watcher | `async def f() -> None: ...` | `invocable=False, streaming=False` |
 
-The non-streaming pattern is the one shown in the [registration example above](#registering-an-agent). The two yielding patterns are below.
+The non-streaming pattern is the one shown in the [registration example above](#registering-an-agent). The other patterns are below.
 
 ### Streaming agent
 
@@ -61,6 +63,32 @@ async def summarize(req: SummarizeInput) -> SummarizeChunk:
     async for token in call_llm_stream(req.text):
         yield SummarizeChunk(delta=token)
 ```
+
+### Trigger
+
+A trigger is invocable but takes no input. The call itself is the signal. The handler returns a result to the caller.
+
+```python
+class RefreshResult(BaseModel):
+    keys_refreshed: int
+    duration_ms: float
+
+spec = AgentSpec(name="refresh-cache", channel="ops", description="Flushes and rebuilds the cache. Returns refresh stats.")
+
+@mesh.agent(spec)
+async def refresh_cache() -> RefreshResult:
+    stats = await rebuild_cache()
+    return RefreshResult(keys_refreshed=stats.count, duration_ms=stats.elapsed)
+```
+
+Called without payload:
+
+```python
+result = await mesh.call("refresh-cache")
+print(f"Refreshed {result['keys_refreshed']} keys")
+```
+
+The contract has `input_schema: null` and `output_schema` with the result model. The absent input schema signals to consumers that no payload is needed.
 
 ### Publisher
 
@@ -78,15 +106,37 @@ async def monitor_prices() -> PriceEvent:
         await asyncio.sleep(1)
 ```
 
+### Watcher
+
+A watcher coordinates through shared state rather than messages. It has no input parameter and does not yield. The handler body typically contains a KV watch loop.
+
+```python
+spec = AgentSpec(name="extract", channel="pipeline", description="Watches for raw documents and extracts entities.")
+
+@mesh.agent(spec)
+async def extract():
+    async for value in mesh.kv.watch("pipeline.*.raw"):
+        doc = Document.model_validate_json(value)
+        extracted = do_extraction(doc)
+        await mesh.kv.put(f"pipeline.{doc.id}.extracted", extracted.model_dump_json())
+```
+
+Watcher agents are visible in the catalog and participate in liveness tracking, but are not invocable. Use `mesh.catalog(invocable=True)` to exclude them when selecting tools for LLM invocation.
+
+!!! note "Scaling watchers"
+    Watcher agents do not benefit from queue-group scaling. Every instance receives every KV update. For expensive processing, delegate to an invocable agent via `mesh.call()`, which scales via queue groups. The watcher becomes a thin routing layer; the processing agent scales independently.
+
 ## Lifecycle
 
 Agents follow a predictable lifecycle:
 
 1. **Start.** `mesh.run()` (blocking) or `async with mesh:` (non-blocking context manager)
-2. **Register.** Subscribe to NATS subject, write contract to KV
-3. **Serve.** Handle incoming requests via queue group
-4. **Stop.** Exiting the context manager: unsubscribe, drain, deregister, disconnect
+2. **Register.** Subscribe to NATS subject (invocable agents) or launch background task (publishers and watchers), write contract to KV
+3. **Serve.** Handle incoming requests via queue group (invocable), emit events (publishers), or react to state changes (watchers)
+4. **Stop.** Exiting the context manager: cancel tasks, unsubscribe, drain, deregister, disconnect
 
 ## Queue Groups
 
-Every agent subscribes via a NATS queue group. This means multiple instances of the same agent automatically load-balance with no configuration changes. Deploy three replicas of `summarizer` and NATS distributes requests across them.
+Every invocable agent subscribes via a NATS queue group. This means multiple instances of the same agent automatically load-balance with no configuration changes. Deploy three replicas of `summarizer` and NATS distributes requests across them.
+
+Publishers and watchers run as background tasks and do not use queue groups. See the [scaling note above](#watcher) for the recommended pattern when watcher processing needs to scale.
