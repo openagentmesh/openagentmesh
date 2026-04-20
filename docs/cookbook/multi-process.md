@@ -38,7 +38,7 @@ mesh.run()  # blocks, like uvicorn.run()
 
 ## Consumer
 
-**consumer.py** discovers agents on the mesh and calls one:
+**consumer.py** discovers agents on the mesh and calls one. `async with mesh:` is the idiom for participating **without registering agents of your own**, scripts, notebooks, orchestrators, and CLI tools that only call:
 
 ```python
 import asyncio
