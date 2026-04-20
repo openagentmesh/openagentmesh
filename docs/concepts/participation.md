@@ -1,10 +1,10 @@
 # Participation Patterns
 
-There are three ways to participate in the mesh. They differ in whether you register agents, call agents, or both. These patterns are orthogonal to [handler shapes](agents.md#handler-shapes): a provider can register buffered handlers, streaming handlers, publishers, triggers, or watchers.
+There are two ways to participate in the mesh: registered and unregistered. The difference is whether you use `@mesh.agent` to put agents on the mesh.
 
-## Provider
+## Registered
 
-Register agents. No outgoing calls.
+A registered process uses `@mesh.agent` to declare one or more agents. Those agents appear in the catalog, get contracts in the registry, and participate in liveness tracking. Any [handler shape](agents.md#handler-shapes) works.
 
 ```python
 from pydantic import BaseModel
@@ -25,11 +25,19 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
 mesh.run()
 ```
 
-The provider registers agents and blocks. It never calls other agents. This is the simplest deployment: one process, one responsibility. Any [handler shape](agents.md#handler-shapes) works: invocable agents serve requests via queue groups, publishers emit events, and watchers react to KV state changes.
+A registered process can also call other agents from inside its handlers:
 
-## Consumer
+```python
+@mesh.agent(AgentSpec(name="reviewer", channel="nlp", description="Summarizes and classifies text."))
+async def review(req: ReviewInput) -> ReviewOutput:
+    summary = await mesh.call("summarizer", {"text": req.text})
+    sentiment = await mesh.call("classifier", {"text": req.text})
+    return ReviewOutput(summary=summary["summary"], sentiment=sentiment["label"])
+```
 
-No registered agents. Discover and call agents on the mesh.
+## Unregistered
+
+An unregistered process connects to the mesh, discovers and calls agents, and disconnects. No `@mesh.agent` decorator, no registration, no catalog entry. This is how scripts, notebooks, CLI tools, and orchestrators interact with the mesh.
 
 ```python
 import asyncio
@@ -48,44 +56,11 @@ async def main():
 asyncio.run(main())
 ```
 
-The consumer connects, browses the catalog, calls agents, and disconnects. No `@mesh.agent` decorator, no registration. This is how scripts, notebooks, CLI tools, and orchestrators interact with the mesh.
-
-## Hybrid
-
-Register agents that also call other agents. Provider and consumer in one process.
-
-```python
-from pydantic import BaseModel
-from openagentmesh import AgentMesh, AgentSpec
-
-mesh = AgentMesh()
-
-class ReviewInput(BaseModel):
-    text: str
-
-class ReviewOutput(BaseModel):
-    summary: str
-    sentiment: str
-
-@mesh.agent(AgentSpec(name="reviewer", channel="nlp", description="Summarizes and classifies text."))
-async def review(req: ReviewInput) -> ReviewOutput:
-    summary = await mesh.call("summarizer", {"text": req.text})
-    sentiment = await mesh.call("classifier", {"text": req.text})
-    return ReviewOutput(summary=summary["summary"], sentiment=sentiment["label"])
-
-mesh.run()
-```
-
-The `reviewer` agent is itself registered on the mesh, but its handler calls two other agents (`summarizer` and `classifier`) to compose the result. It accesses the mesh via closure over the `mesh` variable.
-
-This is the natural pattern for orchestrator agents, pipelines, and any agent that coordinates work across other agents.
-
 ## Summary
 
-| Pattern | Registers agents | Calls agents | Lifecycle |
-|---------|-----------------|-------------|-----------|
-| Provider | Yes | No | `mesh.run()` |
-| Consumer | No | Yes | `async with mesh:` |
-| Hybrid | Yes | Yes | `mesh.run()` or `async with mesh:` |
+| Pattern | Registers agents | Lifecycle |
+|---------|-----------------|-----------|
+| Registered | Yes | `mesh.run()` or `async with mesh:` |
+| Unregistered | No | `async with mesh:` |
 
-All three connect to the same NATS server. All three can run in the same process or in separate processes. The mesh doesn't distinguish between them; they're just different usage patterns of the same `AgentMesh` class.
+Both connect to the same NATS server. Both can run in the same process or in separate processes. The mesh doesn't distinguish between them; they're just different usage patterns of the same `AgentMesh` class.
