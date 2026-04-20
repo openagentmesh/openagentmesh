@@ -1,6 +1,6 @@
 # Subject Naming
 
-All NATS subjects follow a consistent hierarchy.
+All message subjects follow a consistent hierarchy. The subject scheme is transport-agnostic; any system that supports hierarchical topic naming and wildcard subscriptions can implement it.
 
 ## Subject Map
 
@@ -17,7 +17,7 @@ All NATS subjects follow a consistent hierarchy.
 
 ## Wildcards
 
-NATS subject hierarchy enables wildcard subscriptions:
+The subject hierarchy enables wildcard subscriptions:
 
 ```
 mesh.agent.finance.*      # All agents in the finance channel

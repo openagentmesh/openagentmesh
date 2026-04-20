@@ -1,6 +1,6 @@
 # Message Envelope
 
-All messages use NATS headers for metadata and a JSON body for payload.
+All messages use headers for metadata and a JSON body for payload.
 
 ## Request Headers
 
@@ -9,7 +9,6 @@ All messages use NATS headers for metadata and a JSON body for payload.
 | `X-Mesh-Request-Id` | Unique request identifier (UUID) |
 | `X-Mesh-Source` | Name of the calling agent or client |
 | `X-Mesh-Reply-To` | Reply subject for async callback pattern |
-| `traceparent` | W3C Trace Context header for distributed tracing |
 
 ## Response Headers
 

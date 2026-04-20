@@ -1,10 +1,22 @@
 # Protocol
 
-OpenAgentMesh is protocol-first. The core asset is a contract schema and subject naming convention that any NATS client in any language can implement. The Python SDK is a convenience layer.
+OpenAgentMesh is protocol-first. The core asset is a contract schema and subject naming convention that any compliant transport can implement. The Python SDK is a convenience layer; the reference implementation uses NATS, but the protocol itself is transport-agnostic.
+
+## Required Transport Primitives
+
+Any transport that provides the following primitives can host an OpenAgentMesh deployment:
+
+| Primitive | Description |
+|-----------|-------------|
+| **Pub/Sub with queue groups** | Publish messages to named subjects; subscribers in the same queue group receive load-balanced delivery |
+| **Request/Reply** | Synchronous request to a subject with a single response |
+| **Key-Value store** | Per-key read/write with compare-and-swap (CAS) support |
+| **Object store** | Binary blob storage for large payloads |
+| **Message headers** | Arbitrary key-value metadata attached to each message |
 
 ## Participation Without the SDK
 
-Any NATS client can participate in the mesh by following the protocol:
+Any client speaking the underlying transport can participate in the mesh by following the protocol:
 
 | Protocol concept | What to implement |
 |-----------------|-------------------|
@@ -16,7 +28,7 @@ Any NATS client can participate in the mesh by following the protocol:
 
 ## Registry
 
-Two tiers of state in NATS JetStream KV:
+Two tiers of state in the KV store:
 
 ### Catalog (`mesh-catalog`)
 
@@ -42,9 +54,9 @@ Updated via CAS (compare-and-swap) on every registration/deregistration. May be 
 
 Full contract with JSON Schemas, SLA metadata, and error schema. This is the authoritative source for an agent's capabilities.
 
-## JetStream Buckets
+## Storage Buckets
 
-The protocol requires four JetStream buckets, pre-created on startup by `oam mesh up` (or `AgentMesh.local()` in test contexts).
+The protocol requires four storage buckets, pre-created on startup by `oam mesh up` (or `AgentMesh.local()` in test contexts).
 
 ### KV Stores
 
@@ -58,9 +70,9 @@ The protocol requires four JetStream buckets, pre-created on startup by `oam mes
 
 | Bucket | Purpose | Notes |
 |--------|---------|-------|
-| `mesh-artifacts` | Binary artifacts shared between agents | For files, images, large payloads. Uses JetStream Object Store API |
+| `mesh-artifacts` | Binary artifacts shared between agents | For files, images, large payloads |
 
-Bucket names use hyphens, not dots (NATS KV naming constraint).
+Bucket names use hyphens, not dots.
 
 ## Consistency Model
 
