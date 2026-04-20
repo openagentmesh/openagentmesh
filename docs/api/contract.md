@@ -6,21 +6,54 @@ The contract schema is a superset of the A2A Agent Card format. A2A fields at th
 
 ## Using Contracts for LLM Tool Injection
 
-Contracts carry the schemas needed to build LLM tool definitions.
+Contracts carry the schemas needed to build LLM tool definitions. Three conversion methods produce ready-to-use tool dicts.
+
+### Provider-neutral (recommended)
+
+`to_tool_schema()` returns a `{name, description, input_schema}` triple that works with Anthropic, LangChain, LiteLLM, and any framework that accepts a JSON Schema dict:
 
 ```python
 contract = await mesh.contract("summarizer")
+tool = contract.to_tool_schema()
+# {"name": "summarizer", "description": "...", "input_schema": {...}}
+```
 
-# Build a tool definition for your LLM provider
-tool = {
-    "name": contract.name,
-    "description": contract.description,
-    "input_schema": contract.input_schema,
-}
+### OpenAI
 
-# For streaming agents, chunk_schema describes each yielded chunk
-if contract.streaming:
-    print(contract.chunk_schema)
+`to_openai_tool()` wraps the schema in the OpenAI envelope. Supports both Chat Completions and the Responses API:
+
+```python
+# Chat Completions (default)
+tool = contract.to_openai_tool()
+# {"type": "function", "function": {"name": ..., "parameters": ...}}
+
+# Responses API
+tool = contract.to_openai_tool(api="responses")
+# {"type": "function", "name": ..., "parameters": ...}
+
+# Strict mode (opt-in, constrains schema for structured outputs)
+tool = contract.to_openai_tool(strict=True)
+```
+
+### Anthropic
+
+`to_anthropic_tool()` returns the Anthropic Messages API format (identical to `to_tool_schema()`):
+
+```python
+tool = contract.to_anthropic_tool()
+# {"name": ..., "description": ..., "input_schema": {...}}
+```
+
+### Bulk conversion from discovery
+
+```python
+contracts = await mesh.discover(channel="finance")
+invocable = [c for c in contracts if c.invocable]
+
+# Pick the format you need
+tools = [c.to_tool_schema() for c in invocable]
+openai_tools = [c.to_openai_tool() for c in invocable]
+anthropic_tools = [c.to_anthropic_tool() for c in invocable]
 ```
 
 ### Two-step discovery for LLM tool selection
@@ -34,12 +67,16 @@ options = [{"name": e.name, "description": e.description} for e in catalog]
 
 # Step 2: full schema for the selected agent
 contract = await mesh.contract(selected_name)
-tool_def = {
-    "name": contract.name,
-    "description": contract.description,
-    "input_schema": contract.input_schema,
-}
+tool = contract.to_tool_schema()
 ```
+
+### Name sanitization
+
+Agent names with dots (e.g. `billing.invoice.create`) are automatically converted to underscores (`billing_invoice_create`) since LLM providers restrict tool names to `[a-zA-Z0-9_-]`. Names that cannot be sanitized raise `ValueError`.
+
+### Output schema hints
+
+When `output_schema` is present, the description is appended with a `Returns: <field names>` line, giving the LLM a lightweight hint about the response shape. The full schema remains accessible via `contract.output_schema`.
 
 ## Properties
 
@@ -59,6 +96,18 @@ tool_def = {
 | `subject` | `str` | NATS invocation subject |
 
 ## Methods
+
+### `.to_tool_schema()`
+
+Returns a provider-neutral dict with `name`, `description`, and `input_schema`. Raises `ValueError` if the agent is not invocable.
+
+### `.to_openai_tool(*, api="chat", strict=False)`
+
+Returns an OpenAI-format tool dict. `api="responses"` uses the flat Responses API shape. `strict=True` applies OpenAI's structured output constraints to the schema.
+
+### `.to_anthropic_tool()`
+
+Returns an Anthropic Messages API tool dict. Equivalent to `to_tool_schema()`.
 
 ### `.to_catalog_entry()`
 
