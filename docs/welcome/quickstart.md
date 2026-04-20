@@ -121,7 +121,7 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
 mesh.run()
 ```
 
-**consumer.py.** Discovers the agent and calls it:
+**consumer.py.** Discovers the agent and calls it. `async with mesh:` is the idiom for interacting with the mesh **without registering agents of your own**, scripts, notebooks, and orchestrators that only discover and call.
 
 ```python
 import asyncio
