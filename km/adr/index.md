@@ -51,3 +51,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | spec | feature/cli-demos |
 | [ADR-0042](0042-watcher-agent-pattern.md) | Watcher agent pattern (fourth capability combination) | documented | feature/watcher-agent |
 | [ADR-0043](0043-trigger-handler-pattern.md) | Trigger handler pattern (invocable, no input) | documented | feature/watcher-agent |
+| [ADR-0044](0044-handler-shape-rename-responder-streamer.md) | Rename handler shapes to Responder/Streamer | spec | feature/handler-shape-rename |
