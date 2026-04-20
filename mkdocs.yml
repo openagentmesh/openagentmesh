@@ -97,6 +97,7 @@ nav:
       - Multi-Module Projects: cookbook/multi-module.md
       - Shared Plan Coordination: cookbook/shared-plan.md
       - LLM-Driven Tool Selection: cookbook/llm-tool-selection.md
+      - Error Handling: cookbook/error-handling.md
   - API Reference:
       - api/index.md
       - AgentMesh: api/agentmesh.md

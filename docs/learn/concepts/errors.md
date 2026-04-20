@@ -104,3 +104,62 @@ await nc.subscribe("mesh.errors.nlp.summarizer", cb=on_error)
 ```
 
 This is a passive stream. It doesn't affect the caller's response.
+
+## Failure Modes
+
+There are four ways an agent can leave the mesh. Each produces a different caller experience.
+
+### The four failure modes
+
+| Mode | Cause | What the caller sees | Detection speed |
+|------|-------|---------------------|-----------------|
+| Graceful shutdown | `mesh.stop()` or process exit | `MeshError(code="not_found")` on next call (agent already deregistered) | Instant |
+| Handler exception | Bug in handler code | `MeshError(code="handler_error")` with the exception message | Instant |
+| Process crash | OOM kill, SIGKILL, unhandled panic | `MeshError(code="timeout")` after the timeout window expires | Timeout (default varies by agent type) |
+| Network partition | Network failure between agent and NATS | `MeshError(code="timeout")` after the timeout window expires | Timeout |
+
+### Handler exceptions (the common case)
+
+When a handler raises an exception, the mesh catches it and:
+
+1. Wraps it in the error envelope with code `handler_error`
+2. Sends it back to the caller on the reply subject (for `mesh.call()`) or stream subject (for `mesh.stream()`)
+3. Publishes it to the dead-letter subject `mesh.errors.{channel}.{name}` for observability
+
+The caller always gets a structured `MeshError`, never a raw traceback.
+
+### Mid-stream failures
+
+If a streaming handler yields some chunks then crashes:
+
+```python
+chunks = []
+try:
+    async for chunk in mesh.stream("summarizer", payload):
+        chunks.append(chunk)  # partial data is still delivered
+except MeshError as e:
+    print(f"Stream failed after {len(chunks)} chunks: {e.code}")
+    # chunks contains everything received before the failure
+```
+
+Partial data has value (especially for LLM streaming). The error signals "no more is coming", not "discard what you have".
+
+### Process crashes and timeouts
+
+When an agent process dies after accepting a request (crash, OOM, kill), no error reply is sent because the process is gone. The caller's `mesh.call()` or `mesh.stream()` waits until the timeout expires, then raises `MeshError(code="timeout")`.
+
+The timeout is set per call:
+
+```python
+result = await mesh.call("summarizer", payload, timeout=10.0)
+```
+
+Or inferred from the agent's SLA in its contract (`sla.timeout_ms`). Tool-type agents default to shorter timeouts than LLM-powered agents.
+
+There is no way to distinguish "agent is slow" from "agent is dead" at the caller level today. Future versions will use death notices to detect agent death mid-request and fail fast.
+
+### Choosing timeout values
+
+- **Tool agents** (deterministic, fast): 1-5 seconds. A tool that hasn't responded in 5s is almost certainly dead.
+- **LLM agents** (variable latency): 30-120 seconds. LLM calls can genuinely take this long.
+- **Human-in-the-loop**: Use `mesh.send()` with async callbacks instead of `mesh.call()`. Don't block on humans.
