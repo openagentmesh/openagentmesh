@@ -261,3 +261,41 @@ await mesh.kv.update("counter", increment)
 ### `async for value in mesh.kv.watch(key)`
 
 Watch a key for changes. Yields the new value on each update.
+
+## Workspace (Object Store)
+
+Shared binary artifact storage backed by the NATS JetStream Object Store (`mesh-artifacts` bucket). Use for files, images, embeddings, or any binary payload too large for the KV store.
+
+### `await mesh.workspace.put(key, data)`
+
+Store a binary artifact.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `str` | Artifact key (supports `/` for hierarchy, e.g. `docs/report.pdf`) |
+| `data` | `bytes \| str` | Content to store. Strings are UTF-8 encoded. |
+
+### `await mesh.workspace.get(key)`
+
+Retrieve an artifact by key. Returns `bytes`.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `str` | Artifact key |
+
+**Returns:** `bytes`
+
+### `await mesh.workspace.delete(key)`
+
+Delete an artifact.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | `str` | Artifact key |
+
+```python
+# Store and retrieve a binary artifact
+await mesh.workspace.put("results/output.png", image_bytes)
+data = await mesh.workspace.get("results/output.png")
+await mesh.workspace.delete("results/output.png")
+```

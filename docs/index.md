@@ -8,7 +8,7 @@ It's an SDK with batteries included:
 
 - Request/reply, pub/sub, and event streaming
 - Typed contracts with self-discovery
-- Shared KV and Object stores
+- Shared context via KV and Object Stores, with reactive watching
 
 No hardcoded interactions, full decoupling.
 

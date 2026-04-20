@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from ._context import KVStore
 from ._handler import HandlerInfo, inspect_handler
+from ._workspace import Workspace
 from ._local import EmbeddedNats
 from ._models import (
     AgentContract,
@@ -34,6 +35,7 @@ _log = logging.getLogger("openagentmesh")
 _CATALOG_BUCKET = "mesh-catalog"
 _REGISTRY_BUCKET = "mesh-registry"
 _CONTEXT_BUCKET = "mesh-context"
+_ARTIFACTS_BUCKET = "mesh-artifacts"
 _CATALOG_KEY = "catalog"
 
 
@@ -81,7 +83,9 @@ class AgentMesh:
         self._catalog_kv: KeyValue | None = None
         self._registry_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
+        self._artifacts_os: Any | None = None
         self.kv: KVStore | None = None
+        self.workspace: Workspace | None = None
 
         # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
@@ -130,6 +134,15 @@ class AgentMesh:
             self._context_kv = await self._js.create_key_value(bucket=_CONTEXT_BUCKET)
 
         self.kv = KVStore(self._context_kv)
+
+        try:
+            self._artifacts_os = await self._js.object_store(_ARTIFACTS_BUCKET)
+        except Exception:
+            self._artifacts_os = await self._js.create_object_store(
+                bucket=_ARTIFACTS_BUCKET
+            )
+
+        self.workspace = Workspace(self._artifacts_os)
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""

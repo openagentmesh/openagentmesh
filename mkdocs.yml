@@ -89,6 +89,7 @@ nav:
           - Contracts: learn/concepts/contracts.md
           - Discovery: learn/concepts/discovery.md
           - Invocation: learn/concepts/invocation.md
+          - Shared State: learn/concepts/shared-state.md
           - Error Handling: learn/concepts/errors.md
           - Usage Attribution: learn/concepts/usage.md
   - Cookbook:
@@ -98,6 +99,9 @@ nav:
       - Shared Plan Coordination: cookbook/shared-plan.md
       - LLM-Driven Tool Selection: cookbook/llm-tool-selection.md
       - Error Handling: cookbook/error-handling.md
+      - Automatic Load Balancing: cookbook/load-balancing.md
+      - Reactive Pipeline: cookbook/reactive-pipeline.md
+      - Parallel RAG Indexing: cookbook/parallel-rag-indexing.md
   - API Reference:
       - api/index.md
       - AgentMesh: api/agentmesh.md
