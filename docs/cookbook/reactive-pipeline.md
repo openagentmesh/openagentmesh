@@ -67,37 +67,42 @@ mesh.run()
 
 ## Stage 2: Extract
 
-Watches for new raw documents. When one appears, extracts entities and writes the result for the next stage.
+Watches for new raw documents. When one appears, extracts entities and writes the result for the next stage. Registered as a [watcher agent](../concepts/agents.md#watcher): visible in the catalog and tracked for liveness, but not invocable.
 
 ```python
-import asyncio
-import json
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
-async def main():
-    mesh = AgentMesh()
-    async with mesh:
-        print("extract: watching for raw documents...")
-        async for value in mesh.kv.watch("pipeline.*.raw"):
-            doc = Document.model_validate_json(value)
-            print(f"extract: processing {doc.id}")
+mesh = AgentMesh()
 
-            # Simulate entity extraction
-            words = doc.body.split()
-            entities = [w for w in words if w[0].isupper()] if words else []
+spec = AgentSpec(
+    name="extract",
+    channel="pipeline",
+    description="Watches for raw documents and extracts entities.",
+)
 
-            extracted = Extracted(
-                id=doc.id,
-                entities=entities,
-                word_count=len(words),
-            )
-            await mesh.kv.put(
-                f"pipeline.{doc.id}.extracted",
-                extracted.model_dump_json(),
-            )
-            print(f"extract: wrote pipeline.{doc.id}.extracted")
+@mesh.agent(spec)
+async def extract():
+    print("extract: watching for raw documents...")
+    async for value in mesh.kv.watch("pipeline.*.raw"):
+        doc = Document.model_validate_json(value)
+        print(f"extract: processing {doc.id}")
 
-asyncio.run(main())
+        # Simulate entity extraction
+        words = doc.body.split()
+        entities = [w for w in words if w[0].isupper()] if words else []
+
+        extracted = Extracted(
+            id=doc.id,
+            entities=entities,
+            word_count=len(words),
+        )
+        await mesh.kv.put(
+            f"pipeline.{doc.id}.extracted",
+            extracted.model_dump_json(),
+        )
+        print(f"extract: wrote pipeline.{doc.id}.extracted")
+
+mesh.run()
 ```
 
 ## Stage 3: Summarize
@@ -105,35 +110,40 @@ asyncio.run(main())
 Watches for extracted results and produces a final summary.
 
 ```python
-import asyncio
-import json
-from openagentmesh import AgentMesh
+from openagentmesh import AgentMesh, AgentSpec
 
-async def main():
-    mesh = AgentMesh()
-    async with mesh:
-        print("summarize: watching for extracted documents...")
-        async for value in mesh.kv.watch("pipeline.*.extracted"):
-            extracted = Extracted.model_validate_json(value)
-            print(f"summarize: processing {extracted.id}")
+mesh = AgentMesh()
 
-            # Look up the original document for the title
-            raw = await mesh.kv.get(f"pipeline.{extracted.id}.raw")
-            doc = Document.model_validate_json(raw)
+spec = AgentSpec(
+    name="summarize",
+    channel="pipeline",
+    description="Watches for extracted documents and produces a summary.",
+)
 
-            summary = Summary(
-                id=extracted.id,
-                title=doc.title,
-                one_liner=doc.body[:80] + "..." if len(doc.body) > 80 else doc.body,
-                entity_count=len(extracted.entities),
-            )
-            await mesh.kv.put(
-                f"pipeline.{extracted.id}.summary",
-                summary.model_dump_json(),
-            )
-            print(f"summarize: wrote pipeline.{extracted.id}.summary")
+@mesh.agent(spec)
+async def summarize():
+    print("summarize: watching for extracted documents...")
+    async for value in mesh.kv.watch("pipeline.*.extracted"):
+        extracted = Extracted.model_validate_json(value)
+        print(f"summarize: processing {extracted.id}")
 
-asyncio.run(main())
+        # Look up the original document for the title
+        raw = await mesh.kv.get(f"pipeline.{extracted.id}.raw")
+        doc = Document.model_validate_json(raw)
+
+        summary = Summary(
+            id=extracted.id,
+            title=doc.title,
+            one_liner=doc.body[:80] + "..." if len(doc.body) > 80 else doc.body,
+            entity_count=len(extracted.entities),
+        )
+        await mesh.kv.put(
+            f"pipeline.{extracted.id}.summary",
+            summary.model_dump_json(),
+        )
+        print(f"summarize: wrote pipeline.{extracted.id}.summary")
+
+mesh.run()
 ```
 
 ## Submitting a Document
@@ -233,3 +243,16 @@ Key properties:
 - **Stage independence.** Kill the summarize stage midway. Ingest and extract continue producing. Restart summarize and it picks up the unprocessed extracted results.
 - **Parallel pipelines.** Submit ten documents. Each flows through the pipeline independently. Stages process whichever document update arrives next.
 - **Observable state.** Every intermediate result is a KV entry. Debugging is reading keys, not tracing RPC chains.
+- **Visible participants.** All three stages are registered agents. They appear in `mesh.catalog()`, participate in liveness tracking, and can be filtered with `mesh.catalog(invocable=True)` when selecting tools for LLM invocation.
+
+!!! tip "Scaling expensive processing"
+    Watcher agents run as a single instance; every replica receives every KV update. If the processing step is expensive, split the watcher into a thin routing layer that calls an invocable agent via `mesh.call()`. The invocable agent scales via queue groups:
+
+    ```python
+    @mesh.agent(AgentSpec(name="extract-watcher", channel="pipeline",
+        description="Routes raw documents to the extract processor."))
+    async def extract_watcher():
+        async for value in mesh.kv.watch("pipeline.*.raw"):
+            doc = Document.model_validate_json(value)
+            await mesh.call("extract-processor", {"id": doc.id, "body": doc.body})
+    ```

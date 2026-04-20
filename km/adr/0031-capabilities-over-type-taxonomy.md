@@ -27,18 +27,20 @@ Remove the `type` field from `AgentSpec` and the contract schema. Replace it wit
 
 | Capability | Meaning | Inferred from |
 |------------|---------|---------------|
-| `invocable` | Accepts requests via `mesh.call()` or `mesh.stream()` | Handler has a request parameter |
+| `invocable` | Accepts requests via `mesh.call()` or `mesh.stream()` | Handler has a request parameter, or has an output model without streaming |
 | `streaming` | Streams response chunks | Handler is an async generator (`yield`) |
 
-These produce three valid combinations:
+These produce five valid combinations:
 
 | Pattern | `invocable` | `streaming` | Consumer API | Example |
 |---------|-------------|-------------|--------------|---------|
 | Buffered handler | `true` | `false` | `mesh.call()` | NER extraction, sentiment classifier |
 | Streaming handler | `true` | `true` | `mesh.stream()` | LLM summarizer, translator |
+| Trigger | `true` | `false` | `mesh.call()` | Cache refresh, migration runner |
 | Event emitter | `false` | `true` | `mesh.subscribe()` | Price feed, log stream |
+| Watcher | `false` | `false` | N/A (reacts to KV) | Pipeline stage, state reactor |
 
-The fourth combination (`invocable=false, streaming=false`) is not valid; there is no use case for a non-invocable, non-streaming agent.
+The watcher combination was added by ADR-0042. The trigger combination was added by ADR-0043.
 
 ### Updated `AgentSpec`
 

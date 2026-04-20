@@ -80,6 +80,34 @@ The `reviewer` agent is itself registered on the mesh, but its handler calls two
 
 This is the natural pattern for orchestrator agents, pipelines, and any agent that coordinates work across other agents.
 
+## Watcher
+
+Register agents that react to shared state changes. No incoming requests, no outgoing calls to other agents. Coordination happens through data in the KV store.
+
+```python
+from openagentmesh import AgentMesh, AgentSpec
+
+mesh = AgentMesh()
+
+@mesh.agent(AgentSpec(
+    name="extract",
+    channel="pipeline",
+    description="Watches for raw documents and extracts entities.",
+))
+async def extract():
+    async for value in mesh.kv.watch("pipeline.*.raw"):
+        doc = Document.model_validate_json(value)
+        extracted = do_extraction(doc)
+        await mesh.kv.put(f"pipeline.{doc.id}.extracted", extracted.model_dump_json())
+
+mesh.run()
+```
+
+The watcher registers on the mesh (visible in the catalog, tracked for liveness) but is not invocable. Its handler runs as a background task that reacts to KV changes. This is the natural pattern for reactive pipeline stages and state-driven coordination.
+
+!!! note "Scaling"
+    Watcher agents do not benefit from queue-group scaling; every instance receives every KV update. For expensive processing, have the watcher delegate to an invocable agent via `mesh.call()`. The invocable agent scales via queue groups; the watcher stays as a single thin routing instance.
+
 ## Summary
 
 | Pattern | Registers agents | Calls agents | Lifecycle |
@@ -87,5 +115,6 @@ This is the natural pattern for orchestrator agents, pipelines, and any agent th
 | Provider | Yes | No | `mesh.run()` |
 | Consumer | No | Yes | `async with mesh:` |
 | Hybrid | Yes | Yes | `mesh.run()` or `async with mesh:` |
+| Watcher | Yes | No (reacts to KV) | `mesh.run()` |
 
-All three connect to the same NATS server. All three can run in the same process or in separate processes. The mesh doesn't distinguish between them; they're just different usage patterns of the same `AgentMesh` class.
+All four connect to the same NATS server. All four can run in the same process or in separate processes. The mesh doesn't distinguish between them; they're just different usage patterns of the same `AgentMesh` class.

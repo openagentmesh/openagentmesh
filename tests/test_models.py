@@ -135,14 +135,29 @@ class TestHandlerInspection:
         with pytest.raises(TypeError, match="must be async"):
             inspect_handler(handler)
 
-    def test_no_input_no_yield_rejected(self):
-        """No input param + no yield = invalid (fourth combination)."""
+    def test_watcher_shape(self):
+        """No input param + no yield + no output = watcher (ADR-0042)."""
+
+        async def handler():
+            pass
+
+        info = inspect_handler(handler)
+        assert info.invocable is False
+        assert info.streaming is False
+        assert info.input_model is None
+        assert info.output_model is None
+
+    def test_trigger_shape(self):
+        """No input param + output model + no yield = trigger (ADR-0043)."""
 
         async def handler() -> EchoOutput:
-            return EchoOutput(reply="nope")
+            return EchoOutput(reply="done")
 
-        with pytest.raises(TypeError, match="invocable or streaming"):
-            inspect_handler(handler)
+        info = inspect_handler(handler)
+        assert info.invocable is True
+        assert info.streaming is False
+        assert info.input_model is None
+        assert info.output_model is EchoOutput
 
 
 # --- Error subclasses (ADR-0005) ---
