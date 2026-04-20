@@ -46,4 +46,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0036](0036-orchestration-declarative-workflows-and-checkpointing.md) | Orchestration: declarative workflows and checkpointing | discussion | |
 | [ADR-0037](0037-oam-scope-per-agent-visibility-and-reachability.md) | OAM scope: per-agent visibility and reachability | spec | |
 | [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | spec | |
-| [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | spec | feature/tool-conversion |
+| [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
