@@ -92,8 +92,8 @@ The full consumer surface is now:
 
 | Method                                     | Pattern             | When to use                       |
 | ------------------------------------------ | ------------------- | --------------------------------- |
-| `mesh.call("name", payload)`               | Buffered req/reply  | Agent/tool has `streaming: false` |
-| `mesh.stream("name", payload)`             | Streaming req/reply | Agent has `streaming: true`       |
+| `mesh.call("name", payload)`               | Responder req/reply | Agent/tool has `streaming: false` |
+| `mesh.stream("name", payload)`             | Streamer req/reply  | Agent has `streaming: true`       |
 | `mesh.send("name", payload, reply_to=...)` | Async callback      | Fire-and-forget with async reply  |
 | `mesh.subscribe("name")`                   | Pub/sub             | Publisher agent emitting events   |
 

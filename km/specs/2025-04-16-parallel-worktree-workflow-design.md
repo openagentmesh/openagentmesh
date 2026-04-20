@@ -34,7 +34,7 @@ The `km/adr/index.md` table has a **Branch** column:
 ```markdown
 | ADR | Decision | Status | Branch |
 |-----|----------|--------|--------|
-| ADR-0024 | Streaming or buffered handler contract | discussion | feature/handler-types |
+| ADR-0024 | Streamer or responder handler contract | discussion | feature/handler-types |
 | ADR-0025 | Public API for shared context KV | discussion | |
 ```
 

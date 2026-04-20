@@ -19,7 +19,7 @@ On `main`, read `km/adr/index.md`. Check the **Branch** column for your target A
 Add your branch name to the Branch column for each target ADR. Use a descriptive slug, not ADR numbers:
 
 ```markdown
-| ADR-0024 | Streaming or buffered handler contract | spec | feature/handler-types |
+| ADR-0024 | Streamer or responder handler contract | spec | feature/handler-types |
 ```
 
 Multiple related ADRs can share the same branch name.

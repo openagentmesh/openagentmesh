@@ -34,8 +34,8 @@ These produce five valid combinations:
 
 | Pattern | `invocable` | `streaming` | Consumer API | Example |
 |---------|-------------|-------------|--------------|---------|
-| Buffered handler | `true` | `false` | `mesh.call()` | NER extraction, sentiment classifier |
-| Streaming handler | `true` | `true` | `mesh.stream()` | LLM summarizer, translator |
+| Responder | `true` | `false` | `mesh.call()` | NER extraction, sentiment classifier |
+| Streamer | `true` | `true` | `mesh.stream()` | LLM summarizer, translator |
 | Trigger | `true` | `false` | `mesh.call()` | Cache refresh, migration runner |
 | Event emitter | `false` | `true` | `mesh.subscribe()` | Price feed, log stream |
 | Watcher | `false` | `false` | N/A (reacts to KV) | Pipeline stage, state reactor |
@@ -74,7 +74,7 @@ The `type` field is replaced by `invocable` and `streaming`. Catalog filtering u
 # Find all streaming agents in the NLP channel
 streaming_nlp = await mesh.catalog(channel="nlp", streaming=True)
 
-# Find all non-streaming (buffered) agents
+# Find all non-streaming (responder) agents
 tools = await mesh.catalog(streaming=False)
 
 # Find all event emitters
@@ -84,7 +84,7 @@ publishers = await mesh.catalog(invocable=False)
 ### Registration examples
 
 ```python
-# Buffered handler — inferred invocable=True, streaming=False
+# Responder handler — inferred invocable=True, streaming=False
 spec = AgentSpec(
     name="classifier",
     channel="nlp",
@@ -96,7 +96,7 @@ async def classify(req: ClassifyInput) -> ClassifyOutput:
     return ClassifyOutput(label="positive", confidence=0.95)
 
 
-# Streaming handler — inferred invocable=True, streaming=True
+# Streamer handler — inferred invocable=True, streaming=True
 spec = AgentSpec(
     name="summarizer",
     channel="nlp",

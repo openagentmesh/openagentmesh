@@ -31,9 +31,9 @@ New headers:
 
 The SDK maintains a local catalog cache, updated via a catalog change subscription (started on connect, stopped on disconnect). This cache enables pre-flight capability checks without a round trip.
 
-**Client-side (primary):** `mesh.stream()` checks the catalog cache before publishing. If the target agent does not support streaming, raises `StreamingNotSupported` locally. `mesh.call()` checks the inverse: if the target agent is streaming-only, raises `BufferedNotSupported` locally.
+**Client-side (primary):** `mesh.stream()` checks the catalog cache before publishing. If the target agent does not support streaming, raises `StreamingNotSupported` locally. `mesh.call()` checks the inverse: if the target agent is streaming-only, raises `StreamingRequired` locally.
 
-**Handler-side (defense-in-depth):** If a request with `X-Mesh-Stream: true` reaches a non-streaming handler (e.g., stale cache, direct NATS publish), the handler responds with a `MeshError` using code `streaming_not_supported`. The reverse case (`buffered_not_supported`) is enforced the same way.
+**Handler-side (defense-in-depth):** If a request with `X-Mesh-Stream: true` reaches a non-streaming handler (e.g., stale cache, direct NATS publish), the handler responds with a `MeshError` using code `streaming_not_supported`. The reverse case (`streaming_required`) is enforced the same way.
 
 ### Error Subclasses
 
@@ -43,12 +43,12 @@ Three new `MeshError` subclasses for typed exception handling:
 from openagentmesh import MeshError
 
 class StreamingNotSupported(MeshError):
-    """Raised when mesh.stream() targets a buffered agent."""
+    """Raised when mesh.stream() targets a responder agent."""
     # code: "streaming_not_supported"
 
-class BufferedNotSupported(MeshError):
+class StreamingRequired(MeshError):
     """Raised when mesh.call() targets a streaming-only agent."""
-    # code: "buffered_not_supported"
+    # code: "streaming_required"
 
 class ChunkSequenceError(MeshError):
     """Raised when stream chunks arrive out of order."""
@@ -82,7 +82,7 @@ async for chunk in mesh.stream("agent-name", payload, timeout=30.0):
     # chunk is a dict (deserialized JSON)
 ```
 
-`mesh.call()` (buffered) remains the default; streaming is opt-in on both sides.
+`mesh.call()` (responder) remains the default; streaming is opt-in on both sides.
 
 ## Risks and Implications
 

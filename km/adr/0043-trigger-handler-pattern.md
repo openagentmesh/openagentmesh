@@ -38,8 +38,8 @@ invocable = has_input_model
 
 | Pattern | Handler shape | Capabilities |
 |---------|--------------|--------------|
-| Buffered | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
-| Streaming | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
+| Responder | `async def f(req: In) -> Out: return ...` | `invocable=True, streaming=False` |
+| Streamer | `async def f(req: In) -> Chunk: yield ...` | `invocable=True, streaming=True` |
 | **Trigger** | **`async def f() -> Out: return ...`** | **`invocable=True, streaming=False`** |
 | Publisher | `async def f() -> Event: yield ...` | `invocable=False, streaming=True` |
 | Watcher | `async def f() -> None: ...` | `invocable=False, streaming=False` |
@@ -84,7 +84,7 @@ The absent `input_schema` signals to consumers that `mesh.call()` requires no pa
 
 ### No plumbing changes needed
 
-The existing `_handle_buffered` method already supports calling handlers with no arguments when `input_model` is None. The existing `mesh.call()` already accepts `payload=None`. Only the inference rule in `inspect_handler` changes.
+The existing `_handle_responder` method already supports calling handlers with no arguments when `input_model` is None. The existing `mesh.call()` already accepts `payload=None`. Only the inference rule in `inspect_handler` changes.
 
 ## Consequences
 
