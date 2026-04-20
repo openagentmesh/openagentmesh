@@ -115,8 +115,23 @@ class AgentMesh:
     async def _connect(self) -> None:
         if self._nc is not None:
             return
-        self._nc = await nats.connect(self._url)
+        try:
+            self._nc = await nats.connect(
+                self._url,
+                allow_reconnect=False,
+                max_reconnect_attempts=5,
+                reconnect_time_wait=1,
+                error_cb=self._nats_error_cb,
+            )
+        except Exception as e:
+            raise MeshError(
+                code="connection_failed",
+                message=f"Could not connect to mesh at {self._url}. Is it running? Try: oam mesh up",
+            ) from e
         self._js = self._nc.jetstream()
+
+    async def _nats_error_cb(self, e: Exception) -> None:
+        _log.debug("nats: %s", e)
 
     async def _ensure_buckets(self) -> None:
         assert self._js is not None
