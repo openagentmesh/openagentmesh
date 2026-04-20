@@ -12,10 +12,17 @@ It's an SDK with batteries included:
 
 No hardcoded interactions, full decoupling.
 
+Start the mesh, then run:
+
+```bash
+oam mesh up
+```
+
 ```python
-import asyncio
 from openagentmesh import AgentMesh, AgentSpec
 from pydantic import BaseModel
+
+mesh = AgentMesh()
 
 class Input(BaseModel):
     content: str
@@ -23,23 +30,23 @@ class Input(BaseModel):
 class Summary(BaseModel):
     text: str
 
-async def main():
-    async with AgentMesh.local() as mesh:
+spec = AgentSpec(name="summarizer", channel="nlp",
+                 description="Summarizes text to a target length.")
 
-        spec = AgentSpec(name="summarizer", channel="nlp",
-                         description="Summarizes text to a target length.")
+@mesh.agent(spec)
+async def summarize(req: Input) -> Summary:
+    return Summary(text=req.content[:100] + "...")
 
-        @mesh.agent(spec)
-        async def summarize(req: Input) -> Summary:
-            return Summary(text=req.content[:100] + "...")
-
-        result = await mesh.call("summarizer", {"content": "A long document..."})
-        print(result)  # {"text": "A long document..."}
-
-asyncio.run(main())
+mesh.run()
 ```
 
-One agent, one embedded mesh, no config. `AgentMesh.local()` started an embedded server with everything pre-configured. The `@mesh.agent` decorator registered a typed contract. `mesh.call()` discovered the agent by name and invoked it. The caller never imported the provider's code; it only knew the name.
+Discover and call it from anywhere that connects to the same mesh:
+
+```bash
+oam agent call summarizer '{"content": "A long document..."}'
+```
+
+One agent, one connection string, no coupling. `@mesh.agent` registered a typed contract on the bus. The CLI (or any other agent) discovered `summarizer` by name and invoked it. Nothing imported the provider's code; it only knew the name.
 
 ## Why OpenAgentMesh
 
