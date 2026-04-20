@@ -67,7 +67,7 @@ markdown_extensions:
 
 nav:
   - Welcome:
-      - Overview: welcome/index.md
+      - Overview: index.md
       - Quickstart: welcome/quickstart.md
       - Why OpenAgentMesh: welcome/why.md
       - OAM and MCP: welcome/oam-and-mcp.md
