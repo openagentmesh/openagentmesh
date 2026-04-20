@@ -59,7 +59,8 @@ markdown_extensions:
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ['.']
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
@@ -92,6 +93,7 @@ nav:
       - Error Handling: concepts/errors.md
       - Usage Attribution: concepts/usage.md
   - Cookbook:
+      - Overview: cookbook/index.md
       - Multi-Process Agents: cookbook/multi-process.md
       - Multi-Module Projects: cookbook/multi-module.md
       - Shared Plan Coordination: cookbook/shared-plan.md
