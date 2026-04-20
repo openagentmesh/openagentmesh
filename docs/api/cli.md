@@ -42,7 +42,9 @@ current terminal, or `--port <n>` to bind a different port.
 
 ### `oam mesh down`
 
-Stop the mesh started by `oam mesh up`.
+Stop the mesh started by `oam mesh up`. This only affects meshes managed via the
+PID file; embedded meshes (from `oam demo run` or `AgentMesh.local()`) are
+stopped with Ctrl+C in their own terminal.
 
 ```bash
 oam mesh down
