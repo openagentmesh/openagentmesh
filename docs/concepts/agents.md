@@ -49,19 +49,19 @@ These two properties combine into five common patterns:
 
 | Pattern | Handler shape | Invocable | Streaming |
 |---------|--------------|-----------|-----------|
-| Buffered | `async def f(req: In) -> Out: return ...` | Yes (has input) | No |
-| Streaming | `async def f(req: In) -> Chunk: yield ...` | Yes (has input) | Yes |
+| Responder | `async def f(req: In) -> Out: return ...` | Yes (has input) | No |
+| Streamer | `async def f(req: In) -> Chunk: yield ...` | Yes (has input) | Yes |
 | Trigger | `async def f() -> Out: return ...` | Yes (has output) | No |
 | Publisher | `async def f() -> Event: yield ...` | No | Yes |
 | Watcher | `async def f(): ...` | No | No |
 
 No explicit `type` or capability flags. The handler shape is the source of truth.
 
-### Buffered
+### Responder
 
 The most common pattern: accept typed input, return typed output. Shown in the [registration example above](#registering-an-agent).
 
-### Streaming
+### Streamer
 
 ```python
 class SummarizeChunk(BaseModel):

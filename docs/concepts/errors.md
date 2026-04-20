@@ -42,7 +42,7 @@ The `details` field carries extra context when available. Validation errors incl
 | `timeout` | The agent didn't respond within the timeout window | `MeshError` |
 | `not_found` | No agent registered with that name | `MeshError` |
 | `streaming_not_supported` | `mesh.stream()` called on a non-streaming agent | `StreamingNotSupported` |
-| `buffered_not_supported` | `mesh.call()` called on a streaming-only agent | `BufferedNotSupported` |
+| `streaming_required` | `mesh.call()` called on a streaming-only agent | `StreamingRequired` |
 | `chunk_sequence_error` | Stream chunks arrived out of order | `ChunkSequenceError` |
 | `rate_limited` | Agent or mesh rate limit exceeded | `MeshError` |
 
@@ -51,7 +51,7 @@ The `details` field carries extra context when available. Validation errors incl
 Streaming-related errors have dedicated `MeshError` subclasses for typed exception handling:
 
 ```python
-from openagentmesh import StreamingNotSupported, BufferedNotSupported
+from openagentmesh import StreamingNotSupported, StreamingRequired
 
 try:
     async for chunk in mesh.stream("summarizer", payload):
@@ -59,7 +59,7 @@ try:
 except StreamingNotSupported:
     # agent doesn't support streaming, fall back to a single-response call
     result = await mesh.call("summarizer", payload)
-except BufferedNotSupported:
+except StreamingRequired:
     # shouldn't happen here, but shows the pattern
     pass
 ```
