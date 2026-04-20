@@ -48,7 +48,8 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | spec | |
 | [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
 | [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | discussion | |
-| [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | documented | feature/cli-demos |
+| [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | superseded by ADR-0045 | feature/cli-demos |
 | [ADR-0042](0042-watcher-agent-pattern.md) | Watcher agent pattern (fourth capability combination) | documented | feature/watcher-agent |
 | [ADR-0043](0043-trigger-handler-pattern.md) | Trigger handler pattern (invocable, no input) | documented | feature/watcher-agent |
 | [ADR-0044](0044-handler-shape-rename-responder-streamer.md) | Rename handler shapes to Responder/Streamer | documented | feature/handler-shape-rename |
+| [ADR-0045](0045-unlink-cookbook-from-demos.md) | Unlink cookbook docs from demo modules (supersedes ADR-0041) | implemented | |

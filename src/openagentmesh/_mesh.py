@@ -93,6 +93,7 @@ class AgentMesh:
         self._subscriptions: list[Any] = []
         self._embedded: EmbeddedNats | None = None
         self._catalog_cache: dict[str, CatalogEntry] = {}
+        self._catalog_watcher: Any | None = None
         self._catalog_watcher_task: asyncio.Task | None = None
         self._publisher_tasks: dict[str, asyncio.Task] = {}
         self._watcher_tasks: dict[str, asyncio.Task] = {}
@@ -102,7 +103,7 @@ class AgentMesh:
     async def __aenter__(self) -> AgentMesh:
         await self._connect()
         await self._ensure_buckets()
-        self._start_catalog_watcher()
+        await self._start_catalog_watcher()
         await self._subscribe_pending()
         return self
 
@@ -168,14 +169,14 @@ class AgentMesh:
                 self._catalog_cache[name] = contract.to_catalog_entry()
                 self._subscribed.add(name)
 
-    def _start_catalog_watcher(self) -> None:
+    async def _start_catalog_watcher(self) -> None:
         """Start background task that watches the catalog KV for changes (ADR-0032)."""
         assert self._catalog_kv is not None
+        self._catalog_watcher = await self._catalog_kv.watchall()
 
         async def _watch() -> None:
             try:
-                watcher = await self._catalog_kv.watchall()
-                async for entry in watcher:
+                async for entry in self._catalog_watcher:
                     if entry is None or entry.value is None:
                         continue
                     if entry.key != _CATALOG_KEY:
@@ -192,6 +193,12 @@ class AgentMesh:
         self._catalog_watcher_task = asyncio.create_task(_watch())
 
     async def _shutdown(self) -> None:
+        if self._catalog_watcher is not None:
+            try:
+                await self._catalog_watcher.stop()
+            except Exception:
+                pass
+            self._catalog_watcher = None
         if self._catalog_watcher_task is not None:
             self._catalog_watcher_task.cancel()
             try:
