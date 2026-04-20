@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-20
-- **Status:** spec
+- **Status:** documented
 - **Source:** conversation ("Buffered" implies a transport-level buffering mechanism that doesn't exist)
 
 ## Context
