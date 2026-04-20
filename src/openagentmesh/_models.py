@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
+import re
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -60,6 +62,55 @@ class AgentContract(BaseModel):
     chunk_schema: dict[str, Any] | None = None
     registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def to_tool_schema(self) -> dict[str, Any]:
+        """Provider-neutral tool triple: name + description + input_schema."""
+        self._assert_invocable()
+        return {
+            "name": _sanitize_name(self.name),
+            "description": _build_description(self.description, self.output_schema),
+            "input_schema": self.input_schema or {"type": "object", "properties": {}},
+        }
+
+    def to_openai_tool(
+        self,
+        *,
+        api: Literal["chat", "responses"] = "chat",
+        strict: bool = False,
+    ) -> dict[str, Any]:
+        """OpenAI-format tool definition (Chat Completions or Responses API)."""
+        base = self.to_tool_schema()
+        schema = copy.deepcopy(base["input_schema"])
+        if strict:
+            schema = _strict_clean_schema(schema)
+
+        if api == "chat":
+            fn: dict[str, Any] = {
+                "name": base["name"],
+                "description": base["description"],
+                "parameters": schema,
+            }
+            if strict:
+                fn["strict"] = True
+            return {"type": "function", "function": fn}
+
+        result: dict[str, Any] = {
+            "type": "function",
+            "name": base["name"],
+            "description": base["description"],
+            "parameters": schema,
+        }
+        if strict:
+            result["strict"] = True
+        return result
+
+    def to_anthropic_tool(self) -> dict[str, Any]:
+        """Anthropic Messages API tool definition."""
+        return self.to_tool_schema()
+
+    def _assert_invocable(self) -> None:
+        if not self.invocable:
+            raise ValueError(f"Agent '{self.name}' is not invocable (publisher)")
+
     def to_catalog_entry(self) -> CatalogEntry:
         """Project to a lightweight catalog entry."""
         return CatalogEntry(
@@ -107,6 +158,63 @@ class AgentContract(BaseModel):
         import json
 
         return json.dumps(doc)
+
+
+_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_STRICT_STRIP = frozenset({
+    "format", "pattern", "minLength", "maxLength",
+    "minimum", "maximum", "minItems", "maxItems",
+    "default", "title",
+})
+
+
+def _sanitize_name(name: str) -> str:
+    sanitized = name.replace(".", "_")
+    if not _NAME_RE.match(sanitized):
+        raise ValueError(
+            f"Tool name '{sanitized}' (from '{name}') does not match "
+            f"{_NAME_RE.pattern}"
+        )
+    return sanitized
+
+
+def _build_description(description: str, output_schema: dict[str, Any] | None) -> str:
+    if not output_schema:
+        return description
+    props = output_schema.get("properties", {})
+    if not props:
+        return description
+    fields = ", ".join(props.keys())
+    return f"{description}\nReturns: {fields}."
+
+
+def _strict_clean_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    schema = copy.deepcopy(schema)
+    return _strict_clean_node(schema)
+
+
+def _strict_clean_node(node: dict[str, Any]) -> dict[str, Any]:
+    for kw in _STRICT_STRIP:
+        node.pop(kw, None)
+
+    if node.get("type") == "object":
+        node["additionalProperties"] = False
+        props = node.get("properties", {})
+        required = set(node.get("required", []))
+        for prop_name, prop_schema in props.items():
+            _strict_clean_node(prop_schema)
+            if prop_name not in required:
+                current_type = prop_schema.get("type")
+                if current_type and current_type != "null":
+                    prop_schema["type"] = [current_type, "null"]
+        node["required"] = sorted(props.keys())
+
+    if node.get("type") == "array":
+        items = node.get("items")
+        if isinstance(items, dict):
+            _strict_clean_node(items)
+
+    return node
 
 
 class MeshError(Exception):
