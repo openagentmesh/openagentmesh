@@ -43,6 +43,12 @@ def _compute_subject(name: str, channel: str | None) -> str:
     return f"mesh.agent.{name}"
 
 
+def _compute_error_subject(name: str, channel: str | None) -> str:
+    if channel:
+        return f"mesh.errors.{channel}.{name}"
+    return f"mesh.errors.{name}"
+
+
 def _compute_registry_key(name: str, channel: str | None) -> str:
     if channel:
         return f"{channel}.{name}"
@@ -399,6 +405,11 @@ class AgentMesh:
                         error.to_json(),
                         headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
                     )
+                await self._nc.publish(
+                    _compute_error_subject(name, contract.channel),
+                    error.to_json(),
+                    headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
+                )
 
         sub = await self._nc.subscribe(subject, queue=queue, cb=handler)
         self._subscriptions.append(sub)
@@ -544,6 +555,11 @@ class AgentMesh:
                         "X-Mesh-Stream-End": "true",
                         "X-Mesh-Status": "error",
                     },
+                )
+                await self._nc.publish(
+                    _compute_error_subject(name, spec.channel),
+                    error.to_json(),
+                    headers={"X-Mesh-Status": "error"},
                 )
             except Exception:
                 pass
