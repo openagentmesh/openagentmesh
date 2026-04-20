@@ -130,6 +130,7 @@ class EmbeddedNats:
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
 
         # Wait for server readiness
