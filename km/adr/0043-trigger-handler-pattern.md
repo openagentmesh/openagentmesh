@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-20
-- **Status:** spec
+- **Status:** documented
 - **Amends:** ADR-0031 (refines invocability inference), ADR-0042 (distinguishes trigger from watcher)
 - **Source:** conversation (invocable agents that need no input payload)
 

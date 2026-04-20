@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-04-20
-- **Status:** spec
+- **Status:** documented
 - **Amends:** ADR-0031 (adds fourth capability combination)
 - **Source:** conversation (reactive pipeline stages are invisible to the mesh)
 
