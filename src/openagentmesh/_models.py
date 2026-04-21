@@ -230,6 +230,7 @@ class MeshError(Exception):
     ):
         super().__init__(message)
         self.code = code
+        self.message = message
         self.agent = agent
         self.request_id = request_id
         self.details = details or {}
@@ -249,25 +250,13 @@ class MeshError(Exception):
         return json.dumps(self.to_dict()).encode()
 
 
-class StreamingNotSupported(MeshError):
-    """Raised when ``mesh.stream()`` targets a responder agent (ADR-0005)."""
+class InvocationMismatch(MeshError):
+    """Raised when the invocation verb doesn't match the agent's capabilities (ADR-0047)."""
 
-    def __init__(self, agent: str = "", request_id: str = ""):
+    def __init__(self, agent: str = "", message: str = "", request_id: str = ""):
         super().__init__(
-            code="streaming_not_supported",
-            message=f"Agent '{agent}' does not support streaming",
-            agent=agent,
-            request_id=request_id,
-        )
-
-
-class StreamingRequired(MeshError):
-    """Raised when ``mesh.call()`` targets a streaming-only agent (ADR-0005, ADR-0044)."""
-
-    def __init__(self, agent: str = "", request_id: str = ""):
-        super().__init__(
-            code="streaming_required",
-            message=f"Agent '{agent}' is streaming-only; use mesh.stream() instead",
+            code="invocation_mismatch",
+            message=message or f"Invocation mismatch for agent '{agent}'",
             agent=agent,
             request_id=request_id,
         )

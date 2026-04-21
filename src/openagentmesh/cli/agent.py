@@ -9,7 +9,7 @@ import sys
 import typer
 
 from .._mesh import AgentMesh
-from .._models import MeshError
+from .._models import InvocationMismatch, MeshError
 from ._config import resolve_url
 from ._output import as_json
 
@@ -40,10 +40,27 @@ def _read_payload(payload_arg: str | None) -> dict | list | str | int | float | 
         raise typer.Exit(2) from exc
 
 
-def _emit_mesh_error(exc: MeshError) -> None:
+def _cli_hint(exc: MeshError, agent_name: str) -> str | None:
+    if not isinstance(exc, InvocationMismatch):
+        return None
+    msg = exc.message.lower()
+    if "subscribe" in msg:
+        return f"oam agent subscribe {agent_name}"
+    if "stream()" in msg:
+        return f"oam agent stream {agent_name} [payload]"
+    if "call()" in msg:
+        return f"oam agent call {agent_name} [payload]"
+    return None
+
+
+def _emit_mesh_error(exc: MeshError, agent_name: str = "") -> None:
     typer.echo(f"Error [{exc.code}] {exc}", err=True)
     if exc.details:
         typer.echo(as_json(exc.details), err=True)
+    if agent_name:
+        hint = _cli_hint(exc, agent_name)
+        if hint:
+            typer.echo(f"\nTry: {hint}", err=True)
 
 
 @agent_app.command("call")
@@ -67,7 +84,7 @@ def call(
     try:
         result = asyncio.run(_run())
     except MeshError as exc:
-        _emit_mesh_error(exc)
+        _emit_mesh_error(exc, agent_name=name)
         raise typer.Exit(1) from exc
 
     if json_out:
@@ -99,7 +116,32 @@ def stream(
     try:
         asyncio.run(_run())
     except MeshError as exc:
-        _emit_mesh_error(exc)
+        _emit_mesh_error(exc, agent_name=name)
+        raise typer.Exit(1) from exc
+
+
+@agent_app.command("subscribe")
+def subscribe(
+    name: str = typer.Argument(..., help="Agent name (publisher)."),
+    url_flag: str | None = typer.Option(None, "--url", help="Override mesh URL."),
+    timeout: float | None = typer.Option(None, "--timeout", help="Seconds between events before giving up."),
+    json_out: bool = typer.Option(False, "--json", help="Pretty-print each event as JSON."),
+) -> None:
+    """Subscribe to a publisher agent's event stream."""
+    url = resolve_url(url_flag)
+
+    async def _run() -> None:
+        async with AgentMesh(url) as mesh:
+            async for event in mesh.subscribe(agent=name, timeout=timeout):
+                if json_out:
+                    typer.echo(as_json(event))
+                else:
+                    typer.echo(json.dumps(event))
+
+    try:
+        asyncio.run(_run())
+    except MeshError as exc:
+        _emit_mesh_error(exc, agent_name=name)
         raise typer.Exit(1) from exc
 
 

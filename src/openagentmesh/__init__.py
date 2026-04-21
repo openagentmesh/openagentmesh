@@ -4,22 +4,20 @@ from ._mesh import AgentMesh
 from ._models import (
     AgentContract,
     AgentSpec,
-    StreamingRequired,
     CatalogEntry,
     ChunkSequenceError,
+    InvocationMismatch,
     MeshError,
     MeshTimeout,
-    StreamingNotSupported,
 )
 
 __all__ = [
     "AgentMesh",
-    "AgentSpec",
     "AgentContract",
-    "StreamingRequired",
+    "AgentSpec",
     "CatalogEntry",
     "ChunkSequenceError",
+    "InvocationMismatch",
     "MeshError",
     "MeshTimeout",
-    "StreamingNotSupported",
 ]

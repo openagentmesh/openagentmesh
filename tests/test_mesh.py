@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, MeshError
-from openagentmesh._models import StreamingRequired, StreamingNotSupported
+from openagentmesh._models import InvocationMismatch
 
 
 # --- Test models ---
@@ -268,25 +268,67 @@ class TestMultipleAgents:
             assert replies == ["a", "b", "c"]
 
 
-# --- Capability enforcement (ADR-0005) ---
+# --- Invocation mismatch (ADR-0047) ---
 
 
-class TestCapabilityEnforcement:
-    async def test_stream_responder_agent_raises(self):
-        """mesh.stream() against a responder agent raises StreamingNotSupported."""
-        spec = AgentSpec(name="responder", description="Responder agent")
+class TestInvocationMismatch:
+    async def test_call_publisher_raises(self):
+        """mesh.call() against a publisher raises InvocationMismatch."""
+        spec = AgentSpec(name="price-feed", description="Emits prices")
 
         async with AgentMesh.local() as mesh:
             @mesh.agent(spec)
-            async def responder(req: EchoInput) -> EchoOutput:
-                return EchoOutput(reply=req.message)
+            async def price_feed() -> EchoOutput:
+                while True:
+                    yield EchoOutput(reply="tick")
+                    await asyncio.sleep(1)
 
-            with pytest.raises(StreamingNotSupported):
-                async for chunk in mesh.stream("responder", {"message": "hi"}):
+            with pytest.raises(InvocationMismatch, match="publisher.*cannot be called"):
+                await mesh.call("price-feed")
+
+    async def test_stream_publisher_raises(self):
+        """mesh.stream() against a publisher raises InvocationMismatch."""
+        spec = AgentSpec(name="events", description="Emits events")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def events() -> EchoOutput:
+                while True:
+                    yield EchoOutput(reply="event")
+                    await asyncio.sleep(1)
+
+            with pytest.raises(InvocationMismatch, match="publisher.*cannot be streamed"):
+                async for _ in mesh.stream("events"):
                     pass
 
-    async def test_call_streaming_agent_raises(self):
-        """mesh.call() against a streaming-only agent raises StreamingRequired."""
+    async def test_send_publisher_raises(self):
+        """mesh.send() against a publisher raises InvocationMismatch."""
+        spec = AgentSpec(name="emitter", description="Emits stuff")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def emitter() -> EchoOutput:
+                while True:
+                    yield EchoOutput(reply="emit")
+                    await asyncio.sleep(1)
+
+            with pytest.raises(InvocationMismatch, match="publisher.*cannot be sent to"):
+                await mesh.send("emitter", {"data": "test"})
+
+    async def test_call_watcher_raises(self):
+        """mesh.call() against a watcher raises InvocationMismatch."""
+        spec = AgentSpec(name="watcher", description="Watches things")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def watcher():
+                await asyncio.sleep(3600)
+
+            with pytest.raises(InvocationMismatch, match="background task"):
+                await mesh.call("watcher")
+
+    async def test_call_streamer_raises(self):
+        """mesh.call() against a streaming agent raises InvocationMismatch."""
         spec = AgentSpec(name="streamer", description="Streaming agent")
 
         async with AgentMesh.local() as mesh:
@@ -295,8 +337,74 @@ class TestCapabilityEnforcement:
                 for word in req.text.split():
                     yield SummarizeChunk(delta=word)
 
-            with pytest.raises(StreamingRequired):
+            with pytest.raises(InvocationMismatch, match="streaming-only.*stream\\(\\)"):
                 await mesh.call("streamer", {"text": "hello world"})
+
+    async def test_stream_responder_raises(self):
+        """mesh.stream() against a responder raises InvocationMismatch."""
+        spec = AgentSpec(name="responder", description="Responder agent")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def responder(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            with pytest.raises(InvocationMismatch, match="does not support streaming.*call\\(\\)"):
+                async for _ in mesh.stream("responder", {"message": "hi"}):
+                    pass
+
+    async def test_publisher_hint_suggests_subscribe(self):
+        """Publisher mismatch message suggests subscribing."""
+        spec = AgentSpec(name="pub", description="Publisher")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def pub() -> EchoOutput:
+                while True:
+                    yield EchoOutput(reply="x")
+                    await asyncio.sleep(1)
+
+            with pytest.raises(InvocationMismatch, match="[Ss]ubscribe"):
+                await mesh.call("pub")
+
+    async def test_subscribe_responder_raises(self):
+        """mesh.subscribe() against a responder raises InvocationMismatch."""
+        spec = AgentSpec(name="resp", description="Responder")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def resp(req: EchoInput) -> EchoOutput:
+                return EchoOutput(reply=req.message)
+
+            with pytest.raises(InvocationMismatch, match="does not publish.*call\\(\\)"):
+                async for _ in mesh.subscribe(agent="resp"):
+                    pass
+
+    async def test_subscribe_streamer_raises(self):
+        """mesh.subscribe() against a streamer raises InvocationMismatch."""
+        spec = AgentSpec(name="str-agent", description="Streamer")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def str_agent(req: SummarizeInput) -> SummarizeChunk:
+                yield SummarizeChunk(delta="x")
+
+            with pytest.raises(InvocationMismatch, match="streams responses.*stream\\(\\)"):
+                async for _ in mesh.subscribe(agent="str-agent"):
+                    pass
+
+    async def test_subscribe_watcher_raises(self):
+        """mesh.subscribe() against a watcher raises InvocationMismatch."""
+        spec = AgentSpec(name="bg", description="Background")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def bg():
+                await asyncio.sleep(3600)
+
+            with pytest.raises(InvocationMismatch, match="background task.*does not publish"):
+                async for _ in mesh.subscribe(agent="bg"):
+                    pass
 
 
 # --- Streaming error propagation (ADR-0005) ---
@@ -402,9 +510,35 @@ class TestCatalogSubscription:
                     await asyncio.sleep(0.05)
 
                 # mesh2 knows remote-buf is a responder via cache
-                with pytest.raises(StreamingNotSupported):
+                with pytest.raises(InvocationMismatch, match="does not support streaming"):
                     async for _ in mesh2.stream("remote-buf", {"message": "hi"}):
                         pass
+        finally:
+            await embedded.stop()
+
+    async def test_seed_cache_catches_remote_publisher(self):
+        """Caller connecting after a publisher registered gets InvocationMismatch, not NoRespondersError."""
+        from openagentmesh._local import EmbeddedNats
+
+        embedded = EmbeddedNats()
+        await embedded.start()
+        try:
+            mesh1 = AgentMesh(url=embedded.url)
+            async with mesh1:
+                @mesh1.agent(AgentSpec(name="remote-pub", description="Publisher"))
+                async def remote_pub() -> EchoOutput:
+                    while True:
+                        yield EchoOutput(reply="tick")
+                        await asyncio.sleep(1)
+
+                await mesh1._subscribe_pending()
+
+                # mesh2 connects after publisher is already in the catalog
+                mesh2 = AgentMesh(url=embedded.url)
+                async with mesh2:
+                    assert "remote-pub" in mesh2._catalog_cache
+                    with pytest.raises(InvocationMismatch, match="publisher"):
+                        await mesh2.call("remote-pub")
         finally:
             await embedded.stop()
 

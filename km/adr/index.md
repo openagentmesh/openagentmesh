@@ -54,3 +54,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0044](0044-handler-shape-rename-responder-streamer.md) | Rename handler shapes to Responder/Streamer | documented | feature/handler-shape-rename |
 | [ADR-0045](0045-unlink-cookbook-from-demos.md) | Unlink cookbook docs from demo modules (supersedes ADR-0041) | implemented | |
 | [ADR-0046](0046-scalar-and-generic-type-support.md) | Scalar and generic type support via TypeAdapter | documented | |
+| [ADR-0047](0047-invocation-mismatch-preflight-validation.md) | Invocation mismatch pre-flight validation | documented | |

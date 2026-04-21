@@ -28,7 +28,7 @@ async for chunk in mesh.stream("summarizer", {"text": doc}):
     print(chunk["delta"], end="")
 ```
 
-The agent must be a streaming handler (async generator). Calling `mesh.stream()` against a non-streaming agent raises `StreamingNotSupported`. Calling `mesh.call()` against a streaming-only agent raises `StreamingRequired`. Both checks happen locally before the request is sent.
+The agent must be a streaming handler (async generator). Using the wrong verb for an agent's capabilities raises `InvocationMismatch` with an actionable message suggesting the correct verb. All checks happen locally before the request is sent.
 
 ## Async Callback
 

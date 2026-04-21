@@ -22,12 +22,11 @@ from ._local import EmbeddedNats
 from ._models import (
     AgentContract,
     AgentSpec,
-    StreamingRequired,
     CatalogEntry,
     ChunkSequenceError,
+    InvocationMismatch,
     MeshError,
     MeshTimeout,
-    StreamingNotSupported,
 )
 
 _log = logging.getLogger("openagentmesh")
@@ -103,6 +102,7 @@ class AgentMesh:
     async def __aenter__(self) -> AgentMesh:
         await self._connect()
         await self._ensure_buckets()
+        await self._seed_catalog_cache()
         await self._start_catalog_watcher()
         await self._subscribe_pending()
         return self
@@ -183,6 +183,19 @@ class AgentMesh:
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
                 self._subscribed.add(name)
+
+    async def _seed_catalog_cache(self) -> None:
+        """Populate catalog cache from current KV snapshot (ADR-0047)."""
+        assert self._catalog_kv is not None
+        try:
+            from nats.js.errors import KeyNotFoundError
+            entry = await self._catalog_kv.get(_CATALOG_KEY)
+            entries = json.loads(entry.value)
+            self._catalog_cache = {
+                e["name"]: CatalogEntry.model_validate(e) for e in entries
+            }
+        except Exception:
+            pass
 
     async def _start_catalog_watcher(self) -> None:
         """Start background task that watches the catalog KV for changes (ADR-0032)."""
@@ -421,11 +434,11 @@ class AgentMesh:
                 wants_stream = msg.headers.get("X-Mesh-Stream") == "true"
 
             try:
-                # Defense-in-depth capability enforcement (ADR-0005)
+                # Defense-in-depth capability enforcement (ADR-0005, ADR-0047)
                 if wants_stream and not info.streaming:
-                    raise StreamingNotSupported(agent=name, request_id=request_id)
+                    raise InvocationMismatch(agent=name, request_id=request_id, message=f"Agent '{name}' does not support streaming. Use call() instead")
                 if not wants_stream and info.streaming:
-                    raise StreamingRequired(agent=name, request_id=request_id)
+                    raise InvocationMismatch(agent=name, request_id=request_id, message=f"Agent '{name}' is streaming-only. Use stream() instead")
 
                 if info.streaming:
                     await self._handle_streaming(msg, info, name, request_id)
@@ -632,7 +645,7 @@ class AgentMesh:
         """Synchronous request/reply. Returns the response as a dict."""
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
-        self._check_responder(name)
+        self._check_call(name)
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
@@ -665,7 +678,7 @@ class AgentMesh:
         """Streaming request. Yields response chunks as dicts."""
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
-        self._check_streaming(name)
+        self._check_stream(name)
 
         subject = self._resolve_subject(name)
         request_id = uuid.uuid4().hex
@@ -757,11 +770,15 @@ class AgentMesh:
         if agent is None and channel is None and subject is None:
             raise ValueError("Provide 'agent', 'channel', or 'subject'")
 
+        # --- capability check (ADR-0047) ---
+        if agent:
+            self._check_subscribe(agent)
+
         # --- resolve target subject ---
         if subject:
             resolved = subject
         elif agent:
-            resolved = self._resolve_event_subject(agent, channel)
+            resolved = await self._resolve_event_subject(agent, channel)
         else:
             # channel only
             resolved = f"mesh.agent.{channel}.>"
@@ -834,6 +851,7 @@ class AgentMesh:
         """
         assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
         await self._subscribe_pending()
+        self._check_send(name)
 
         if on_reply is not None and reply_to is not None:
             raise ValueError("'on_reply' and 'reply_to' are mutually exclusive")
@@ -949,29 +967,63 @@ class AgentMesh:
                 continue
         return contracts
 
-    # --- Capability checks (ADR-0005) ---
+    # --- Capability checks (ADR-0047) ---
 
-    def _check_streaming(self, name: str) -> None:
-        """Raise StreamingNotSupported if agent does not stream."""
+    def _capabilities(self, name: str) -> tuple[bool, bool] | None:
+        """Return (invocable, streaming) for a known agent, or None if unknown."""
         if name in self._agents:
             _, _, contract = self._agents[name]
-            if not contract.streaming:
-                raise StreamingNotSupported(agent=name)
-            return
+            return contract.invocable, contract.streaming
         entry = self._catalog_cache.get(name)
-        if entry is not None and not entry.streaming:
-            raise StreamingNotSupported(agent=name)
+        if entry is not None:
+            return entry.invocable, entry.streaming
+        return None
 
-    def _check_responder(self, name: str) -> None:
-        """Raise StreamingRequired if agent is streaming-only."""
-        if name in self._agents:
-            _, _, contract = self._agents[name]
-            if contract.streaming:
-                raise StreamingRequired(agent=name)
+    def _check_call(self, name: str) -> None:
+        caps = self._capabilities(name)
+        if caps is None:
             return
-        entry = self._catalog_cache.get(name)
-        if entry is not None and entry.streaming:
-            raise StreamingRequired(agent=name)
+        invocable, streaming = caps
+        if not invocable:
+            if streaming:
+                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be called. Subscribe to its events instead")
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be called")
+        if streaming:
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is streaming-only. Use stream() instead")
+
+    def _check_stream(self, name: str) -> None:
+        caps = self._capabilities(name)
+        if caps is None:
+            return
+        invocable, streaming = caps
+        if not invocable:
+            if streaming:
+                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be streamed. Subscribe to its events instead")
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be streamed")
+        if not streaming:
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' does not support streaming. Use call() instead")
+
+    def _check_send(self, name: str) -> None:
+        caps = self._capabilities(name)
+        if caps is None:
+            return
+        invocable, streaming = caps
+        if not invocable:
+            if streaming:
+                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be sent to. Subscribe to its events instead")
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be sent to")
+
+    def _check_subscribe(self, name: str) -> None:
+        caps = self._capabilities(name)
+        if caps is None:
+            return
+        invocable, streaming = caps
+        if invocable:
+            if streaming:
+                raise InvocationMismatch(agent=name, message=f"Agent '{name}' streams responses to requests. Use stream() instead")
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' does not publish events. Use call() instead")
+        if not streaming:
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and does not publish events")
 
     # --- Internal helpers ---
 
@@ -981,7 +1033,7 @@ class AgentMesh:
             return contract.subject
         return f"mesh.agent.{name}"
 
-    def _resolve_event_subject(self, name: str, channel: str | None = None) -> str:
+    async def _resolve_event_subject(self, name: str, channel: str | None = None) -> str:
         """Resolve an agent name to its event subject."""
         if name in self._agents:
             spec, _, _ = self._agents[name]
@@ -997,7 +1049,11 @@ class AgentMesh:
                 return f"mesh.agent.{ch}.{name}.events"
             return f"mesh.agent.{name}.events"
 
-        raise MeshError(code="not_found", message=f"Agent '{name}' not found")
+        c = await self.contract(name, channel)
+        ch = channel or c.channel
+        if ch:
+            return f"mesh.agent.{ch}.{name}.events"
+        return f"mesh.agent.{name}.events"
 
     @staticmethod
     def _serialize_payload(payload: Any) -> bytes:

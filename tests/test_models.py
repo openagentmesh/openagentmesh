@@ -3,12 +3,8 @@
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentSpec, CatalogEntry, MeshError, MeshTimeout
-from openagentmesh._models import (
-    StreamingRequired,
-    ChunkSequenceError,
-    StreamingNotSupported,
-)
+from openagentmesh import AgentSpec, CatalogEntry, InvocationMismatch, MeshError, MeshTimeout
+from openagentmesh._models import ChunkSequenceError
 from openagentmesh._handler import inspect_handler
 
 
@@ -212,17 +208,15 @@ class TestHandlerInspection:
 
 
 class TestErrorSubclasses:
-    def test_streaming_not_supported_is_mesh_error(self):
-        err = StreamingNotSupported(agent="echo")
+    def test_invocation_mismatch_is_mesh_error(self):
+        err = InvocationMismatch(agent="echo", message="Agent 'echo' is a publisher and cannot be called")
         assert isinstance(err, MeshError)
-        assert err.code == "streaming_not_supported"
+        assert err.code == "invocation_mismatch"
         assert "echo" in str(err)
 
-    def test_streaming_required_is_mesh_error(self):
-        err = StreamingRequired(agent="streamer")
-        assert isinstance(err, MeshError)
-        assert err.code == "streaming_required"
-        assert "streamer" in str(err)
+    def test_invocation_mismatch_default_message(self):
+        err = InvocationMismatch(agent="echo")
+        assert "echo" in err.message
 
     def test_chunk_sequence_error_is_mesh_error(self):
         err = ChunkSequenceError(
@@ -235,14 +229,14 @@ class TestErrorSubclasses:
         assert err.details["got_seq"] == 5
 
     def test_catch_specific_subclass(self):
-        """Callers can except StreamingNotSupported without catching all MeshErrors."""
+        """Callers can except InvocationMismatch without catching all MeshErrors."""
         try:
-            raise StreamingNotSupported(agent="echo")
-        except StreamingNotSupported:
-            pass  # caught by subclass
+            raise InvocationMismatch(agent="echo", message="test")
+        except InvocationMismatch:
+            pass
 
-        with pytest.raises(StreamingNotSupported):
-            raise StreamingNotSupported(agent="echo")
+        with pytest.raises(InvocationMismatch):
+            raise InvocationMismatch(agent="echo", message="test")
 
 
 class TestMeshTimeout:
