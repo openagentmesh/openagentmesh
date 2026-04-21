@@ -1,7 +1,7 @@
 <br />
 <div align="center">
   <a href="https://openagentmesh.github.io/openagentmesh/">
-    <img src="logo.png" alt="OpenAgentMesh" width="100" height="100">
+    <img src="logo/logo.png" alt="OpenAgentMesh" width="100" height="100">
   </a>
 
   <h3 align="center">OpenAgentMesh</h3>
