@@ -4,7 +4,6 @@ import asyncio
 import signal
 import sys
 from pathlib import Path
-
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec
@@ -12,7 +11,6 @@ from openagentmesh import AgentMesh, AgentSpec
 
 class Greeting(BaseModel):
     name: str
-
 
 class Response(BaseModel):
     message: str
@@ -26,13 +24,21 @@ async def main(mesh: AgentMesh) -> None:
     print()
     _step("\u2714", f"Connected to mesh at {mesh._url}")
 
+    
     @mesh.agent(AgentSpec(name="greeter", description="Returns a greeting for the given name"))
     async def greeter(req: Greeting) -> Response:
         return Response(message=f"Hello, {req.name}!")
-
     _step("\u2714", "Agent 'greeter' registered (handler shape: Responder)")
-    _step("\u2714", "Contract published to registry")
-    _step("\u2714", "Catalog updated (1 agent)")
+
+    @mesh.agent(AgentSpec(name="counter", description="Counts from a given number for ten times"))
+    async def counter(start: int) -> int:
+        for i in range(start, start + 10):
+            await asyncio.sleep(1)
+            yield i
+    _step("\u2714", "Agent 'counter' registered (handler shape: Streamer)")
+
+    _step("\u2714", "Agents registered")
+    _step("\u2714", f"Catalog updated ({len(await mesh.catalog())} agents)")
 
     print("\n  Calling greeter({\"name\": \"World\"})...")
     result = await mesh.call("greeter", Greeting(name="World"))
@@ -49,6 +55,7 @@ async def main(mesh: AgentMesh) -> None:
     print(f"    oam mesh catalog")
     print(f"    oam agent contract greeter")
     print(f"    oam agent call greeter '{{\"name\": \"Alice\"}}'")
+    print(f"    oam agent stream counter '0'")
     print("\n  Press Ctrl+C to stop.\n")
 
     stop = asyncio.Event()

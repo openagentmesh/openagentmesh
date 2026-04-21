@@ -529,6 +529,7 @@ class AgentMesh:
                     "X-Mesh-Request-Id": request_id,
                 },
             )
+            await self._nc.flush()
             seq += 1
 
         await self._nc.publish(
@@ -540,6 +541,7 @@ class AgentMesh:
                 "X-Mesh-Request-Id": request_id,
             },
         )
+        await self._nc.flush()
 
     # --- Watcher execution (ADR-0042) ---
 
