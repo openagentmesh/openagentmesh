@@ -1,10 +1,12 @@
 """Register a greeting agent on the mesh, call it, then stay open for interaction."""
 
 import asyncio
+import random
 import signal
 import sys
+from datetime import datetime
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from openagentmesh import AgentMesh, AgentSpec
 
@@ -14,6 +16,11 @@ class Greeting(BaseModel):
 
 class Response(BaseModel):
     message: str
+
+class Ticker(BaseModel):
+    symbol: str | None = 'ACME'
+    timestamp: datetime = Field(default_factory=datetime.now)
+    price: float
 
 
 def _step(icon: str, text: str) -> None:
@@ -37,6 +44,14 @@ async def main(mesh: AgentMesh) -> None:
             yield i
     _step("\u2714", "Agent 'counter' registered (handler shape: Streamer)")
 
+
+    @mesh.agent(AgentSpec(name="ticker", description="Shows a ticker symbol and price"))
+    async def ticker() -> Ticker:
+        while True:
+            yield Ticker(price=round(random.uniform(75, 82), 4))
+            await asyncio.sleep(1)
+    _step("\u2714", "Agent 'ticker' registered (handler shape: Publisher)")
+
     _step("\u2714", "Agents registered")
     _step("\u2714", f"Catalog updated ({len(await mesh.catalog())} agents)")
 
@@ -56,6 +71,7 @@ async def main(mesh: AgentMesh) -> None:
     print(f"    oam agent contract greeter")
     print(f"    oam agent call greeter '{{\"name\": \"Alice\"}}'")
     print(f"    oam agent stream counter '0'")
+    print(f"    oam agent subscribe ticker")
     print("\n  Press Ctrl+C to stop.\n")
 
     stop = asyncio.Event()
