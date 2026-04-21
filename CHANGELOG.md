@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-21
+
+### Added
+
+- Startup banner with mesh art and block-letter OAM for `oam demo` and `oam mesh up`.
+
+### Changed
+
+- Simplified `oam demo` from sub-commands (`list`, `show`, `run`) to a single command that launches the hello-world demo.
+
 ## [0.1.1] - 2026-04-21
 
 ### Added
@@ -24,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release. History before this point not documented.
 
-[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/openagentmesh/openagentmesh/releases/tag/v0.1.0
