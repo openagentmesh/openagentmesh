@@ -359,14 +359,14 @@ class AgentMesh:
                 streaming=info.streaming,
                 capabilities={"streaming": info.streaming, "invocable": info.invocable},
                 input_schema=(
-                    info.input_model.model_json_schema() if info.input_model else None
+                    info.input_adapter.json_schema() if info.input_adapter else None
                 ),
                 output_schema=(
-                    info.output_model.model_json_schema() if info.output_model else None
+                    info.output_adapter.json_schema() if info.output_adapter else None
                 ),
                 chunk_schema=(
-                    info.output_model.model_json_schema()
-                    if info.streaming and info.output_model
+                    info.output_adapter.json_schema()
+                    if info.streaming and info.output_adapter
                     else None
                 ),
             )
@@ -472,8 +472,8 @@ class AgentMesh:
         agent_name: str,
         request_id: str,
     ) -> None:
-        if info.input_model and msg.data:
-            payload = info.input_model.model_validate_json(msg.data)
+        if info.input_adapter and msg.data:
+            payload = info.input_adapter.validate_json(msg.data)
         else:
             payload = None
 
@@ -482,8 +482,8 @@ class AgentMesh:
         else:
             result = await info.func()
 
-        if isinstance(result, BaseModel):
-            response_data = result.model_dump_json().encode()
+        if info.output_adapter and result is not None:
+            response_data = info.output_adapter.dump_json(result)
         else:
             response_data = json.dumps(result).encode() if result is not None else b"{}"
 
@@ -507,16 +507,16 @@ class AgentMesh:
     ) -> None:
         stream_subject = f"mesh.stream.{request_id}"
 
-        if info.input_model and msg.data:
-            payload = info.input_model.model_validate_json(msg.data)
+        if info.input_adapter and msg.data:
+            payload = info.input_adapter.validate_json(msg.data)
         else:
             payload = None
 
         gen = info.func(payload) if payload is not None else info.func()
         seq = 0
         async for chunk in gen:
-            if isinstance(chunk, BaseModel):
-                chunk_data = chunk.model_dump_json().encode()
+            if info.output_adapter:
+                chunk_data = info.output_adapter.dump_json(chunk)
             else:
                 chunk_data = json.dumps(chunk).encode()
 
@@ -565,8 +565,8 @@ class AgentMesh:
         seq = 0
         try:
             async for chunk in gen:
-                if isinstance(chunk, BaseModel):
-                    data = chunk.model_dump_json().encode()
+                if info.output_adapter:
+                    data = info.output_adapter.dump_json(chunk)
                 else:
                     data = json.dumps(chunk).encode()
 
@@ -1003,12 +1003,8 @@ class AgentMesh:
             return b""
         if isinstance(payload, BaseModel):
             return payload.model_dump_json().encode()
-        if isinstance(payload, dict):
-            return json.dumps(payload).encode()
         if isinstance(payload, bytes):
             return payload
-        if isinstance(payload, str):
-            return payload.encode()
         return json.dumps(payload).encode()
 
     async def _publish_contract(self, contract: AgentContract) -> None:

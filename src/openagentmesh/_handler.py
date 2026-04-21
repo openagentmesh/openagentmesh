@@ -1,4 +1,4 @@
-"""Handler shape inspection for the @mesh.agent decorator (ADR-0031)."""
+"""Handler shape inspection for the @mesh.agent decorator (ADR-0031, ADR-0046)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, get_type_hints
 
-from pydantic import BaseModel
+from pydantic import TypeAdapter
 
 
 @dataclass
@@ -14,8 +14,8 @@ class HandlerInfo:
     """Result of inspecting a handler function."""
 
     func: Any
-    input_model: type[BaseModel] | None
-    output_model: type[BaseModel] | None
+    input_adapter: TypeAdapter | None
+    output_adapter: TypeAdapter | None
     invocable: bool
     streaming: bool
 
@@ -23,12 +23,16 @@ class HandlerInfo:
 def inspect_handler(func: Any) -> HandlerInfo:
     """Inspect an async handler to determine capabilities and type models.
 
-    Rules (ADR-0031, ADR-0042, ADR-0043):
+    Rules (ADR-0031, ADR-0042, ADR-0043, ADR-0046):
     - async def with request param and return   -> invocable=True,  streaming=False
     - async generator with request param        -> invocable=True,  streaming=True
     - async def without request param, returns  -> invocable=True,  streaming=False (trigger)
     - async generator without request param     -> invocable=False, streaming=True  (publisher)
     - async def without request param, no return -> invocable=False, streaming=False (watcher)
+
+    Type hints can be any type Pydantic's TypeAdapter supports (ADR-0046):
+    BaseModel subclasses, scalars (str, int, float, bool), generics (list[X],
+    dict[str, X]), Optional, Union, Literal, Enum, datetime, UUID, etc.
     """
     if not (inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func)):
         raise TypeError(
@@ -39,29 +43,26 @@ def inspect_handler(func: Any) -> HandlerInfo:
     streaming = inspect.isasyncgenfunction(func)
     hints = get_type_hints(func)
 
-    # Parameters (skip 'self')
     sig = inspect.signature(func)
     params = [p for name, p in sig.parameters.items() if name != "self"]
 
-    # Input model: first parameter with a BaseModel type hint
-    input_model: type[BaseModel] | None = None
+    input_adapter: TypeAdapter | None = None
     if params:
         param_type = hints.get(params[0].name)
-        if param_type is not None and isinstance(param_type, type) and issubclass(param_type, BaseModel):
-            input_model = param_type
+        if param_type is not None:
+            input_adapter = TypeAdapter(param_type)
 
-    # Output model: return annotation
-    output_model: type[BaseModel] | None = None
+    output_adapter: TypeAdapter | None = None
     return_type = hints.get("return")
-    if return_type is not None and isinstance(return_type, type) and issubclass(return_type, BaseModel):
-        output_model = return_type
+    if return_type is not None and return_type is not type(None):
+        output_adapter = TypeAdapter(return_type)
 
-    invocable = input_model is not None or (output_model is not None and not streaming)
+    invocable = input_adapter is not None or (output_adapter is not None and not streaming)
 
     return HandlerInfo(
         func=func,
-        input_model=input_model,
-        output_model=output_model,
+        input_adapter=input_adapter,
+        output_adapter=output_adapter,
         invocable=invocable,
         streaming=streaming,
     )

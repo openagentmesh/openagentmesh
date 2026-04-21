@@ -102,8 +102,8 @@ class TestHandlerInspection:
         info = inspect_handler(handler)
         assert info.invocable is True
         assert info.streaming is False
-        assert info.input_model is EchoInput
-        assert info.output_model is EchoOutput
+        assert info.input_adapter is not None
+        assert info.output_adapter is not None
 
     def test_streaming_handler(self):
         """Streaming: invocable=True, streaming=True."""
@@ -114,8 +114,8 @@ class TestHandlerInspection:
         info = inspect_handler(handler)
         assert info.invocable is True
         assert info.streaming is True
-        assert info.input_model is EchoInput
-        assert info.output_model is Chunk
+        assert info.input_adapter is not None
+        assert info.output_adapter is not None
 
     def test_event_emitter(self):
         """Event emitter: invocable=False, streaming=True."""
@@ -126,7 +126,7 @@ class TestHandlerInspection:
         info = inspect_handler(handler)
         assert info.invocable is False
         assert info.streaming is True
-        assert info.output_model is Event
+        assert info.output_adapter is not None
 
     def test_sync_handler_rejected(self):
         def handler(req: EchoInput) -> EchoOutput:
@@ -144,8 +144,8 @@ class TestHandlerInspection:
         info = inspect_handler(handler)
         assert info.invocable is False
         assert info.streaming is False
-        assert info.input_model is None
-        assert info.output_model is None
+        assert info.input_adapter is None
+        assert info.output_adapter is None
 
     def test_trigger_shape(self):
         """No input param + output model + no yield = trigger (ADR-0043)."""
@@ -156,8 +156,56 @@ class TestHandlerInspection:
         info = inspect_handler(handler)
         assert info.invocable is True
         assert info.streaming is False
-        assert info.input_model is None
-        assert info.output_model is EchoOutput
+        assert info.input_adapter is None
+        assert info.output_adapter is not None
+
+    def test_scalar_input_output(self):
+        """Scalar types are recognized as input/output (ADR-0046)."""
+
+        async def handler(name: str) -> str:
+            return f"Hello, {name}"
+
+        info = inspect_handler(handler)
+        assert info.invocable is True
+        assert info.streaming is False
+        assert info.input_adapter is not None
+        assert info.output_adapter is not None
+        assert info.input_adapter.json_schema() == {"type": "string"}
+        assert info.output_adapter.json_schema() == {"type": "string"}
+
+    def test_generic_output(self):
+        """Generic container types produce correct schema (ADR-0046)."""
+
+        async def handler(text: str) -> list[str]:
+            return text.split()
+
+        info = inspect_handler(handler)
+        assert info.output_adapter is not None
+        schema = info.output_adapter.json_schema()
+        assert schema["type"] == "array"
+        assert schema["items"] == {"type": "string"}
+
+    def test_int_trigger(self):
+        """Scalar return without input is a trigger (ADR-0046 + ADR-0043)."""
+
+        async def handler() -> int:
+            return 42
+
+        info = inspect_handler(handler)
+        assert info.invocable is True
+        assert info.input_adapter is None
+        assert info.output_adapter is not None
+        assert info.output_adapter.json_schema() == {"type": "integer"}
+
+    def test_none_return_is_watcher(self):
+        """Explicit -> None is still a watcher, not a trigger (ADR-0046)."""
+
+        async def handler() -> None:
+            pass
+
+        info = inspect_handler(handler)
+        assert info.invocable is False
+        assert info.output_adapter is None
 
 
 # --- Error subclasses (ADR-0005) ---

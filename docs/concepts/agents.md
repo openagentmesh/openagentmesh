@@ -135,6 +135,54 @@ All agents (including publishers and watchers) are visible in the catalog and pa
 !!! note "Scaling background agents"
     Publishers and watchers run as background tasks and do not use queue groups. Every instance receives every KV update or emits its own event stream. For expensive processing in a watcher, delegate to an invocable agent via `mesh.call()`, which scales via queue groups. The watcher becomes a thin routing layer; the processing agent scales independently.
 
+## Type Hints
+
+Handler type hints can be any type that Pydantic v2 can validate, not just `BaseModel` subclasses. Use scalar types, generics, or standard library types when a full model would be unnecessary ceremony.
+
+### Scalar types
+
+```python
+spec = AgentSpec(name="greet", description="Greets by name.")
+
+@mesh.agent(spec)
+async def greet(name: str) -> str:
+    return f"Hello, {name}"
+```
+
+The contract schema reflects the scalar type:
+
+```json
+{
+  "input_schema": { "type": "string" },
+  "output_schema": { "type": "string" }
+}
+```
+
+### Generic containers
+
+```python
+spec = AgentSpec(name="split", description="Splits text into words.")
+
+@mesh.agent(spec)
+async def split(text: str) -> list[str]:
+    return text.split()
+```
+
+### Supported types
+
+Any type Pydantic's `TypeAdapter` can handle:
+
+- **Scalars:** `str`, `int`, `float`, `bool`
+- **Standard library:** `datetime`, `date`, `UUID`, `Path`, `Decimal`, `Enum` subclasses
+- **Generics:** `list[X]`, `dict[str, X]`, `set[X]`, `tuple[X, ...]`
+- **Optionals and unions:** `X | None`, `Optional[X]`, `Union[X, Y]`
+- **Literals:** `Literal["a", "b"]`
+- **Pydantic models:** `BaseModel` subclasses
+
+Types that cannot produce a JSON Schema (callables, IO objects) raise an error at decoration time.
+
+Use `BaseModel` when your payload has multiple fields or when you want named, self-documenting schemas in the contract. Use scalar or generic types when the payload is a single value.
+
 ## Lifecycle
 
 Agents follow a predictable lifecycle:

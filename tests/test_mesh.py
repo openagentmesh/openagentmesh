@@ -407,3 +407,109 @@ class TestCatalogSubscription:
                         pass
         finally:
             await embedded.stop()
+
+
+# --- Scalar and generic type support (ADR-0046) ---
+
+
+class TestScalarTypes:
+    async def test_scalar_responder(self):
+        """str -> str handler works end-to-end."""
+        spec = AgentSpec(name="greet", description="Greets by name")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def greet(name: str) -> str:
+                return f"Hello, {name}"
+
+            result = await mesh.call("greet", "world")
+            assert result == "Hello, world"
+
+    async def test_int_responder(self):
+        """int -> int handler works end-to-end."""
+        spec = AgentSpec(name="double", description="Doubles a number")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def double(n: int) -> int:
+                return n * 2
+
+            result = await mesh.call("double", 21)
+            assert result == 42
+
+    async def test_scalar_trigger(self):
+        """No-input handler returning int is invocable (trigger)."""
+        spec = AgentSpec(name="answer", description="Returns the answer")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def answer() -> int:
+                return 42
+
+            result = await mesh.call("answer")
+            assert result == 42
+
+    async def test_list_output(self):
+        """Handler returning list[str] serializes correctly."""
+        spec = AgentSpec(name="split", description="Splits text")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def split(text: str) -> list[str]:
+                return text.split()
+
+            result = await mesh.call("split", "one two three")
+            assert result == ["one", "two", "three"]
+
+    async def test_scalar_streaming(self):
+        """Streaming handler yielding str chunks works."""
+        spec = AgentSpec(name="words", description="Yields words")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def words(text: str) -> str:
+                for word in text.split():
+                    yield word
+
+            chunks = []
+            async for chunk in mesh.stream("words", "one two three"):
+                chunks.append(chunk)
+
+            assert chunks == ["one", "two", "three"]
+
+    async def test_scalar_contract_schema(self):
+        """Scalar types produce correct JSON Schema in the contract."""
+        spec = AgentSpec(name="greet", description="Greets by name")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def greet(name: str) -> str:
+                return f"Hello, {name}"
+
+            contract = await mesh.contract("greet")
+            assert contract.input_schema == {"type": "string"}
+            assert contract.output_schema == {"type": "string"}
+
+    async def test_mixed_scalar_input_model_output(self):
+        """Scalar input with BaseModel output works."""
+        spec = AgentSpec(name="lookup", description="Looks up a name")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def lookup(name: str) -> EchoOutput:
+                return EchoOutput(reply=f"Found: {name}")
+
+            result = await mesh.call("lookup", "alice")
+            assert result["reply"] == "Found: alice"
+
+    async def test_mixed_model_input_scalar_output(self):
+        """BaseModel input with scalar output works."""
+        spec = AgentSpec(name="length", description="Returns message length")
+
+        async with AgentMesh.local() as mesh:
+            @mesh.agent(spec)
+            async def length(req: EchoInput) -> int:
+                return len(req.message)
+
+            result = await mesh.call("length", {"message": "hello"})
+            assert result == 5
