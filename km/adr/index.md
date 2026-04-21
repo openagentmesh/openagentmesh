@@ -55,3 +55,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0045](0045-unlink-cookbook-from-demos.md) | Unlink cookbook docs from demo modules (supersedes ADR-0041) | implemented | |
 | [ADR-0046](0046-scalar-and-generic-type-support.md) | Scalar and generic type support via TypeAdapter | documented | |
 | [ADR-0047](0047-invocation-mismatch-preflight-validation.md) | Invocation mismatch pre-flight validation | documented | |
+| [ADR-0048](0048-mesh-native-observability.md) | Mesh-native observability: structured logging and tracing on NATS subjects | discussion | |
