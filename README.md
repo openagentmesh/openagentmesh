@@ -19,7 +19,7 @@
 
 ## ✨ Highlights
 
-- **Decoupled multi-agent system** Run agents and tools however you want. Have them talk to each other as if they were running in the same process.
+- **Decoupled multi-agent system.** Run agents and tools however you want. Have them talk to each other as if they were running in the same process.
 - **Bring your own agent.** Works with any agentic framework (LangChain, CrewAI, PydanticAI, etc.).
 - **Agents as functions.** Just wrap your agents in a handler function and the `@mesh.agent` decorator. Done.
 - **Batteries included.** Agent catalog with runtime discovery, sync/async requests, pub/sub, shared KV and Object store, load balancing. All from a single infrastructure dependency.
