@@ -28,6 +28,16 @@ LOG_FILE = RUN_DIR / "oam-mesh.log"
 DATA_DIR = RUN_DIR / "data"
 
 
+def _port_in_use(port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.connect(("127.0.0.1", port))
+            return True
+        except (ConnectionRefusedError, OSError):
+            return False
+
+
 def _process_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -123,12 +133,21 @@ def up(
     if existing:
         PID_FILE.unlink(missing_ok=True)
 
+    if _port_in_use(port):
+        typer.echo(
+            f"Port {port} is already in use. "
+            f"Another NATS or service may be running. Check: lsof -i :{port}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     binary = asyncio.run(_resolve_binary())
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     log_fh = LOG_FILE.open("ab")
     popen_kwargs: dict = {
+        "stdin": subprocess.DEVNULL,
         "stdout": log_fh,
         "stderr": log_fh,
     }
@@ -143,7 +162,6 @@ def up(
     url = f"nats://127.0.0.1:{port}"
     try:
         asyncio.run(_wait_for_ready(url))
-        asyncio.run(_prime_buckets(url))
     except Exception as exc:
         proc.terminate()
         try:
@@ -151,6 +169,24 @@ def up(
         except subprocess.TimeoutExpired:
             proc.kill()
         typer.echo(f"Failed to start mesh: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if proc.poll() is not None:
+        typer.echo(
+            f"NATS exited immediately. Check {LOG_FILE} for details.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    try:
+        asyncio.run(_prime_buckets(url))
+    except Exception as exc:
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        typer.echo(f"Failed to prime KV buckets: {exc}", err=True)
         raise typer.Exit(1) from exc
 
     PID_FILE.write_text(str(proc.pid))
