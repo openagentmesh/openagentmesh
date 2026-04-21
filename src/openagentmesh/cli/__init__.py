@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from .agent import agent_app
-from .demo import demo_app
+from .demo import demo
 from .mesh import mesh_app
 
 app = typer.Typer(
@@ -17,7 +17,7 @@ app = typer.Typer(
 
 app.add_typer(mesh_app, name="mesh")
 app.add_typer(agent_app, name="agent")
-app.add_typer(demo_app, name="demo")
+app.command("demo")(demo)
 
 
 @app.callback()
