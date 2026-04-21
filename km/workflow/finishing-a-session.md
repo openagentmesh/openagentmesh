@@ -7,7 +7,8 @@ Before pushing, verify:
 1. All tests pass (`pytest`).
 2. Code samples in `docs/` match the implementation.
 3. ADR statuses are updated in the worktree's copy of `km/adr/index.md` (e.g., `spec` to `implemented` or `documented`).
-4. No unrelated changes crept in.
+4. `CHANGELOG.md` updated: add entries under `[Unreleased]` for user-visible changes. Write for users, not developers.
+5. No unrelated changes crept in.
 
 ## Push and open PR
 

@@ -100,7 +100,7 @@ Multiple features can be implemented simultaneously using git worktrees. Each wo
 ### Isolation rule
 
 - **Code changes only happen inside worktrees.** All modifications to `src/`, `tests/`, `docs/`, and dependency files (`pyproject.toml`, `uv.lock`) must be in a worktree branch, never directly on `main`.
-- **`main` is the thinking space.** Direct work on `main` is limited to `km/` (ADRs, specs, notes, brainstorming), `CLAUDE.md`, and project config files.
+- **`main` is the thinking space.** Direct work on `main` is limited to `km/` (ADRs, specs, notes, brainstorming), `CLAUDE.md`, `CHANGELOG.md`, and project config files.
 
 ### When to create a worktree
 
@@ -145,6 +145,16 @@ The contract schema is a superset of the A2A Agent Card format. A2A fields at to
 - `url` field is not stored in registry; injected by gateway at federation time. `.to_agent_card(url=None)` is a thin projection.
 - `description` is consumed by LLMs for tool selection: must state what the agent does, what inputs it handles, when NOT to use it.
 
+
+## Changelog
+
+`CHANGELOG.md` at repo root, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Sections: Added, Changed, Deprecated, Removed, Fixed, Security.
+
+- **Write for users, not developers.** Each entry explains what changed and why it matters. Not commit messages, not code details.
+- **`[Unreleased]` accumulates changes** as PRs merge. On release, rename to the version number and open a new `[Unreleased]` block.
+- **Diff links** at the bottom of the file, one per version. GitHub renders these as clickable comparisons.
+- **No tooling.** Plain Markdown, updated manually. Revisit if contributors join and merge conflicts become a problem.
+- **Releasing:** `/release <major|minor|patch>` bumps `pyproject.toml`, updates `CHANGELOG.md`, commits, tags, and pushes.
 
 ## Behavioral notes
 - Act as an expert advisor, always evaluating the user's idea critically: surface potenetial problems and push back when there are significant risks. Seek and ensure alignment proactively before proceeding with any change.
