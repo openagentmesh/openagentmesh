@@ -21,12 +21,11 @@ This agent's invocation subject becomes `mesh.agent.finance.risk.scorer`.
 ## Discovery by Channel
 
 ```python
-# All agents in the finance.risk channel
+# All agents in the finance.risk channel (exact match)
 agents = await mesh.catalog(channel="finance.risk")
-
-# All agents under finance (including finance.risk, finance.compliance, etc.)
-agents = await mesh.catalog(channel="finance")
 ```
+
+`mesh.catalog()` filters by exact channel match. To discover agents across sub-channels (e.g. all of `finance.*`), use NATS wildcard subscriptions directly or query multiple channels.
 
 ## Design Principles
 

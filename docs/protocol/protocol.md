@@ -21,7 +21,7 @@ Any client speaking the underlying transport can participate in the mesh by foll
 | Protocol concept | What to implement |
 |-----------------|-------------------|
 | Subject `mesh.agent.{channel}.{name}` | Subscribe with a queue group |
-| KV key `mesh-registry.{channel}.{name}` | Write contract JSON on startup |
+| KV bucket `mesh-registry`, key `{channel}.{name}` | Write contract JSON on startup |
 | KV key `mesh-catalog` | CAS-update the catalog array |
 | `X-Mesh-Request-Id` header | Generate per request, echo in response |
 | `X-Mesh-Status` header | Set to `ok` or `error` |
@@ -50,9 +50,9 @@ Single KV key containing a JSON array of lightweight entries:
 
 Updated via CAS (compare-and-swap) on every registration/deregistration. May be momentarily stale during concurrent updates.
 
-### Per-Agent Registry (`mesh-registry.{channel}.{name}`)
+### Per-Agent Registry (bucket `mesh-registry`, key `{channel}.{name}`)
 
-Full contract with JSON Schemas, SLA metadata, and error schema. This is the authoritative source for an agent's capabilities.
+Full contract with JSON Schemas and capability flags. This is the authoritative source for an agent's capabilities.
 
 ## Storage Buckets
 

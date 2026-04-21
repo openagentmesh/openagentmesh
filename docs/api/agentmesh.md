@@ -93,7 +93,9 @@ Capabilities are inferred from the handler shape at decoration time. `AgentSpec`
 |---------------|-------------|-------------|--------------|
 | `async def f(req) -> Out: return ...` | `True` | `False` | `mesh.call()` |
 | `async def f(req) -> Chunk: yield ...` | `True` | `True` | `mesh.stream()` |
+| `async def f() -> Out: return ...` | `True` | `False` | `mesh.call()` |
 | `async def f() -> Event: yield ...` | `False` | `True` | `mesh.subscribe()` |
+| `async def f(): ...` | `False` | `False` | (background task) |
 
 ## Invocation
 
@@ -106,7 +108,7 @@ Synchronous request/reply. Blocks until the agent responds or times out.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
-| `payload` | `dict \| BaseModel` | required | Input payload (dict or Pydantic model) |
+| `payload` | `Any` | `None` | Input payload (dict, Pydantic model, or any JSON-serializable value) |
 | `timeout` | `float` | `30.0` | Timeout in seconds |
 
 **Returns:** `dict` with the deserialized response payload.
@@ -118,7 +120,7 @@ Streaming request. Yields response chunks as dicts.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
-| `payload` | `dict \| BaseModel` | required | Input payload |
+| `payload` | `Any` | `None` | Input payload (dict, Pydantic model, or any JSON-serializable value) |
 | `timeout` | `float` | `60.0` | Total stream timeout in seconds |
 
 **Yields:** `dict` chunks.
@@ -130,7 +132,7 @@ Async callback invocation. Three modes: fire-and-forget, managed callback, or ma
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
-| `payload` | `dict \| BaseModel` | required | Input payload |
+| `payload` | `Any` | `None` | Input payload (dict, Pydantic model, or any JSON-serializable value) |
 | `on_reply` | `Callable[[dict], Awaitable[None]] \| None` | `None` | Callback for each reply message |
 | `on_error` | `Callable[[MeshError], Awaitable[None]] \| None` | `None` | Callback for timeout or error |
 | `reply_to` | `str \| None` | `None` | Manual reply subject (mutually exclusive with `on_reply`) |
@@ -210,13 +212,14 @@ Full `AgentContract` objects for all matching agents.
 
 **Returns:** `list[AgentContract]`
 
-### `await mesh.contract(name)`
+### `await mesh.contract(name, *, channel=None)`
 
 Fetch a single agent's full contract. This is the authoritative source.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | `str` | required | Agent name |
+| `channel` | `str \| None` | `None` | Channel hint for registry key lookup |
 
 **Returns:** `AgentContract`
 
@@ -261,6 +264,10 @@ await mesh.kv.update("counter", increment)
 ### `async for value in mesh.kv.watch(key)`
 
 Watch a key for changes. Yields the new value on each update.
+
+### `await mesh.kv.delete(key)`
+
+Delete a key.
 
 ## Workspace (Object Store)
 

@@ -279,9 +279,9 @@ tool = {
 
 | Method | Description |
 |--------|-------------|
-| `await mesh.catalog(channel=None, tags=None)` | Returns `list[CatalogEntry]` (name, description, version, tags, invocable, streaming) |
+| `await mesh.catalog(channel=None, tags=None, streaming=None, invocable=None)` | Returns `list[CatalogEntry]` (name, description, version, tags, invocable, streaming) |
 | `await mesh.discover(channel=None)` | Full `AgentContract` objects |
-| `await mesh.contract(name)` | Single agent's full contract (authoritative) |
+| `await mesh.contract(name, channel=None)` | Single agent's full contract (authoritative) |
 
 ### AgentSpec
 

@@ -37,4 +37,4 @@ async with AgentMesh() as mesh:     # connects to nats://localhost:4222
 | [Parallel RAG Indexing](parallel-rag-indexing.md) | ObjectStore + queue groups |
 
 !!! tip "Interactive demos"
-    For an interactive experience, try `oam demo run hello_world`. It starts a live mesh you can explore from another terminal.
+    For an interactive experience, try `oam demo`. It starts a local mesh with sample agents you can explore from another terminal.

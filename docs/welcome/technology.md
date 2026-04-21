@@ -77,11 +77,16 @@ The NATS protocol **is** the product. The Python SDK is a convenience layer.
 Any NATS client in any language can participate in the mesh by following the subject naming conventions and message envelope format. A Go service, a Rust CLI tool, or a Node.js application can register agents, discover the catalog, and invoke other agents. No SDK required.
 
 ```
-# Subject conventions (any NATS client can use these directly)
-mesh.agent.{channel}.{name}      # invocation
-mesh.registry.{channel}.{name}   # contract in KV
-mesh.catalog                     # lightweight index in KV
-mesh.health.{channel}.{name}     # heartbeat
+# NATS subjects (any NATS client can use these directly)
+mesh.agent.{channel}.{name}            # invocation
+mesh.agent.{channel}.{name}.events     # publisher events
+mesh.stream.{request_id}               # streaming chunks
+mesh.errors.{channel}.{name}           # dead-letter errors
+mesh.results.{request_id}              # async callback replies
+
+# KV buckets (contract storage, not subjects)
+mesh-registry: {channel}.{name}        # full contract per agent
+mesh-catalog: catalog                  # lightweight agent index
 ```
 
 This means OAM is not locked to Python. The protocol is language-agnostic by design.

@@ -43,7 +43,7 @@ current terminal, or `--port <n>` to bind a different port.
 ### `oam mesh down`
 
 Stop the mesh started by `oam mesh up`. This only affects meshes managed via the
-PID file; embedded meshes (from `oam demo run` or `AgentMesh.local()`) are
+PID file; embedded meshes (from `oam demo` or `AgentMesh.local()`) are
 stopped with Ctrl+C in their own terminal.
 
 ```bash
@@ -103,6 +103,17 @@ Same as `call`, but for streaming agents. Each chunk is printed as it arrives.
 
 ```bash
 oam agent stream summarizer '{"text": "long document..."}'
+```
+
+### `oam agent subscribe`
+
+Subscribe to a publisher agent's event stream. Each event is printed as it
+arrives. Press Ctrl-C to stop.
+
+```bash
+oam agent subscribe price-feed
+oam agent subscribe price-feed --json
+oam agent subscribe price-feed --timeout 30
 ```
 
 ### `oam agent contract`

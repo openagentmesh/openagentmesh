@@ -93,8 +93,15 @@ async def main(mesh: AgentMesh) -> None:
 
 ## Run It
 
-```bash
-oam demo run reactive_pipeline
+```python
+import asyncio
+from openagentmesh import AgentMesh
+
+async def run():
+    async with AgentMesh.local() as mesh:
+        await main(mesh)
+
+asyncio.run(run())
 ```
 
 ## How It Works
@@ -141,7 +148,7 @@ Key properties:
 - **Stage independence.** Kill the summarize stage midway. Ingest and extract continue producing. Restart summarize and it picks up the unprocessed extracted results.
 - **Parallel pipelines.** Submit ten documents. Each flows through the pipeline independently. Stages process whichever document update arrives next.
 - **Observable state.** Every intermediate result is a KV entry. Debugging is reading keys, not tracing RPC chains.
-- **Visible participants.** All three stages are registered agents. They appear in `mesh.catalog()`, participate in liveness tracking, and can be filtered with `mesh.catalog(invocable=True)` when selecting tools for LLM invocation.
+- **Mixed participation.** The ingest stage is a registered agent (visible in `mesh.catalog()`, callable via `mesh.call()`). The extract and summarize stages are plain async functions coordinating through KV watch. To make all stages visible in the catalog, register them as [watcher agents](../concepts/agents.md#watcher).
 
 !!! tip "Dot-separated keys for wildcard watching"
     KV keys use `.` as the hierarchy separator (not `/`) because NATS subject matching treats `.` as a token delimiter. This enables `watch("pipeline.*.raw")` to match any document ID in the middle.

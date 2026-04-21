@@ -27,7 +27,7 @@ OAM contracts are an **A2A-compatible superset**. The contract schema places A2A
   "name": "summarizer",
   "description": "Summarizes input text...",
   "version": "1.0.0",
-  "capabilities": { "streaming": false, "pushNotifications": true },
+  "capabilities": { "streaming": false, "invocable": true },
   "skills": [
     {
       "id": "summarizer",

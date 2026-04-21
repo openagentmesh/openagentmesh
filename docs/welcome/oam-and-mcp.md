@@ -33,7 +33,7 @@ catalog = await mesh.catalog(channel="nlp")
 
 # Tier 2: full contract (only for the agent you need)
 contract = await mesh.contract("summarizer")
-# Returns: complete JSON Schemas, SLA metadata, error schemas
+# Returns: complete JSON Schemas and capability flags
 ```
 
 An LLM can scan a catalog of 500 agents in a single context window, select the right one, then fetch only that agent's full schema. No vector database needed.

@@ -100,8 +100,15 @@ async def main(mesh: AgentMesh) -> None:
 
 ## Run It
 
-```bash
-oam demo run shared_plan
+```python
+import asyncio
+from openagentmesh import AgentMesh
+
+async def run():
+    async with AgentMesh.local() as mesh:
+        await main(mesh)
+
+asyncio.run(run())
 ```
 
 ## How It Works

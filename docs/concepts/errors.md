@@ -11,7 +11,7 @@ async with mesh:
     try:
         result = await mesh.call("summarizer", {"text": 42})  # wrong type
     except MeshError as e:
-        print(e.code)        # "validation_error"
+        print(e.code)        # "handler_error"
         print(e.message)     # "Field 'text' expected str, got int"
         print(e.agent)       # "summarizer"
         print(e.request_id)  # "a1b2c3..."
@@ -23,7 +23,7 @@ When an agent returns `X-Mesh-Status: error`, the response body is always this s
 
 ```json
 {
-  "code": "validation_error",
+  "code": "handler_error",
   "message": "Field 'text' expected str, got int",
   "agent": "summarizer",
   "request_id": "a1b2c3d4",
@@ -31,19 +31,18 @@ When an agent returns `X-Mesh-Status: error`, the response body is always this s
 }
 ```
 
-The `details` field carries extra context when available. Validation errors include the field-level issues; handler errors may include a truncated traceback.
+The `details` field carries extra context when available.
 
 ## Error Codes
 
 | Code | When | Exception class |
 |------|------|-----------------|
-| `validation_error` | Input doesn't match the agent's Pydantic schema | `MeshError` |
-| `handler_error` | The agent's handler function raised an exception | `MeshError` |
-| `timeout` | The agent didn't respond within the timeout window | `MeshError` |
+| `handler_error` | The agent's handler function raised an exception (including Pydantic validation failures) | `MeshError` |
+| `timeout` | The agent didn't respond within the timeout window | `MeshTimeout` |
 | `not_found` | No agent registered with that name | `MeshError` |
 | `invocation_mismatch` | Wrong verb for the agent's capabilities | `InvocationMismatch` |
 | `chunk_sequence_error` | Stream chunks arrived out of order | `ChunkSequenceError` |
-| `rate_limited` | Agent or mesh rate limit exceeded | `MeshError` |
+| `connection_failed` | Could not connect to the mesh | `MeshError` |
 
 ## Error Subclasses
 
@@ -82,8 +81,7 @@ The mesh catches exceptions so callers don't have to guess what went wrong.
 
 1. The caller sends a request via `mesh.call()`.
 2. Capabilities are checked before the request is sent. If the agent is non-invocable or streaming-only, `InvocationMismatch` is raised locally (no round trip).
-3. The mesh validates the payload against the agent's input schema. If it fails, a `validation_error` is returned immediately; the handler never runs.
-4. If the handler raises an exception, the mesh wraps it in the error envelope with code `handler_error` and returns it to the caller.
+3. The agent-side runtime validates and deserializes the payload, then calls the handler. If validation fails or the handler raises an exception, the mesh wraps it in the error envelope with code `handler_error` and returns it to the caller.
 5. The caller receives a structured `MeshError`, not a raw Python exception.
 
 ### Streaming invocation
@@ -122,7 +120,7 @@ There are four ways an agent can leave the mesh. Each produces a different calle
 
 | Mode | Cause | What the caller sees | Detection speed |
 |------|-------|---------------------|-----------------|
-| Graceful shutdown | `mesh.stop()` or process exit | `MeshError(code="not_found")` on next call (agent already deregistered) | Instant |
+| Graceful shutdown | Context manager exit or process interrupt | `MeshError(code="not_found")` on next call (agent already deregistered) | Instant |
 | Handler exception | Bug in handler code | `MeshError(code="handler_error")` with the exception message | Instant |
 | Process crash | OOM kill, SIGKILL, unhandled panic | `MeshError(code="timeout")` after the timeout window expires | Timeout (default varies by agent type) |
 | Network partition | Network failure between agent and NATS | `MeshError(code="timeout")` after the timeout window expires | Timeout |
@@ -163,9 +161,7 @@ The timeout is set per call:
 result = await mesh.call("summarizer", payload, timeout=10.0)
 ```
 
-Or inferred from the agent's SLA in its contract (`sla.timeout_ms`). Tool-type agents default to shorter timeouts than LLM-powered agents.
-
-There is no way to distinguish "agent is slow" from "agent is dead" at the caller level today. Future versions will use death notices to detect agent death mid-request and fail fast.
+There is no way to distinguish "agent is slow" from "agent is dead" at the caller level today. Future versions may use death notices to detect agent death mid-request and fail fast.
 
 ### Choosing timeout values
 

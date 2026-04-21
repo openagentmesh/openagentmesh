@@ -4,16 +4,24 @@ All message subjects follow a consistent hierarchy. The subject scheme is transp
 
 ## Subject Map
 
+### NATS Subjects
+
 | Subject | Purpose |
 |---------|---------|
 | `mesh.agent.{channel}.{name}` | Invocation (queue group subscription) |
 | `mesh.agent.{name}` | Invocation for root-level agents (no channel) |
-| `mesh.registry.{channel}.{name}` | KV registry key for full contract |
-| `mesh.catalog` | KV key for lightweight catalog index |
-| `mesh.health.{channel}.{name}` | Heartbeat subject |
-| `mesh.agent.{channel}.{name}.events` | Pub/sub event emissions |
-| `mesh.errors.{channel}.{name}` | Dead-letter subject |
+| `mesh.agent.{channel}.{name}.events` | Pub/sub event emissions from publisher agents |
+| `mesh.stream.{request_id}` | Streaming response chunks |
+| `mesh.errors.{channel}.{name}` | Dead-letter subject for handler errors |
 | `mesh.results.{request_id}` | Async callback reply subject |
+
+### KV Keys (not NATS subjects)
+
+| Bucket | Key | Purpose |
+|--------|-----|---------|
+| `mesh-catalog` | `catalog` | Lightweight catalog index (JSON array) |
+| `mesh-registry` | `{channel}.{name}` or `{name}` | Full agent contract |
+| `mesh-context` | Agent-defined | Shared state between agents |
 
 ## Wildcards
 
@@ -22,7 +30,7 @@ The subject hierarchy enables wildcard subscriptions:
 ```
 mesh.agent.finance.*      # All agents in the finance channel
 mesh.agent.finance.>      # All agents in finance and sub-channels
-mesh.health.>             # All health heartbeats
+mesh.errors.>             # All dead-letter errors
 ```
 
 ## Channel Mapping

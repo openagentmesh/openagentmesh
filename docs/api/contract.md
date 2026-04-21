@@ -93,7 +93,9 @@ When `output_schema` is present, the description is appended with a `Returns: <f
 | `output_schema` | `dict \| None` | JSON Schema for output model (non-streaming agents) |
 | `chunk_schema` | `dict \| None` | JSON Schema for chunk model (streaming agents) |
 | `capabilities` | `dict` | Capability flags (`streaming`, `invocable`) |
+| `skills` | `list[dict]` | A2A-compatible skill descriptors (auto-generated) |
 | `subject` | `str` | NATS invocation subject |
+| `registered_at` | `datetime` | UTC timestamp of registration |
 
 ## Methods
 
