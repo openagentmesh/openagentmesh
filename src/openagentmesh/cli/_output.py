@@ -3,7 +3,38 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any
+
+
+def banner() -> str:
+    """Startup banner with mesh art, block-letter OAM, name, and version."""
+    try:
+        from importlib.metadata import version as _v
+        ver = _v("openagentmesh")
+    except Exception:
+        ver = "dev"
+
+    if not sys.stdout.isatty():
+        return f"\n  Open Agent Mesh v{ver}\n"
+
+    C = "\033[36m"
+    B = "\033[1m"
+    D = "\033[2m"
+    R = "\033[0m"
+
+    return "\n".join([
+        "",
+        f"  {C}● ━━ ● ━━ ●{R}     {B} ███   ███  █   █{R}",
+        f"  {C}┃ ╲  ┃  ╱ ┃{R}     {B}█   █ █   █ ██ ██{R}",
+        f"  {C}● ━━ ◉ ━━ ●{R}     {B}█   █ █████ █ █ █{R}",
+        f"  {C}┃ ╱  ┃  ╲ ┃{R}     {B}█   █ █   █ █   █{R}",
+        f"  {C}● ━━ ● ━━ ●{R}     {B} ███  █   █ █   █{R}",
+        "",
+        f"  {B}Open Agent Mesh{R}  {D}v{ver}{R}",
+        f"  {D}The fabric for multi-agent systems{R}",
+        "",
+    ])
 
 
 def as_json(obj: Any) -> str:

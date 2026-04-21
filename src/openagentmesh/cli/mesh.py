@@ -156,9 +156,11 @@ def up(
     PID_FILE.write_text(str(proc.pid))
     write_url_file(url)
 
-    typer.echo(f"NATS listening on {url}")
-    typer.echo("KV buckets ready: mesh-catalog, mesh-registry, mesh-context")
-    typer.echo(f"Wrote {OAM_URL_FILE}")
+    from ._output import banner
+    typer.echo(banner())
+    typer.echo(f"  NATS listening on {url}")
+    typer.echo("  KV buckets ready: mesh-catalog, mesh-registry, mesh-context")
+    typer.echo(f"  Wrote {OAM_URL_FILE}")
 
     if foreground:
         def _stop(_signum, _frame):

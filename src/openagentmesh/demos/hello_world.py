@@ -28,7 +28,8 @@ def _step(icon: str, text: str) -> None:
 
 
 async def main(mesh: AgentMesh) -> None:
-    print()
+    from openagentmesh.cli._output import banner
+    print(banner())
     _step("\u2714", f"Connected to mesh at {mesh._url}")
 
     
