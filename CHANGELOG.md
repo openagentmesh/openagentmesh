@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-21
+
+### Changed
+
+- Redesigned README with centered logo header, badges, highlights section, section emojis, and MCP/A2A positioning.
+- Extended Python compatibility to 3.11+ (previously 3.12+).
+
+### Added
+
+- PyPI classifiers for Python 3.11, 3.12, and 3.13.
+- Contributing and License sections in README.
+
 ## [0.1.4] - 2026-04-21
 
 ### Changed
@@ -50,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release. History before this point not documented.
 
-[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.1...v0.1.2

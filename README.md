@@ -1,28 +1,44 @@
-# OpenAgentMesh
+<br />
+<div align="center">
+  <a href="https://openagentmesh.github.io/openagentmesh/">
+    <img src="logo.png" alt="OpenAgentMesh" width="100" height="100">
+  </a>
 
-> The fabric for multi-agent systems, with the simplicity of a REST endpoint.
+  <h3 align="center">OpenAgentMesh</h3>
 
-OpenAgentMesh (OAM) is a framework for multi-agent interaction. Agents register on a shared message bus, discover each other at runtime, interact and scale with no direct coupling. 
+  <p align="center">
+    The fabric for multi-agent systems, with the simplicity of a REST endpoint.
+    <br />
+    <a href="https://openagentmesh.github.io/openagentmesh/"><strong>Documentation</strong></a>
+  </p>
 
-Use the mesh for agents, tools and resources: supports sync requests, callbacks, pub/sub, watchers, shared KV and object stores. All out of the box. 
+  [![PyPI](https://img.shields.io/pypi/v/openagentmesh)](https://pypi.org/project/openagentmesh/)
+  [![Python](https://img.shields.io/pypi/pyversions/openagentmesh)](https://pypi.org/project/openagentmesh/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+</div>
 
-*Bring your own agent:* can work with any agentic framework (LangChain, CrewAI, PydanticAI, etc.). 
+## ✨ Highlights
 
+- **Decoupled multi-agent system** Run agents and tools however you want. Have them talk to each other as if they were running in the same process.
+- **Bring your own agent.** Works with any agentic framework (LangChain, CrewAI, PydanticAI, etc.).
+- **Agents as functions.** Just wrap your agents in a handler function and the `@mesh.agent` decorator. Done.
+- **Batteries included.** Agent catalog with runtime discovery, sync/async requests, pub/sub, shared KV and Object store, load balancing. All from a single infrastructure dependency.
+- **Protocol-first.** The protocol is the product. Python SDK and CLI facilitate use. Any NATS client in any language can participate by following the subject and envelope format.
+- **No-effort scaling.** Code remains the same. Just add instances.
 
-[Full documentation](https://openagentmesh.github.io/openagentmesh/) (or run `uv run zensical serve` locally).
+## 📦 Installation
 
-
-## Installation
 ```bash
 pip install openagentmesh
 ```
 
-## See it in action
+## 🎬 See it in action
+
 ```bash
 oam demo
 ```
 
-## Quickstart
+## 🚀 Quickstart
 
 **1. Start a local mesh:**
 
@@ -33,16 +49,13 @@ oam mesh up
 **2. Register an agent** (`agent.py`):
 
 ```python
-# Basic example
-from pydantic import BaseModel
 from openagentmesh import AgentMesh, AgentSpec
 
 mesh = AgentMesh()
 
-# Or use plain types, will still be enforced
 @mesh.agent(AgentSpec(name="echo", description="Echoes a message back."))
 async def echo(req: str) -> str: 
-    return f"Echo: {req.message}"
+    return f"Echo: {req}"
 
 mesh.run()
 ```
@@ -54,15 +67,30 @@ python agent.py
 **3. Discover and call it from the terminal:**
 
 ```bash
-oam mesh catalog                          # list registered agents
-oam agent contract echo                   # view the full contract
-oam agent call echo '{"message": "hello"}'  # invoke it
+oam mesh catalog               # list registered agents
+oam agent contract echo        # view the full contract
+oam agent call echo '"hello"'  # invoke it
 ```
 
 No hardcoded addresses. The CLI discovers `echo` from the mesh, reads its contract, and calls it.
 
+## 🔗 How OAM relates to MCP and A2A
 
-## What it does
+OAM is not a replacement for MCP or A2A. It complements both.
+
+**MCP** is the standard for connecting LLMs to tools. OAM adds value where MCP alone hits friction: context bloat from loading too many tool schemas, patterns beyond request/reply (pub/sub, async callbacks, shared context), and automatic cross-team discovery.
+
+**A2A** is Google's protocol for cross-organization agent federation over HTTP. OAM contracts are an A2A-compatible superset: A2A fields at top level, OAM extensions under `x-agentmesh`. Use OAM internally, project to A2A at the boundary where internal meets external.
+
+| Concern | MCP | OAM | A2A |
+|---------|-----|-----|-----|
+| Scope | Third party toolsets | Agent-to-agent/tool (internal) | Agent-to-agent (cross-org) |
+| Transport | stdio / SSE | NATS | HTTP |
+| Discovery | Manual config | Automatic | Agent Card directory |
+| Load balancing | N/A | NATS queue groups | External |
+| Interaction | Streaming | Request/reply, streaming, async callback, pub/sub, reactive watcher | Request/reply, streaming |
+
+## 📖 How to use
 
 Any async function can be an agent: LLM chains, deterministic tools, data transformers, event publishers. The `@mesh.agent` decorator inspects the function signature to infer capabilities automatically.
 
@@ -78,7 +106,7 @@ Five handler patterns, determined by the function shape:
 
 No capability flags to set. The handler shape is the source of truth.
 
-## Invocation patterns
+## 📡 Invocation patterns
 
 Four ways to interact with agents:
 
@@ -98,7 +126,7 @@ async for event in mesh.subscribe(agent="price-feed"):
     print(event["price"])
 ```
 
-## Discovery
+## 🔍 Discovery
 
 Two-tier discovery designed for efficient agent selection, including by LLMs:
 
@@ -115,7 +143,7 @@ contract.description    # LLM-consumable description
 
 Catalog entries are compact enough for direct LLM consumption. The LLM picks from the catalog, then only the selected agent's full schema is fetched. Channels and tags narrow the candidate set further.
 
-## Shared state
+## 💾 Shared state
 
 Agents can share context through **KV Store** and binary artifacts through **Workspace**, and watch for changes in both.
 
@@ -132,7 +160,7 @@ await mesh.workspace.put("docs/report.pdf", pdf_bytes)
 data = await mesh.workspace.get("docs/report.pdf")
 ```
 
-## Participation patterns
+## 🤝 Participation patterns
 
 Two ways to participate: register agents, or just connect and call.
 
@@ -146,7 +174,7 @@ async with mesh:
     result = await mesh.call("summarizer", {"text": "..."})
 ```
 
-## Technology
+## ⚙️ Technology
 
 OAM uses **NATS** as its single infrastructure dependency. One embedded binary provides everything, no need for additional servers/services:
 
@@ -162,7 +190,7 @@ No Consul for discovery. No Redis for state. No RabbitMQ or Kafka for messaging.
 
 **Pydantic v2** generates JSON Schemas from type hints for every agent contract. Runtime validation at the mesh boundary; malformed requests are rejected before reaching your handler.
 
-**Protocol-first.** The protocol is the product, the python SDK and CLI are the first implementation. Any NATS client in any language (Javascript, Go, Rust, etc.) can participate by following the subject naming and envelope format. Dedicated SDKs will come in the future.
+**Protocol-first.** The protocol is the product, the Python SDK and CLI are the first implementation. Any NATS client in any language (Javascript, Go, Rust, etc.) can participate by following the subject naming and envelope format. Dedicated SDKs will come in the future.
 
 ## Scaling
 
@@ -182,23 +210,7 @@ mesh = AgentMesh()                                # local (oam mesh up)
 mesh = AgentMesh("nats://mesh.company.com:4222")  # production
 ```
 
-## How OAM relates to MCP and A2A
-
-OAM is not a replacement for MCP or A2A. It complements both.
-
-**MCP** is the standard for connecting LLMs to tools. OAM agents can be projected as MCP tool definitions using their contract schemas. Use OAM for the internal fabric (discovery, routing, load balancing) and project to MCP format at the LLM boundary. OAM adds value where MCP alone hits friction: context bloat from loading hundreds of tool schemas, patterns beyond request/reply (pub/sub, async callbacks), and automatic cross-team discovery.
-
-**A2A** is Google's protocol for cross-organization agent federation over HTTP. OAM contracts are an A2A-compatible superset: A2A fields at top level, OAM extensions under `x-agentmesh`. The projection from OAM contract to A2A Agent Card is a thin operation. Use OAM internally, project to A2A at the boundary where internal meets external.
-
-| Concern | MCP | OAM | A2A |
-|---------|-----|-----|-----|
-| Scope | Third party toolsets | Agent-to-agent/tool (internal) | Agent-to-agent (cross-org) |
-| Transport | stdio / SSE | NATS | HTTP |
-| Discovery | Manual config | Automatic | Agent Card directory |
-| Load balancing | N/A | NATS queue groups | External |
-| Interaction | Streaming | Request/reply, streaming, async callback, pub/sub, reactive watcher | Request/reply, streaming |
-
-## CLI
+## 💻 CLI
 
 The `oam` CLI is installed with the SDK:
 
@@ -215,4 +227,16 @@ The `oam` CLI is installed with the SDK:
 | `oam agent stream <name> <json>` | Stream from an agent |
 | `oam agent subscribe <name>` | Subscribe to publisher events |
 
-(see full documentation for more details)
+See the [full documentation](https://openagentmesh.github.io/openagentmesh/) for more details.
+
+## 🤲 Contributing
+
+Contributions are welcome. Open an [issue](https://github.com/openagentmesh/openagentmesh/issues) for bugs or new features before submitting a pull request.
+
+For bug fixes, include a failing test that demonstrates the issue. For new features, start with the use case: describe what you're trying to build and why the current API doesn't cover it.
+
+⭐️ Hit the star if you like this! ⭐️
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
