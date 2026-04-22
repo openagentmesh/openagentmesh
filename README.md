@@ -28,8 +28,26 @@
 
 ## 📦 Installation
 
+**As a dependency** (projects using OAM agents):
+
 ```bash
+uv add openagentmesh
+# or
 pip install openagentmesh
+```
+
+**As a CLI tool** (using `oam` commands directly):
+
+```bash
+uv tool install openagentmesh
+```
+
+**For development:**
+
+```bash
+git clone https://github.com/openagentmesh/openagentmesh.git
+cd openagentmesh
+uv sync
 ```
 
 ## 🎬 See it in action
