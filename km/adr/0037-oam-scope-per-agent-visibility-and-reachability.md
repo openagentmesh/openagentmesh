@@ -3,7 +3,7 @@
 - **Type:** api-design
 - **Date:** 2026-04-18
 - **Status:** spec
-- **Related:** ADR-0035 (control plane), ADR-0030 (AgentSpec), ADR-0028 (CatalogEntry), ADR-0032 (catalog subscription), ADR-0038 (NATS authentication, pending)
+- **Related:** ADR-0035 (control plane), ADR-0030 (AgentSpec), ADR-0028 (CatalogEntry), ADR-0032 (catalog subscription), ADR-0038 (NATS authentication, pending), ADR-0039 (contract-to-LLM-tool conversion)
 - **Source:** conversation (shaping session on authn/z)
 
 ## Context
@@ -197,6 +197,15 @@ ADR-0035 proposes a control plane for runtime visibility and reachability change
 - Channel gates become control-plane-owned scope overrides injected into callers' resolution path.
 
 ADR-0035's open question "should scoping be enforced at the SDK level, the NATS level, or both?" is answered: **both, at different granularities, for different purposes.** NATS enforces the trust boundary. OAM scope enforces the logical topology inside it.
+
+## Relationship to LLM-driven agents
+
+A frequent concern is that an LLM-driven agent picks a tool it should not invoke and causes a call the operator did not intend. This is a caller-side problem, and it is exactly the layer this ADR addresses. Two in-process gates compose:
+
+1. **Curated tool set (ADR-0039).** `to_tool_schema` / `to_openai_tool` / `to_anthropic_tool` let the agent author hand the LLM only the contracts it is allowed to use. Unlisted contracts do not exist to the model, which is the strongest form of restriction.
+2. **`can_call` enforcement (this ADR).** If the LLM hallucinates a subject outside the curated set, or if the tool list is looser than the scope, `mesh.call()` / `mesh.stream()` / `mesh.send()` raise `scope_denied` before any NATS publish.
+
+Neither gate requires a wire-level mechanism, a sidecar, or per-message NATS authz. Wire-level enforcement (see ADR-0038) adds nothing to this threat because the offending action never reaches NATS. The correct reach for LLM-tool-misuse is always caller-side and in-process.
 
 ## Non-goals
 

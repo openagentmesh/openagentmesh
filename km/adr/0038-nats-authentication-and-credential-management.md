@@ -183,10 +183,16 @@ tls {
 - **OAM-native identity abstraction.** No `AgentIdentity` type, no issuer service, no OAM-format tokens. We ship NATS-standard `.creds` and let the ecosystem do the rest.
 - **Per-agent credentials.** Process-level only. Per-agent logical isolation is covered by ADR-0037.
 - **Multi-account tenancy.** Single account for Phase 2. Tenancy via NATS accounts is a future ADR when a concrete use case appears.
-- **BYOK for downstream API keys.** ADR-0023 already excluded this. Confirmed: this ADR covers mesh access only.
+- **BYOK for downstream API keys.** ADR-0023 already excluded this. Confirmed: this ADR covers mesh access only. Tools like [OneCLI](https://github.com/onecli/onecli) address the adjacent problem of agent-to-third-party-API secret management via an outbound-HTTP credential proxy. They sit outside OAM by design (handler bodies are developer territory, per ADR-0008's no-framework-adapters principle) and provide no mesh-level authz.
 - **Kill-switch runtime revocation.** Deferred to the ADR-0035 control plane. First iteration of auth is "re-issue credentials, restart affected processes".
 - **Templated role generation with `{channel}` / `{name}`.** Coarse roles only in Phase 2; templates are a possible future extension.
 - **Credential rotation automation.** Operator rotates manually via `oam auth user add` + process restart. Automated rotation is a later concern.
+
+## Threat model notes
+
+- **The mesh URL is not a secret.** `nats://mesh.company.com:4222` leaks through logs, configs, screenshots, and shared shell history. With auth on (§1), knowing the URL buys an attacker nothing because connections require a valid `.creds` verified against the operator key chain. Without auth, knowing the URL plus reachability grants full access, which is why open mesh is restricted to `AgentMesh.local()` (§2). Never rely on URL obscurity.
+- **A compromised `.creds` grants full role permissions, not just one agent's logical scope.** A `worker` credential permits publishing on any subject allowed by the `worker` role (§5), covering every agent hosted by that process, not just one. Multiple agents sharing a process share one blast radius. ADR-0037 scope is cooperative and does not contain this: if the host is compromised, the attacker inherits the process's NATS permissions wholesale. Mitigations available today: isolate mutually-untrusting workloads into separate processes with narrower custom roles. Mitigations deferred: auth callout for JIT per-process JWTs, or a sidecar data-plane (both in Alternatives).
+- **LLM-driven tool misuse is a caller-side concern, not a wire-level one.** An LLM agent selecting an unintended tool is bounded earlier than this ADR's layer: ADR-0039 (`to_tool_schema`) governs which contracts are handed to the model as tools, and ADR-0037 `can_call` blocks the resulting publish in-process before any NATS traffic. Wire-level enforcement adds nothing to this threat and duplicates checks already run in-process.
 
 ## Consequences
 
@@ -208,6 +214,16 @@ tls {
 **Accounts-per-tenant at Phase 2.** Rejected. Premature: no concrete multi-tenant deployment requirement today. Accounts remain available to operators who configure them manually; OAM documents the pattern but does not build for it yet.
 
 **Federated resolver (delegated JWT verification).** Out of scope. `resolver: full` with the JWT store on disk is sufficient for single-site meshes. Federated / leaf-node topologies will need their own ADR.
+
+**Dynamic NATS permissions via KV lookup on every message.** Rejected as not supported by NATS. JWT permissions are resolved at connect time and cached server-side; there is no per-publish authz hook. The closest primitive is auth callout (below), which runs at connect time, not per message.
+
+**NATS auth callout for JIT per-process JWTs.** Possible future extension, not Phase 2. NATS 2.10+ supports an external auth-callout service that mints a JWT at connect time; such a service could read `$KV.mesh-policy` and return a narrow JWT scoped to exactly the subjects the connecting agent process needs. This weakens the credential-explosion argument against per-agent identity (§3) because credentials are minted rather than stored, but it still ties identity to a NATS connection rather than a per-message check. Track as a follow-up if per-process enforcement without per-agent deployment cost becomes a requirement.
+
+**Custom broker (NATS replacement) with baked-in per-message authz.** Rejected. Replacing NATS with an in-house broker that enforces per-message policy from a KV would deliver one feature (dynamic per-agent wire-level enforcement) at the cost of re-implementing pub/sub, queue groups, JetStream, KV, Object Store, clustering, leaf nodes, and client libraries in every language OAM wants to support. Violates ADR-0008 (DX over infra-building) and ADR-0019's framing of OAM as a layer over a message bus, not a bus itself. If the feature is ever needed, a sidecar or auth callout delivers it with orders of magnitude less machinery.
+
+**Sidecar data-plane per host (Envoy-style).** Deferred. A lightweight sidecar fronting NATS, enforcing per-agent policy read from `$KV.mesh-policy`, would provide wire-level per-agent enforcement without replacing the broker. Canonical service-mesh pattern, matches OAM's "fabric for multi-agent systems" positioning. Only earns its keep against adversarial in-process code (for example, mutually-untrusting workloads co-located on the same host); ADR-0037 scope is sufficient for honest callers. An SDK-spawned sidecar is viable as a dev-mode convenience but must be platform-managed in production to retain enforcement value (an agent process cannot be the parent of its own enforcer). Revisit if a concrete use case demands it.
+
+**Downstream-API credential vault integrated into the SDK (OneCLI-style).** Rejected for this ADR. Agent-to-external-API secrets are a different problem from mesh authn/z. ADR-0023 already excludes BYOK for downstream keys. Handler bodies choose whatever secret-management approach they like; OAM does not prescribe one.
 
 ## Open Questions
 
