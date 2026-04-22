@@ -36,8 +36,7 @@ class Summary(BaseModel):
 async def main(mesh: AgentMesh) -> None:
     # Stage 1: Ingest agent writes raw document to KV
     @mesh.agent(AgentSpec(
-        name="ingest",
-        channel="pipeline",
+        name="pipeline.ingest",
         description="Accepts a document and writes it to pipeline KV for downstream processing.",
     ))
     async def ingest(req: Document) -> Document:
@@ -75,7 +74,7 @@ async def main(mesh: AgentMesh) -> None:
     await asyncio.sleep(0.1)  # let watchers attach
 
     # Submit a document
-    await mesh.call("ingest", Document(
+    await mesh.call("pipeline.ingest", Document(
         id="doc-001",
         title="Quarterly Report",
         body="Revenue at Acme Corp grew 15% in Q3. The Berlin office expanded headcount.",
@@ -127,7 +126,7 @@ sequenceDiagram
     Extract->>KV: watch("pipeline.*.raw")
     Summarize->>KV: watch("pipeline.*.extracted")
 
-    Client->>Ingest: mesh.call("ingest", doc)
+    Client->>Ingest: mesh.call("pipeline.ingest", doc)
     Ingest->>KV: put("pipeline.doc-001.raw", ...)
 
     KV-->>Extract: notification: pipeline.doc-001.raw changed
@@ -157,10 +156,10 @@ Key properties:
     Watcher agents run as a single instance; every replica receives every KV update. If the processing step is expensive, split the watcher into a thin routing layer that calls an invocable agent via `mesh.call()`. The invocable agent scales via queue groups:
 
     ```python
-    @mesh.agent(AgentSpec(name="extract-watcher", channel="pipeline",
+    @mesh.agent(AgentSpec(name="pipeline.extract-watcher",
         description="Routes raw documents to the extract processor."))
     async def extract_watcher():
         async for value in mesh.kv.watch("pipeline.*.raw"):
             doc = Document.model_validate_json(value)
-            await mesh.call("extract-processor", {"id": doc.id, "body": doc.body})
+            await mesh.call("pipeline.extract-processor", {"id": doc.id, "body": doc.body})
     ```

@@ -40,8 +40,7 @@ embedder = SentenceTransformer("all-MiniLM-L6-v2")
 chroma = chromadb.Client()
 
 spec = AgentSpec(
-    name="indexer",
-    channel="rag",
+    name="rag.indexer",
     description="Indexes a chunk of a document into ChromaDB. Input: ObjectStore key, chunk index, total chunks.",
 )
 
@@ -99,7 +98,7 @@ async def main():
 
         # Fan out indexing across available indexer instances
         tasks = [
-            mesh.call("indexer", {
+            mesh.call("rag.indexer", {
                 "workspace_key": "docs/quarterly-report.txt",
                 "chunk_index": i,
                 "chunk_count": CHUNK_COUNT,

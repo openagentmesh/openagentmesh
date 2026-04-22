@@ -45,34 +45,34 @@ async def call_with_fallback(mesh: AgentMesh, agents: list[str], payload):
 
 
 async def main(mesh: AgentMesh) -> None:
-    @mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="Summarizes text. May fail under load."))
+    @mesh.agent(AgentSpec(name="nlp.summarizer", description="Summarizes text. May fail under load."))
     async def summarize(req: SummarizeInput) -> SummarizeOutput:
         if random.random() < 0.3:
             raise RuntimeError("LLM provider timeout")
         return SummarizeOutput(summary=f"Summary of: {req.text[:50]}")
 
-    @mesh.agent(AgentSpec(name="basic-summarizer", channel="nlp", description="Simple fallback summarizer."))
+    @mesh.agent(AgentSpec(name="nlp.basic-summarizer", description="Simple fallback summarizer."))
     async def basic_summarize(req: SummarizeInput) -> SummarizeOutput:
         return SummarizeOutput(summary=req.text[:80] + "...")
 
     # Pattern 1: Basic error handling
     print("--- Pattern 1: Basic error handling ---")
     try:
-        result = await mesh.call("summarizer", SummarizeInput(text="Long document about AI agents"))
+        result = await mesh.call("nlp.summarizer", SummarizeInput(text="Long document about AI agents"))
         print(f"  Success: {result['summary']}")
     except MeshError as e:
         print(f"  Error: [{e.code}] {e}")
 
     # Pattern 2: Retry with backoff
     print("\n--- Pattern 2: Retry with backoff ---")
-    result = await call_with_retry(mesh, "summarizer", SummarizeInput(text="Important document"))
+    result = await call_with_retry(mesh, "nlp.summarizer", SummarizeInput(text="Important document"))
     print(f"  Success: {result['summary']}")
 
     # Pattern 3: Fallback agent
     print("\n--- Pattern 3: Fallback to alternative agent ---")
     result = await call_with_fallback(
         mesh,
-        agents=["summarizer", "basic-summarizer"],
+        agents=["nlp.summarizer", "nlp.basic-summarizer"],
         payload=SummarizeInput(text="Critical document that must be processed"),
     )
     print(f"  Success: {result['summary']}")

@@ -80,7 +80,7 @@ class TestHelloWorld:
 class TestCapabilityInference:
     async def test_responder_agent_catalog(self):
         """Responder handler: invocable=True, streaming=False in catalog."""
-        spec = AgentSpec(name="buf", channel="test", description="Responder")
+        spec = AgentSpec(name="test.buf", description="Responder")
 
         async with AgentMesh.local() as mesh:
             @mesh.agent(spec)
@@ -91,8 +91,7 @@ class TestCapabilityInference:
 
             assert len(catalog) == 1
             assert isinstance(catalog[0], CatalogEntry)
-            assert catalog[0].name == "buf"
-            assert catalog[0].channel == "test"
+            assert catalog[0].name == "test.buf"
             assert catalog[0].invocable is True
             assert catalog[0].streaming is False
 
@@ -118,18 +117,19 @@ class TestCapabilityInference:
 
 class TestCatalog:
     async def test_filter_by_channel(self):
+        """ADR-0049: channel filter is a prefix match on dotted name."""
         async with AgentMesh.local() as mesh:
-            @mesh.agent(AgentSpec(name="a", channel="nlp", description="NLP agent"))
+            @mesh.agent(AgentSpec(name="nlp.a", description="NLP agent"))
             async def a(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
-            @mesh.agent(AgentSpec(name="b", channel="finance", description="Finance agent"))
+            @mesh.agent(AgentSpec(name="finance.b", description="Finance agent"))
             async def b(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
             nlp = await mesh.catalog(channel="nlp")
             assert len(nlp) == 1
-            assert nlp[0].name == "a"
+            assert nlp[0].name == "nlp.a"
 
     async def test_filter_by_tags(self):
         async with AgentMesh.local() as mesh:
@@ -477,14 +477,14 @@ class TestCatalogSubscription:
     async def test_catalog_reads_from_cache(self):
         """mesh.catalog() returns entries from the cache."""
         async with AgentMesh.local() as mesh:
-            @mesh.agent(AgentSpec(name="a", channel="nlp", description="A"))
+            @mesh.agent(AgentSpec(name="nlp.a", description="A"))
             async def a(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=req.message)
 
             # catalog() calls _subscribe_pending() which seeds cache
             entries = await mesh.catalog()
             assert len(entries) == 1
-            assert entries[0].name == "a"
+            assert entries[0].name == "nlp.a"
 
     async def test_capability_check_uses_cache_for_remote(self):
         """Pre-flight check works for agents only known via catalog cache."""

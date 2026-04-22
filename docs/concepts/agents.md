@@ -67,7 +67,7 @@ The most common pattern: accept typed input, return typed output. Shown in the [
 class SummarizeChunk(BaseModel):
     delta: str
 
-spec = AgentSpec(name="summarizer", channel="nlp", description="Streams a summary.")
+spec = AgentSpec(name="nlp.summarizer", description="Streams a summary.")
 
 @mesh.agent(spec)
 async def summarize(req: SummarizeInput) -> SummarizeChunk:
@@ -84,7 +84,7 @@ class RefreshResult(BaseModel):
     keys_refreshed: int
     duration_ms: float
 
-spec = AgentSpec(name="refresh-cache", channel="ops", description="Flushes and rebuilds the cache. Returns refresh stats.")
+spec = AgentSpec(name="ops.refresh-cache", description="Flushes and rebuilds the cache. Returns refresh stats.")
 
 @mesh.agent(spec)
 async def refresh_cache() -> RefreshResult:
@@ -95,7 +95,7 @@ async def refresh_cache() -> RefreshResult:
 Called without payload:
 
 ```python
-result = await mesh.call("refresh-cache")
+result = await mesh.call("ops.refresh-cache")
 print(f"Refreshed {result['keys_refreshed']} keys")
 ```
 
@@ -106,7 +106,7 @@ class PriceEvent(BaseModel):
     symbol: str
     price: float
 
-spec = AgentSpec(name="price-feed", channel="finance", description="Emits price events.")
+spec = AgentSpec(name="finance.price-feed", description="Emits price events.")
 
 @mesh.agent(spec)
 async def monitor_prices() -> PriceEvent:
@@ -120,7 +120,7 @@ async def monitor_prices() -> PriceEvent:
 No input, no output, no yield. Runs as a background task. The handler body typically contains a KV watch loop or other long-running coordination logic.
 
 ```python
-spec = AgentSpec(name="extract", channel="pipeline", description="Watches for raw documents and extracts entities.")
+spec = AgentSpec(name="pipeline.extract", description="Watches for raw documents and extracts entities.")
 
 @mesh.agent(spec)
 async def extract():

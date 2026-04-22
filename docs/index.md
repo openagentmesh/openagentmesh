@@ -30,7 +30,7 @@ class Input(BaseModel):
 class Summary(BaseModel):
     text: str
 
-spec = AgentSpec(name="summarizer", channel="nlp",
+spec = AgentSpec(name="nlp.summarizer",
                  description="Summarizes text to a target length.")
 
 @mesh.agent(spec)
@@ -43,10 +43,10 @@ mesh.run()
 Discover and call it from anywhere that connects to the same mesh:
 
 ```bash
-oam agent call summarizer '{"content": "A long document..."}'
+oam agent call nlp.summarizer '{"content": "A long document..."}'
 ```
 
-One agent, one connection string, no coupling. `@mesh.agent` registered a typed contract on the bus. The CLI (or any other agent) discovered `summarizer` by name and invoked it. Nothing imported the provider's code; it only knew the name.
+One agent, one connection string, no coupling. `@mesh.agent` registered a typed contract on the bus. The CLI (or any other agent) discovered `nlp.summarizer` by name and invoked it. Nothing imported the provider's code; it only knew the name.
 
 ## Why OpenAgentMesh
 
@@ -64,13 +64,13 @@ The protocol runs on [NATS](https://nats.io), which provides pub/sub, request/re
 
 ```python
 catalog  = await mesh.catalog(channel="nlp")
-contract = await mesh.contract("summarizer")
+contract = await mesh.contract("nlp.summarizer")
 ```
 
 **Type Safety.** Input and output models are Pydantic v2. Contracts carry JSON Schemas generated from your type hints. Validation happens before your handler runs, and errors are structured, not stack traces.
 
 ```python
-spec = AgentSpec(name="scorer", channel="finance",
+spec = AgentSpec(name="finance.scorer",
                  description="Scores credit risk for a company.")
 
 @mesh.agent(spec)

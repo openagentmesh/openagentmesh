@@ -7,7 +7,26 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+_NAME_SEGMENT_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def _validate_agent_name(value: str) -> str:
+    if not value:
+        raise ValueError("agent name must not be empty")
+    if value.startswith(".") or value.endswith("."):
+        raise ValueError(f"agent name '{value}' must not start or end with '.'")
+    if ".." in value:
+        raise ValueError(f"agent name '{value}' must not contain consecutive dots")
+    for seg in value.split("."):
+        if not _NAME_SEGMENT_RE.match(seg):
+            raise ValueError(
+                f"agent name '{value}' has invalid segment '{seg}' "
+                f"(allowed: {_NAME_SEGMENT_RE.pattern})"
+            )
+    return value
 
 
 class AgentSpec(BaseModel):
@@ -15,13 +34,21 @@ class AgentSpec(BaseModel):
 
     Declares *what* the agent is. Capabilities (``invocable``, ``streaming``)
     are inferred from the handler shape at registration time (ADR-0031).
+
+    ``name`` is a dotted identifier, e.g. ``"finance.risk.scorer"`` or
+    ``"echo"`` (ADR-0049). The full name maps to the NATS subject tail
+    after ``mesh.agent.``.
     """
 
     name: str
     description: str
-    channel: str | None = None
     tags: list[str] = Field(default_factory=list)
     version: str = "0.1.0"
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, v: str) -> str:
+        return _validate_agent_name(v)
 
 
 class CatalogEntry(BaseModel):
@@ -29,7 +56,6 @@ class CatalogEntry(BaseModel):
 
     name: str
     description: str
-    channel: str | None = None
     version: str = "0.1.0"
     tags: list[str] = Field(default_factory=list)
     invocable: bool = True
@@ -52,7 +78,6 @@ class AgentContract(BaseModel):
     skills: list[dict[str, Any]] = Field(default_factory=list)
 
     # OAM fields (x-agentmesh namespace when serialized)
-    channel: str | None = None
     subject: str = ""
     tags: list[str] = Field(default_factory=list)
     invocable: bool = True
@@ -116,7 +141,6 @@ class AgentContract(BaseModel):
         return CatalogEntry(
             name=self.name,
             description=self.description,
-            channel=self.channel,
             version=self.version,
             tags=self.tags,
             invocable=self.invocable,
@@ -146,7 +170,6 @@ class AgentContract(BaseModel):
             },
             "skills": [skill],
             "x-agentmesh": {
-                "channel": self.channel,
                 "subject": self.subject,
                 "tags": self.tags,
                 "registered_at": self.registered_at.isoformat(),

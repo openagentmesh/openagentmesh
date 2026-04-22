@@ -20,7 +20,7 @@ class TranslateOutput(BaseModel):
 async def main(mesh: AgentMesh) -> None:
     instance_counter = {"n": 0}
 
-    @mesh.agent(AgentSpec(name="translator", channel="nlp", description="Translates text to a target language."))
+    @mesh.agent(AgentSpec(name="nlp.translator", description="Translates text to a target language."))
     async def translate(req: TranslateInput) -> TranslateOutput:
         instance_counter["n"] += 1
         instance_id = instance_counter["n"]
@@ -32,7 +32,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Fire 10 concurrent requests
     tasks = [
-        mesh.call("translator", TranslateInput(text=f"Hello #{i}", target_language="es"))
+        mesh.call("nlp.translator", TranslateInput(text=f"Hello #{i}", target_language="es"))
         for i in range(10)
     ]
     results = await asyncio.gather(*tasks)

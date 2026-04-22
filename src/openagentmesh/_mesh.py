@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
@@ -16,17 +15,23 @@ from nats.js.kv import KeyValue
 from pydantic import BaseModel
 
 from ._context import KVStore
+from ._discovery import DiscoveryMixin
 from ._handler import HandlerInfo, inspect_handler
+from ._invocation import InvocationMixin
 from ._workspace import Workspace
 from ._local import EmbeddedNats
 from ._models import (
     AgentContract,
     AgentSpec,
     CatalogEntry,
-    ChunkSequenceError,
     InvocationMismatch,
     MeshError,
-    MeshTimeout,
+)
+from ._subjects import (
+    compute_error_subject,
+    compute_event_subject,
+    compute_registry_key,
+    compute_subject,
 )
 
 _log = logging.getLogger("openagentmesh")
@@ -38,25 +43,7 @@ _ARTIFACTS_BUCKET = "mesh-artifacts"
 _CATALOG_KEY = "catalog"
 
 
-def _compute_subject(name: str, channel: str | None) -> str:
-    if channel:
-        return f"mesh.agent.{channel}.{name}"
-    return f"mesh.agent.{name}"
-
-
-def _compute_error_subject(name: str, channel: str | None) -> str:
-    if channel:
-        return f"mesh.errors.{channel}.{name}"
-    return f"mesh.errors.{name}"
-
-
-def _compute_registry_key(name: str, channel: str | None) -> str:
-    if channel:
-        return f"{channel}.{name}"
-    return name
-
-
-class AgentMesh:
+class AgentMesh(InvocationMixin, DiscoveryMixin):
     """Client and host for OpenAgentMesh agents.
 
     Use as an async context manager::
@@ -135,30 +122,21 @@ class AgentMesh:
 
     async def _ensure_buckets(self) -> None:
         assert self._js is not None
-        try:
-            self._catalog_kv = await self._js.key_value(_CATALOG_BUCKET)
-        except Exception:
-            self._catalog_kv = await self._js.create_key_value(bucket=_CATALOG_BUCKET)
 
-        try:
-            self._registry_kv = await self._js.key_value(_REGISTRY_BUCKET)
-        except Exception:
-            self._registry_kv = await self._js.create_key_value(bucket=_REGISTRY_BUCKET)
-
-        try:
-            self._context_kv = await self._js.key_value(_CONTEXT_BUCKET)
-        except Exception:
-            self._context_kv = await self._js.create_key_value(bucket=_CONTEXT_BUCKET)
+        specs = [
+            ("_catalog_kv",   _CATALOG_BUCKET,   self._js.key_value,    self._js.create_key_value),
+            ("_registry_kv",  _REGISTRY_BUCKET,  self._js.key_value,    self._js.create_key_value),
+            ("_context_kv",   _CONTEXT_BUCKET,   self._js.key_value,    self._js.create_key_value),
+            ("_artifacts_os", _ARTIFACTS_BUCKET, self._js.object_store, self._js.create_object_store),
+        ]
+        for attr, bucket, get, create in specs:
+            try:
+                val = await get(bucket)
+            except Exception:
+                val = await create(bucket=bucket)
+            setattr(self, attr, val)
 
         self.kv = KVStore(self._context_kv)
-
-        try:
-            self._artifacts_os = await self._js.object_store(_ARTIFACTS_BUCKET)
-        except Exception:
-            self._artifacts_os = await self._js.create_object_store(
-                bucket=_ARTIFACTS_BUCKET
-            )
-
         self.workspace = Workspace(self._artifacts_os)
 
     async def _subscribe_pending(self) -> None:
@@ -168,14 +146,12 @@ class AgentMesh:
                 if info.invocable:
                     await self._subscribe_agent(name, info, contract)
                 elif info.streaming:
-                    # Publisher agent: launch emission task (ADR-0034)
                     if name not in self._publisher_tasks:
                         task = asyncio.create_task(
-                            self._emit_publisher_events(name, spec, info)
+                            self._emit_publisher_events(name, info)
                         )
                         self._publisher_tasks[name] = task
                 else:
-                    # Watcher agent: launch handler as background task (ADR-0042)
                     if name not in self._watcher_tasks:
                         task = asyncio.create_task(self._run_watcher(name, info))
                         self._watcher_tasks[name] = task
@@ -188,7 +164,6 @@ class AgentMesh:
         """Populate catalog cache from current KV snapshot (ADR-0047)."""
         assert self._catalog_kv is not None
         try:
-            from nats.js.errors import KeyNotFoundError
             entry = await self._catalog_kv.get(_CATALOG_KEY)
             entries = json.loads(entry.value)
             self._catalog_cache = {
@@ -214,13 +189,20 @@ class AgentMesh:
                         e["name"]: CatalogEntry.model_validate(e) for e in entries
                     }
             except asyncio.CancelledError:
-                pass
+                pass  # normal shutdown: task cancelled by _shutdown()
             except Exception:
-                pass
+                pass  # watcher is best-effort; mesh operates on last known cache
 
         self._catalog_watcher_task = asyncio.create_task(_watch())
 
     async def _shutdown(self) -> None:
+        # Shutdown ordering: stop inbound watchers first so the catalog cache
+        # stops mutating, then cancel background handler tasks, unsubscribe
+        # NATS handlers, deregister from the cluster catalog/registry, and
+        # finally drain the connection. Every step swallows exceptions because
+        # shutdown must always succeed -- a broken connection is the common case.
+
+        # 1. Stop catalog watcher: the KV iterator and its consumer task.
         if self._catalog_watcher is not None:
             try:
                 await self._catalog_watcher.stop()
@@ -235,7 +217,9 @@ class AgentMesh:
                 pass
             self._catalog_watcher_task = None
 
-        # Cancel watcher tasks (ADR-0042)
+        # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
+        # tasks receive cancel() before we await any one of them, avoiding
+        # serialization of their shutdown latency.
         for task in self._watcher_tasks.values():
             task.cancel()
         for task in self._watcher_tasks.values():
@@ -245,7 +229,9 @@ class AgentMesh:
                 pass
         self._watcher_tasks.clear()
 
-        # Cancel publisher tasks (ADR-0034)
+        # 3. Cancel publisher emission tasks (ADR-0034). Same two-pass pattern;
+        # the publisher's CancelledError branch flushes a final end-of-stream
+        # marker on its event subject before the connection is drained.
         for task in self._publisher_tasks.values():
             task.cancel()
         for task in self._publisher_tasks.values():
@@ -255,6 +241,8 @@ class AgentMesh:
                 pass
         self._publisher_tasks.clear()
 
+        # 4. Unsubscribe invocable-agent subscriptions so the broker stops
+        # routing requests to this process before we tear down the registry.
         for sub in self._subscriptions:
             try:
                 await sub.unsubscribe()
@@ -262,22 +250,28 @@ class AgentMesh:
                 pass
         self._subscriptions.clear()
 
+        # 5. Deregister from the cluster: remove each owned agent from the
+        # shared catalog (CAS retry inside _update_catalog) and delete its
+        # per-agent registry key. Skipped when buckets were never created
+        # (connection failed before _ensure_buckets completed).
         if self._catalog_kv and self._registry_kv:
             for name in self._subscribed:
                 if name in self._agents:
-                    spec, _, contract = self._agents[name]
+                    _, _, contract = self._agents[name]
                     try:
                         await self._update_catalog(contract, add=False)
                     except Exception:
                         pass
                     try:
-                        key = _compute_registry_key(name, spec.channel)
-                        await self._registry_kv.delete(key)
+                        await self._registry_kv.delete(compute_registry_key(name))
                     except Exception:
                         pass
 
         self._subscribed.clear()
 
+        # 6. Drain the NATS connection so in-flight publishes (including the
+        # deregistration writes above) flush before the socket closes. Fall
+        # back to a hard close if drain fails (e.g. broker already gone).
         if self._nc and self._nc.is_connected:
             try:
                 await self._nc.drain()
@@ -360,12 +354,11 @@ class AgentMesh:
         def decorator(func):
             info = inspect_handler(func)
 
-            subject = _compute_subject(spec.name, spec.channel)
+            subject = compute_subject(spec.name)
             contract = AgentContract(
                 name=spec.name,
                 description=spec.description,
                 version=spec.version,
-                channel=spec.channel,
                 subject=subject,
                 tags=spec.tags,
                 invocable=info.invocable,
@@ -434,7 +427,6 @@ class AgentMesh:
                 wants_stream = msg.headers.get("X-Mesh-Stream") == "true"
 
             try:
-                # Defense-in-depth capability enforcement (ADR-0005, ADR-0047)
                 if wants_stream and not info.streaming:
                     raise InvocationMismatch(agent=name, request_id=request_id, message=f"Agent '{name}' does not support streaming. Use call() instead")
                 if not wants_stream and info.streaming:
@@ -470,7 +462,7 @@ class AgentMesh:
                         headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
                     )
                 await self._nc.publish(
-                    _compute_error_subject(name, contract.channel),
+                    compute_error_subject(name),
                     error.to_json(),
                     headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
                 )
@@ -568,13 +560,10 @@ class AgentMesh:
     # --- Publisher emission (ADR-0034) ---
 
     async def _emit_publisher_events(
-        self, name: str, spec: AgentSpec, info: HandlerInfo
+        self, name: str, info: HandlerInfo
     ) -> None:
         """Run a publisher handler and publish yielded values to its event subject."""
-        if spec.channel:
-            event_subject = f"mesh.agent.{spec.channel}.{name}.events"
-        else:
-            event_subject = f"mesh.agent.{name}.events"
+        event_subject = compute_event_subject(name)
 
         gen = info.func()
         seq = 0
@@ -595,7 +584,6 @@ class AgentMesh:
                 )
                 seq += 1
 
-            # Generator returned normally: send terminal
             await self._nc.publish(
                 event_subject,
                 b"",
@@ -605,7 +593,6 @@ class AgentMesh:
                 },
             )
         except asyncio.CancelledError:
-            # Shutdown: send terminal
             try:
                 await self._nc.publish(
                     event_subject,
@@ -632,428 +619,60 @@ class AgentMesh:
                     },
                 )
                 await self._nc.publish(
-                    _compute_error_subject(name, spec.channel),
+                    compute_error_subject(name),
                     error.to_json(),
                     headers={"X-Mesh-Status": "error"},
                 )
             except Exception:
                 pass
 
-    # --- Invocation ---
-
-    async def call(self, name: str, payload: Any = None, timeout: float = 30.0) -> dict:
-        """Synchronous request/reply. Returns the response as a dict."""
-        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
-        await self._subscribe_pending()
-        self._check_call(name)
-
-        subject = self._resolve_subject(name)
-        request_id = uuid.uuid4().hex
-        data = self._serialize_payload(payload)
-
-        response = await self._nc.request(
-            subject, data, timeout=timeout,
-            headers={"X-Mesh-Request-Id": request_id},
-        )
-
-        status = ""
-        if response.headers:
-            status = response.headers.get("X-Mesh-Status", "")
-
-        if status == "error":
-            err = json.loads(response.data)
-            raise MeshError(
-                code=err.get("code", "unknown"),
-                message=err.get("message", "Unknown error"),
-                agent=err.get("agent", name),
-                request_id=request_id,
-                details=err.get("details", {}),
-            )
-
-        return json.loads(response.data) if response.data else {}
-
-    async def stream(
-        self, name: str, payload: Any = None, timeout: float = 60.0
-    ) -> AsyncIterator[dict]:
-        """Streaming request. Yields response chunks as dicts."""
-        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
-        await self._subscribe_pending()
-        self._check_stream(name)
-
-        subject = self._resolve_subject(name)
-        request_id = uuid.uuid4().hex
-        stream_subject = f"mesh.stream.{request_id}"
-
-        chunks: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
-        expected_seq = [0]
-
-        async def chunk_handler(msg: nats.aio.msg.Msg) -> None:
-            is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
-            is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
-
-            if is_error and msg.data:
-                err = json.loads(msg.data)
-                await chunks.put(MeshError(
-                    code=err.get("code", "handler_error"),
-                    message=err.get("message", "Unknown streaming error"),
-                    agent=err.get("agent", name),
-                    request_id=request_id,
-                    details=err.get("details", {}),
-                ))
-                return
-
-            if is_end:
-                await chunks.put(None)
-                return
-
-            if msg.data and msg.headers:
-                seq = int(msg.headers.get("X-Mesh-Stream-Seq", "-1"))
-                if seq != expected_seq[0]:
-                    await chunks.put(ChunkSequenceError(
-                        agent=name,
-                        request_id=request_id,
-                        details={"expected_seq": expected_seq[0], "got_seq": seq},
-                    ))
-                    return
-                expected_seq[0] += 1
-                await chunks.put(json.loads(msg.data))
-
-        sub = await self._nc.subscribe(stream_subject, cb=chunk_handler)
-
-        try:
-            data = self._serialize_payload(payload)
-            headers = {
-                "X-Mesh-Request-Id": request_id,
-                "X-Mesh-Stream": "true",
-            }
-            await self._nc.publish(subject, data, headers=headers)
-
-            deadline = asyncio.get_event_loop().time() + timeout
-            while True:
-                remaining = deadline - asyncio.get_event_loop().time()
-                if remaining <= 0:
-                    raise MeshError(
-                        code="timeout", message="Stream timed out", agent=name
-                    )
-                chunk = await asyncio.wait_for(chunks.get(), timeout=remaining)
-                if chunk is None:
-                    break
-                if isinstance(chunk, MeshError):
-                    raise chunk
-                yield chunk
-        finally:
-            await sub.unsubscribe()
-
-    async def subscribe(
-        self,
-        *,
-        agent: str | None = None,
-        channel: str | None = None,
-        subject: str | None = None,
-        timeout: float | None = None,
-    ) -> AsyncIterator[dict]:
-        """Subscribe to events on a subject, agent, or channel.
-
-        Yields dicts parsed from incoming JSON messages. The generator
-        terminates when a message with ``X-Mesh-Stream-End: true`` arrives,
-        or when the caller breaks out of the loop.
-
-        At least one of *agent*, *channel*, or *subject* must be provided.
-        *agent* and *subject* are mutually exclusive. *channel* can be
-        combined with *agent* to override the agent's registered channel.
-        """
-        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
-
-        # --- parameter validation ---
-        if agent is not None and subject is not None:
-            raise ValueError("'agent' and 'subject' are mutually exclusive")
-        if agent is None and channel is None and subject is None:
-            raise ValueError("Provide 'agent', 'channel', or 'subject'")
-
-        # --- capability check (ADR-0047) ---
-        if agent:
-            self._check_subscribe(agent)
-
-        # --- resolve target subject ---
-        if subject:
-            resolved = subject
-        elif agent:
-            resolved = await self._resolve_event_subject(agent, channel)
-        else:
-            # channel only
-            resolved = f"mesh.agent.{channel}.>"
-
-        # --- queue-based async generator ---
-        items: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
-
-        async def _on_msg(msg: nats.aio.msg.Msg) -> None:
-            is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
-            is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
-
-            if is_error and msg.data:
-                err = json.loads(msg.data)
-                await items.put(MeshError(
-                    code=err.get("code", "unknown"),
-                    message=err.get("message", "Unknown error"),
-                    agent=err.get("agent", ""),
-                    request_id=err.get("request_id", ""),
-                    details=err.get("details", {}),
-                ))
-                return
-
-            if msg.data:
-                await items.put(json.loads(msg.data))
-
-            if is_end:
-                await items.put(None)
-
-        # Subscribe to NATS *before* launching publisher tasks so the
-        # subscriber is ready to receive the first emitted event.
-        sub = await self._nc.subscribe(resolved, cb=_on_msg)
-        await self._subscribe_pending()
-
-        try:
-            while True:
-                if timeout is not None:
-                    try:
-                        item = await asyncio.wait_for(items.get(), timeout=timeout)
-                    except asyncio.TimeoutError:
-                        raise MeshTimeout(subject=resolved, timeout=timeout)
-                else:
-                    item = await items.get()
-
-                if item is None:
-                    break
-                if isinstance(item, MeshError):
-                    raise item
-                yield item
-        finally:
-            await sub.unsubscribe()
-
-    async def send(
-        self,
-        name: str,
-        payload: Any = None,
-        *,
-        on_reply: Any = None,
-        on_error: Any = None,
-        reply_to: str | None = None,
-        timeout: float = 60.0,
-    ) -> None:
-        """Fire-and-forget invocation with optional managed callback (ADR-0034).
-
-        Three modes:
-
-        - No ``on_reply``, no ``reply_to``: pure fire-and-forget.
-        - ``reply_to="subject"``: legacy manual reply subject.
-        - ``on_reply=callback``: SDK manages request ID, subscription, and cleanup.
-          Optional ``on_error=callback`` fires on timeout or handler error.
-        """
-        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
-        await self._subscribe_pending()
-        self._check_send(name)
-
-        if on_reply is not None and reply_to is not None:
-            raise ValueError("'on_reply' and 'reply_to' are mutually exclusive")
-
-        subject = self._resolve_subject(name)
-        request_id = uuid.uuid4().hex
-        data = self._serialize_payload(payload)
-
-        if on_reply is not None:
-            # Managed callback: SDK handles reply subscription
-            reply_subject = f"mesh.results.{request_id}"
-
-            async def _callback_task() -> None:
-                try:
-                    async for msg in self.subscribe(subject=reply_subject, timeout=timeout):
-                        await on_reply(msg)
-                except MeshTimeout as e:
-                    if on_error is not None:
-                        await on_error(e)
-                    else:
-                        _log.warning("send('%s') reply timed out: %s", name, e)
-                except MeshError as e:
-                    if on_error is not None:
-                        await on_error(e)
-                    else:
-                        _log.warning("send('%s') reply error: %s", name, e)
-
-            asyncio.create_task(_callback_task())
-
-            headers: dict[str, str] = {"X-Mesh-Request-Id": request_id}
-            await self._nc.publish(subject, data, headers=headers, reply=reply_subject)
-        else:
-            # Fire-and-forget or manual reply_to
-            headers = {"X-Mesh-Request-Id": request_id}
-            if reply_to:
-                headers["X-Mesh-Reply-To"] = reply_to
-            await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")
-
-    # --- Discovery ---
-
-    async def catalog(
-        self,
-        channel: str | None = None,
-        tags: list[str] | None = None,
-        streaming: bool | None = None,
-        invocable: bool | None = None,
-    ) -> list[CatalogEntry]:
-        """Lightweight agent listing from the catalog cache (ADR-0028, ADR-0032)."""
-        await self._subscribe_pending()
-
-        entries = list(self._catalog_cache.values())
-
-        if channel is not None:
-            entries = [e for e in entries if e.channel == channel]
-        if tags is not None:
-            tag_set = set(tags)
-            entries = [e for e in entries if tag_set.issubset(set(e.tags))]
-        if streaming is not None:
-            entries = [e for e in entries if e.streaming == streaming]
-        if invocable is not None:
-            entries = [e for e in entries if e.invocable == invocable]
-
-        return entries
-
-    async def contract(self, name: str, channel: str | None = None) -> AgentContract:
-        """Fetch full contract from the registry (authoritative)."""
-        assert self._registry_kv is not None
-
-        key = _compute_registry_key(name, channel)
-
-        if channel is None and name in self._agents:
-            _, _, c = self._agents[name]
-            return c
-
-        try:
-            entry = await self._registry_kv.get(key)
-        except Exception:
-            if channel is not None:
-                try:
-                    entry = await self._registry_kv.get(name)
-                except Exception:
-                    raise MeshError(code="not_found", message=f"Agent '{name}' not found")
-            else:
-                raise MeshError(code="not_found", message=f"Agent '{name}' not found")
-
-        data = json.loads(entry.value)
-        xam = data.get("x-agentmesh", {})
-        caps = data.get("capabilities", {})
-
-        return AgentContract(
-            name=data["name"],
-            description=data["description"],
-            version=data.get("version", "0.1.0"),
-            capabilities=caps,
-            skills=data.get("skills", []),
-            channel=xam.get("channel"),
-            subject=xam.get("subject", ""),
-            tags=xam.get("tags", []),
-            invocable=caps.get("invocable", True),
-            streaming=caps.get("streaming", False),
-            chunk_schema=xam.get("chunk_schema"),
-        )
-
-    async def discover(self, channel: str | None = None) -> list[AgentContract]:
-        """Full contract listing. Heavier than catalog(), authoritative."""
-        catalog_entries = await self.catalog(channel=channel)
-        contracts = []
-        for entry in catalog_entries:
-            try:
-                c = await self.contract(entry.name, channel=entry.channel)
-                contracts.append(c)
-            except MeshError:
-                continue
-        return contracts
-
     # --- Capability checks (ADR-0047) ---
 
-    def _capabilities(self, name: str) -> tuple[bool, bool] | None:
-        """Return (invocable, streaming) for a known agent, or None if unknown."""
+    # (operation, invocable, streaming) → error suffix. Missing key = allowed.
+    _CAPABILITY_ERRORS: dict[tuple[str, bool, bool], str] = {
+        ("call", False, True):      "is a publisher and cannot be called. Subscribe to its events instead",
+        ("call", False, False):     "is a background task and cannot be called",
+        ("call", True, True):       "is streaming-only. Use stream() instead",
+        ("stream", False, True):    "is a publisher and cannot be streamed. Subscribe to its events instead",
+        ("stream", False, False):   "is a background task and cannot be streamed",
+        ("stream", True, False):    "does not support streaming. Use call() instead",
+        ("send", False, True):      "is a publisher and cannot be sent to. Subscribe to its events instead",
+        ("send", False, False):     "is a background task and cannot be sent to",
+        ("subscribe", True, True):  "streams responses to requests. Use stream() instead",
+        ("subscribe", True, False): "does not publish events. Use call() instead",
+        ("subscribe", False, False): "is a background task and does not publish events",
+    }
+
+    def _check_capability(self, name: str, operation: str) -> None:
         if name in self._agents:
             _, _, contract = self._agents[name]
-            return contract.invocable, contract.streaming
-        entry = self._catalog_cache.get(name)
-        if entry is not None:
-            return entry.invocable, entry.streaming
-        return None
+            caps = (contract.invocable, contract.streaming)
+        else:
+            entry = self._catalog_cache.get(name)
+            if entry is None:
+                return
+            caps = (entry.invocable, entry.streaming)
+        msg = self._CAPABILITY_ERRORS.get((operation, *caps))
+        if msg:
+            raise InvocationMismatch(agent=name, message=f"Agent '{name}' {msg}")
 
-    def _check_call(self, name: str) -> None:
-        caps = self._capabilities(name)
-        if caps is None:
-            return
-        invocable, streaming = caps
-        if not invocable:
-            if streaming:
-                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be called. Subscribe to its events instead")
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be called")
-        if streaming:
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is streaming-only. Use stream() instead")
-
-    def _check_stream(self, name: str) -> None:
-        caps = self._capabilities(name)
-        if caps is None:
-            return
-        invocable, streaming = caps
-        if not invocable:
-            if streaming:
-                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be streamed. Subscribe to its events instead")
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be streamed")
-        if not streaming:
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' does not support streaming. Use call() instead")
-
-    def _check_send(self, name: str) -> None:
-        caps = self._capabilities(name)
-        if caps is None:
-            return
-        invocable, streaming = caps
-        if not invocable:
-            if streaming:
-                raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a publisher and cannot be sent to. Subscribe to its events instead")
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and cannot be sent to")
-
-    def _check_subscribe(self, name: str) -> None:
-        caps = self._capabilities(name)
-        if caps is None:
-            return
-        invocable, streaming = caps
-        if invocable:
-            if streaming:
-                raise InvocationMismatch(agent=name, message=f"Agent '{name}' streams responses to requests. Use stream() instead")
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' does not publish events. Use call() instead")
-        if not streaming:
-            raise InvocationMismatch(agent=name, message=f"Agent '{name}' is a background task and does not publish events")
 
     # --- Internal helpers ---
 
     def _resolve_subject(self, name: str) -> str:
-        if name in self._agents:
-            _, _, contract = self._agents[name]
-            return contract.subject
-        return f"mesh.agent.{name}"
+        return compute_subject(name)
 
-    async def _resolve_event_subject(self, name: str, channel: str | None = None) -> str:
-        """Resolve an agent name to its event subject."""
-        if name in self._agents:
-            spec, _, _ = self._agents[name]
-            ch = channel or spec.channel
-            if ch:
-                return f"mesh.agent.{ch}.{name}.events"
-            return f"mesh.agent.{name}.events"
+    async def _resolve_event_subject(self, name: str) -> str:
+        """Resolve an agent name to its event subject.
 
-        entry = self._catalog_cache.get(name)
-        if entry is not None:
-            ch = channel or entry.channel
-            if ch:
-                return f"mesh.agent.{ch}.{name}.events"
-            return f"mesh.agent.{name}.events"
-
-        c = await self.contract(name, channel)
-        ch = channel or c.channel
-        if ch:
-            return f"mesh.agent.{ch}.{name}.events"
-        return f"mesh.agent.{name}.events"
+        Raises MeshError(code="not_found") if the agent is unknown locally
+        and absent from the registry. Without this check subscribe(agent=...)
+        would block forever on a subject that nobody publishes to.
+        """
+        if name in self._agents or name in self._catalog_cache:
+            return compute_event_subject(name)
+        await self.contract(name)
+        return compute_event_subject(name)
 
     @staticmethod
     def _serialize_payload(payload: Any) -> bytes:
@@ -1067,7 +686,7 @@ class AgentMesh:
 
     async def _publish_contract(self, contract: AgentContract) -> None:
         assert self._registry_kv is not None
-        key = _compute_registry_key(contract.name, contract.channel)
+        key = compute_registry_key(contract.name)
         await self._registry_kv.put(key, contract.to_registry_json().encode())
 
     async def _update_catalog(self, contract: AgentContract, *, add: bool) -> None:

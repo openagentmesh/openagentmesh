@@ -174,7 +174,7 @@ class TestSharedPlanCoordination:
 
             completed_by: dict[str, str] = {}
 
-            @mesh.agent(AgentSpec(name="worker", channel="dev", description="Completes plan tasks"))
+            @mesh.agent(AgentSpec(name="dev.worker", description="Completes plan tasks"))
             async def worker(req: TaskClaim) -> TaskResult:
                 # Claim
                 def claim(value: str) -> str:
@@ -203,7 +203,7 @@ class TestSharedPlanCoordination:
 
             # Dispatch all tasks concurrently (simulating two+ agents via queue group)
             calls = [
-                mesh.call("worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
+                mesh.call("dev.worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
                 for i in range(1, 6)
             ]
             results = await asyncio.gather(*calls)
@@ -227,7 +227,7 @@ class TestSharedPlanCoordination:
             plan = make_plan(5)
             await mesh.kv.put("plan-001", plan.model_dump_json())
 
-            @mesh.agent(AgentSpec(name="worker", channel="dev", description="Completes plan tasks"))
+            @mesh.agent(AgentSpec(name="dev.worker", description="Completes plan tasks"))
             async def worker(req: TaskClaim) -> TaskResult:
                 def mark_complete(value: str) -> str:
                     p = Plan.model_validate_json(value)
@@ -244,7 +244,7 @@ class TestSharedPlanCoordination:
 
             start = time.monotonic()
             calls = [
-                mesh.call("worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
+                mesh.call("dev.worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
                 for i in range(1, 6)
             ]
             await asyncio.gather(*calls)

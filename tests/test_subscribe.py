@@ -192,8 +192,7 @@ class TestSubscribeAgentResolution:
         """
         async with AgentMesh.local() as mesh:
             spec = AgentSpec(
-                name="price-feed",
-                channel="finance",
+                name="finance.price-feed",
                 description="Price events",
             )
 
@@ -203,7 +202,7 @@ class TestSubscribeAgentResolution:
                 yield PriceEvent(symbol="GOOG", price=2800.0)
 
             received = []
-            async for event in mesh.subscribe(agent="price-feed", timeout=2.0):
+            async for event in mesh.subscribe(agent="finance.price-feed", timeout=2.0):
                 received.append(event)
 
             assert received == [
@@ -212,7 +211,7 @@ class TestSubscribeAgentResolution:
             ]
 
     async def test_subscribe_by_agent_name_no_channel(self):
-        """subscribe(agent=...) works for agents without a channel.
+        """subscribe(agent=...) works for agents at the root (no channel prefix).
 
         Publisher emission (ADR-0034) runs the handler automatically.
         """

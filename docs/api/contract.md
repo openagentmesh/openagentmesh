@@ -13,9 +13,9 @@ Contracts carry the schemas needed to build LLM tool definitions. Three conversi
 `to_tool_schema()` returns a `{name, description, input_schema}` triple that works with Anthropic, LangChain, LiteLLM, and any framework that accepts a JSON Schema dict:
 
 ```python
-contract = await mesh.contract("summarizer")
+contract = await mesh.contract("nlp.summarizer")
 tool = contract.to_tool_schema()
-# {"name": "summarizer", "description": "...", "input_schema": {...}}
+# {"name": "nlp_summarizer", "description": "...", "input_schema": {...}}
 ```
 
 ### OpenAI
@@ -72,7 +72,7 @@ tool = contract.to_tool_schema()
 
 ### Name sanitization
 
-Agent names with dots (e.g. `billing.invoice.create`) are automatically converted to underscores (`billing_invoice_create`) since LLM providers restrict tool names to `[a-zA-Z0-9_-]`. Names that cannot be sanitized raise `ValueError`.
+Agent names are dotted identifiers (e.g. `billing.invoice.create`); LLM providers restrict tool names to `[a-zA-Z0-9_-]`, so dots are automatically converted to underscores (`billing_invoice_create`). Names that cannot be sanitized raise `ValueError`.
 
 ### Output schema hints
 
@@ -85,7 +85,6 @@ When `output_schema` is present, the description is appended with a `Returns: <f
 | `name` | `str` | Agent name |
 | `description` | `str` | LLM-consumable description |
 | `version` | `str` | Semantic version |
-| `channel` | `str \| None` | Channel namespace |
 | `tags` | `list[str]` | Searchable tags |
 | `invocable` | `bool` | Whether the agent accepts requests |
 | `streaming` | `bool` | Whether the agent streams responses |
@@ -117,7 +116,7 @@ Project to a lightweight `CatalogEntry`.
 
 ```python
 entry = contract.to_catalog_entry()
-# CatalogEntry(name="summarizer", description="...", invocable=True, streaming=False)
+# CatalogEntry(name="nlp.summarizer", description="...", invocable=True, streaming=False)
 ```
 
 ### `.to_registry_json()`

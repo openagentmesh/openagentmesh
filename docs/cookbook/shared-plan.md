@@ -44,7 +44,7 @@ class TaskResult(BaseModel):
 
 
 async def main(mesh: AgentMesh) -> None:
-    @mesh.agent(AgentSpec(name="worker", channel="dev", description="Picks and completes plan tasks"))
+    @mesh.agent(AgentSpec(name="dev.worker", description="Picks and completes plan tasks"))
     async def worker(req: TaskClaim) -> TaskResult:
         def claim(value: str) -> str:
             plan = Plan.model_validate_json(value)
@@ -83,7 +83,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Dispatch all tasks concurrently (queue group distributes across workers)
     calls = [
-        mesh.call("worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
+        mesh.call("dev.worker", TaskClaim(plan_id="plan-001", task_id=f"task-{i}"))
         for i in range(1, 6)
     ]
     results = await asyncio.gather(*calls)

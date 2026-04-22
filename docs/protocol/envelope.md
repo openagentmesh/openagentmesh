@@ -20,7 +20,7 @@ All messages use headers for metadata and a JSON body for payload.
 
 ## Streaming Headers
 
-Used on `mesh.stream.{request_id}` subjects for streaming responses, and on `mesh.agent.{channel}.{name}.events` subjects for publisher emissions.
+Used on `mesh.stream.{request_id}` subjects for streaming responses, and on `mesh.agent.{name}.events` subjects for publisher emissions.
 
 | Header | Description |
 |--------|-------------|

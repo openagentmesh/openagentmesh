@@ -8,14 +8,14 @@ Contracts are a superset of the [A2A Agent Card](https://google.github.io/A2A/) 
 
 ```json
 {
-  "name": "summarizer",
+  "name": "nlp.summarizer",
   "description": "Summarizes text to a target length.",
   "version": "1.0.0",
   "capabilities": { "streaming": false, "invocable": true },
   "skills": [
     {
-      "id": "summarizer",
-      "name": "summarizer",
+      "id": "nlp.summarizer",
+      "name": "nlp.summarizer",
       "description": "Summarizes text to a target length.",
       "tags": ["text", "summarization"],
       "inputSchema": { ... },
@@ -23,7 +23,6 @@ Contracts are a superset of the [A2A Agent Card](https://google.github.io/A2A/) 
     }
   ],
   "x-agentmesh": {
-    "channel": "nlp",
     "subject": "mesh.agent.nlp.summarizer",
     "tags": ["text", "summarization"],
     "registered_at": "2026-04-17T10:00:00Z"
@@ -31,14 +30,15 @@ Contracts are a superset of the [A2A Agent Card](https://google.github.io/A2A/) 
 }
 ```
 
+The dotted `name` carries both the channel hierarchy and the leaf identifier (ADR-0049).
+
 ## Auto-Generation
 
 Contracts are generated automatically from your `AgentSpec` and handler type hints:
 
 ```python
 spec = AgentSpec(
-    name="summarizer",
-    channel="nlp",
+    name="nlp.summarizer",
     description="Summarizes text to a target length.",
 )
 
@@ -56,7 +56,7 @@ Capabilities (`invocable`, `streaming`) are inferred from the handler shape. No 
 Fetch a contract and use its schemas to build tool definitions for your LLM provider:
 
 ```python
-contract = await mesh.contract("summarizer")
+contract = await mesh.contract("nlp.summarizer")
 
 # Build tool definition
 tool = {

@@ -17,7 +17,7 @@ class TestLoadBalancingRecipe:
         async with AgentMesh.local() as mesh:
             await main(mesh)
             tasks = [
-                mesh.call("translator", TranslateInput(text=f"msg {i}"))
+                mesh.call("nlp.translator", TranslateInput(text=f"msg {i}"))
                 for i in range(5)
             ]
             results = await asyncio.gather(*tasks)

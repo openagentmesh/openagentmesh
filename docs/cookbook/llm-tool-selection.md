@@ -42,11 +42,11 @@ class TaskResponse(BaseModel):
 
 async def main(mesh: AgentMesh) -> None:
     # Register some tool agents
-    @mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="Summarizes text."))
+    @mesh.agent(AgentSpec(name="nlp.summarizer", description="Summarizes text."))
     async def summarize(req: SummarizeInput) -> SummarizeOutput:
         return SummarizeOutput(summary=req.text[:80] + "...")
 
-    @mesh.agent(AgentSpec(name="translator", channel="nlp", description="Translates text to a target language."))
+    @mesh.agent(AgentSpec(name="nlp.translator", description="Translates text to a target language."))
     async def translate(req: TranslateInput) -> TranslateOutput:
         return TranslateOutput(translated=f"[{req.target_language}] {req.text}")
 

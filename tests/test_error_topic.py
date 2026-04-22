@@ -1,4 +1,4 @@
-"""Tests for error topic publishing: handler errors are published to mesh.errors.{channel}.{name}."""
+"""Tests for error topic publishing: handler errors are published to mesh.errors.{name}."""
 
 import asyncio
 import json
@@ -44,9 +44,9 @@ class TestErrorTopicPublishing:
             assert received[0]["agent"] == "fail-agent"
 
     async def test_handler_error_with_channel_published_to_error_subject(self):
+        """ADR-0049: dotted name is the full identifier; error subject is mesh.errors.{name}."""
         spec = AgentSpec(
-            name="fail-agent",
-            channel="nlp",
+            name="nlp.fail-agent",
             description="Always fails",
         )
 
@@ -63,14 +63,14 @@ class TestErrorTopicPublishing:
             await mesh._nc.subscribe("mesh.errors.nlp.fail-agent", cb=on_error)
 
             with pytest.raises(MeshError, match="channel error"):
-                await mesh.call("fail-agent", {"text": "hello"})
+                await mesh.call("nlp.fail-agent", {"text": "hello"})
 
             await asyncio.sleep(0.1)
 
             assert len(received) == 1
             assert received[0]["code"] == "handler_error"
             assert "channel error" in received[0]["message"]
-            assert received[0]["agent"] == "fail-agent"
+            assert received[0]["agent"] == "nlp.fail-agent"
 
     async def test_streaming_error_published_to_error_subject(self):
         spec = AgentSpec(name="fail-agent", description="Fails mid-stream")

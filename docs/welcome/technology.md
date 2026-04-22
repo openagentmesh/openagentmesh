@@ -34,12 +34,12 @@ When multiple instances of the same agent connect to the mesh, NATS automaticall
 
 ```python
 # Deploy 3 instances of the same agent -- NATS handles the rest
-@mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="..."))
+@mesh.agent(AgentSpec(name="nlp.summarizer", description="..."))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 
 # Consumers don't know or care how many instances exist
-result = await mesh.call("summarizer", payload)
+result = await mesh.call("nlp.summarizer", payload)
 ```
 
 ## Why Pydantic v2
@@ -57,7 +57,7 @@ class SummarizeOutput(BaseModel):
     summary: str
     token_count: int
 
-@mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="..."))
+@mesh.agent(AgentSpec(name="nlp.summarizer", description="..."))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     ...
 # The decorator introspects type hints, generates JSON Schemas,

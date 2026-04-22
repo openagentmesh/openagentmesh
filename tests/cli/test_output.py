@@ -16,7 +16,7 @@ def test_table_empty_rows_shows_marker():
 
 def test_json_handles_pydantic_model():
     entry = CatalogEntry(
-        name="agent", description="desc", channel=None,
+        name="agent", description="desc",
         streaming=False, invocable=True, tags=["x"],
     )
     out = as_json(entry)
@@ -25,7 +25,7 @@ def test_json_handles_pydantic_model():
 
 def test_json_handles_pydantic_list():
     entry = CatalogEntry(
-        name="agent", description="d", channel=None,
+        name="agent", description="d",
         streaming=False, invocable=True, tags=[],
     )
     out = as_json([entry])

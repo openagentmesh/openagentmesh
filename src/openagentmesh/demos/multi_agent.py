@@ -18,8 +18,7 @@ class SummarizeOutput(BaseModel):
 
 async def main(mesh: AgentMesh) -> None:
     @mesh.agent(AgentSpec(
-        name="summarizer",
-        channel="nlp",
+        name="nlp.summarizer",
         description="Summarizes text to a target length. Input: raw text and optional max_length.",
     ))
     async def summarize(req: SummarizeInput) -> SummarizeOutput:
@@ -33,7 +32,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Call by name
     result = await mesh.call(
-        "summarizer",
+        "nlp.summarizer",
         SummarizeInput(
             text="AgentMesh connects agents over NATS. Agents register, discover, and invoke each other at runtime.",
             max_length=40,

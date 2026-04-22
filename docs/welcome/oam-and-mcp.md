@@ -63,7 +63,7 @@ With OAM, discovery is automatic:
 
 ```python
 # Team A registers an agent -- no announcement needed
-spec = AgentSpec(name="risk-scorer", channel="finance", description="...", tags=["risk"])
+spec = AgentSpec(name="finance.risk-scorer", description="...", tags=["risk"])
 
 @mesh.agent(spec)
 async def score_risk(req: RiskInput) -> RiskOutput:

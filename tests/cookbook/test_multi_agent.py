@@ -16,13 +16,13 @@ class TestMultiAgentRecipe:
             await main(mesh)
             catalog = await mesh.catalog()
             names = [e.name for e in catalog]
-            assert "summarizer" in names
+            assert "nlp.summarizer" in names
 
     async def test_call_returns_truncated_text(self):
         async with AgentMesh.local() as mesh:
             await main(mesh)
             result = await mesh.call(
-                "summarizer",
+                "nlp.summarizer",
                 SummarizeInput(text="A" * 300, max_length=50),
             )
             assert len(result["summary"]) == 50

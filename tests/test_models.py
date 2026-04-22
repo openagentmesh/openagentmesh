@@ -35,19 +35,17 @@ class TestAgentSpec:
         spec = AgentSpec(name="echo", description="Echoes messages")
         assert spec.name == "echo"
         assert spec.description == "Echoes messages"
-        assert spec.channel is None
         assert spec.tags == []
         assert spec.version == "0.1.0"
 
     def test_full(self):
         spec = AgentSpec(
-            name="classifier",
-            channel="nlp",
+            name="nlp.classifier",
             description="Classifies text sentiment",
             tags=["nlp", "classification"],
             version="1.0.0",
         )
-        assert spec.channel == "nlp"
+        assert spec.name == "nlp.classifier"
         assert spec.tags == ["nlp", "classification"]
         assert spec.version == "1.0.0"
 
@@ -55,6 +53,18 @@ class TestAgentSpec:
         """ADR-0031: AgentSpec has no type field."""
         spec = AgentSpec(name="x", description="x")
         assert not hasattr(spec, "type")
+
+    def test_dotted_name_allowed(self):
+        """ADR-0049: dotted identifiers are the canonical form."""
+        spec = AgentSpec(name="finance.risk.scorer", description="d")
+        assert spec.name == "finance.risk.scorer"
+
+    def test_invalid_name_rejected(self):
+        """ADR-0049: segments must match [a-zA-Z0-9_-]+, no leading/trailing/consecutive dots."""
+        import pydantic
+        for bad in ["", ".a", "a.", "a..b", "a b", "a/b"]:
+            with pytest.raises(pydantic.ValidationError):
+                AgentSpec(name=bad, description="d")
 
 
 # --- CatalogEntry (ADR-0028) ---
@@ -73,7 +83,6 @@ class TestCatalogEntry:
         assert entry.streaming is False
         assert entry.version == "0.1.0"
         assert entry.tags == []
-        assert entry.channel is None
 
     def test_capability_booleans(self):
         """ADR-0031: invocable and streaming replace type taxonomy."""

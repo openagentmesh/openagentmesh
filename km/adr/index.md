@@ -56,3 +56,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0046](0046-scalar-and-generic-type-support.md) | Scalar and generic type support via TypeAdapter | documented | |
 | [ADR-0047](0047-invocation-mismatch-preflight-validation.md) | Invocation mismatch pre-flight validation | documented | |
 | [ADR-0048](0048-mesh-native-observability.md) | Mesh-native observability: structured logging and tracing on NATS subjects | discussion | |
+| [ADR-0049](0049-dotted-agent-name-as-identifier.md) | Dotted agent name as sole identifier (removes `channel` field) | documented | |

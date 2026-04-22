@@ -18,7 +18,7 @@ class SummarizeInput(BaseModel):
 class SummarizeOutput(BaseModel):
     summary: str
 
-@mesh.agent(AgentSpec(name="summarizer", channel="nlp", description="Summarizes text."))
+@mesh.agent(AgentSpec(name="nlp.summarizer", description="Summarizes text."))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
     return SummarizeOutput(summary=req.text[:100])
 
@@ -28,10 +28,10 @@ mesh.run()
 A registered process can also call other agents from inside its handlers:
 
 ```python
-@mesh.agent(AgentSpec(name="reviewer", channel="nlp", description="Summarizes and classifies text."))
+@mesh.agent(AgentSpec(name="nlp.reviewer", description="Summarizes and classifies text."))
 async def review(req: ReviewInput) -> ReviewOutput:
-    summary = await mesh.call("summarizer", {"text": req.text})
-    sentiment = await mesh.call("classifier", {"text": req.text})
+    summary = await mesh.call("nlp.summarizer", {"text": req.text})
+    sentiment = await mesh.call("nlp.classifier", {"text": req.text})
     return ReviewOutput(summary=summary["summary"], sentiment=sentiment["label"])
 ```
 

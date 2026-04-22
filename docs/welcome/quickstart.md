@@ -129,8 +129,7 @@ class SummarizeOutput(BaseModel):
     summary: str
 
 @mesh.agent(AgentSpec(
-    name="summarizer",
-    channel="nlp",
+    name="nlp.summarizer",
     description="Summarizes text to a target length. Input: raw text. Not for structured data.",
 ))
 async def summarize(req: SummarizeInput) -> SummarizeOutput:
@@ -153,7 +152,7 @@ async def main():
             print(entry.name, "-", entry.description)
 
         result = await mesh.call(
-            "summarizer",
+            "nlp.summarizer",
             {"text": "OpenAgentMesh makes coding multi-agent systems as easy as writing a REST endpoint", "max_length": 50},
         )
         print(result["summary"])
@@ -168,12 +167,11 @@ python consumer.py
 
 ## Channels
 
-Channels are namespace prefixes that group agents by domain or team.
+Channels are the leading dot-segments of an agent's name. They group agents by domain or team.
 
 ```python
 spec = AgentSpec(
-    name="scorer",
-    channel="finance.risk",
+    name="finance.risk.scorer",
     description="Scores credit risk from a company profile.",
 )
 
@@ -182,13 +180,20 @@ async def score(req: ScoreInput) -> ScoreOutput:
     ...
 ```
 
-Discover all agents in a channel:
+Call by full dotted name:
 
 ```python
-agents = await mesh.catalog(channel="finance.risk")
+await mesh.call("finance.risk.scorer", ScoreInput(profile="..."))
 ```
 
-Agents without a channel register at the root level and are invoked directly by name.
+Discover by channel prefix:
+
+```python
+agents = await mesh.catalog(channel="finance.risk")    # exact tier and sub-tiers
+agents = await mesh.catalog(channel="finance")         # all of finance.*
+```
+
+Agents without a dot in the name register at the root level.
 
 ## Connect to Shared NATS
 
@@ -238,7 +243,7 @@ await mesh.send(
 Fetch an agent's full contract and use its schemas for LLM tool injection.
 
 ```python
-contract = await mesh.contract("summarizer")
+contract = await mesh.contract("nlp.summarizer")
 
 # Access schemas directly
 contract.input_schema    # JSON Schema dict for the input model
@@ -290,24 +295,23 @@ tool = {
 | Method | Description |
 |--------|-------------|
 | `async for msg in mesh.subscribe(agent=name)` | Subscribe to an agent's event stream |
-| `async for msg in mesh.subscribe(channel=name)` | Subscribe to all events in a channel (wildcard) |
+| `async for msg in mesh.subscribe(channel=prefix)` | Subscribe to all events in a channel (wildcard) |
 | `async for msg in mesh.subscribe(subject=raw)` | Subscribe to a raw NATS subject |
 
 ### Discovery
 
 | Method | Description |
 |--------|-------------|
-| `await mesh.catalog(channel=None, tags=None, streaming=None, invocable=None)` | Returns `list[CatalogEntry]` (name, description, version, tags, invocable, streaming) |
+| `await mesh.catalog(channel=None, tags=None, streaming=None, invocable=None)` | Returns `list[CatalogEntry]` (`channel` is a prefix filter) |
 | `await mesh.discover(channel=None)` | Full `AgentContract` objects |
-| `await mesh.contract(name, channel=None)` | Single agent's full contract (authoritative) |
+| `await mesh.contract(name)` | Single agent's full contract (authoritative) |
 
 ### AgentSpec
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `name` | `str` | required | Agent name |
+| `name` | `str` | required | Dotted identifier (e.g. `finance.risk.scorer` or `echo`) |
 | `description` | `str` | required | LLM-consumable description |
-| `channel` | `str \| None` | `None` | Namespace prefix |
 | `tags` | `list[str]` | `[]` | Searchable tags |
 | `version` | `str` | `"0.1.0"` | Semver version |
 

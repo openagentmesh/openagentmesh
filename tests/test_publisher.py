@@ -18,8 +18,7 @@ class TestPublisherEmission:
         """Publisher handler's yielded values arrive on mesh.subscribe(agent=...)."""
         async with AgentMesh.local() as mesh:
             spec = AgentSpec(
-                name="ticker",
-                channel="finance",
+                name="finance.ticker",
                 description="Emits prices",
             )
 
@@ -31,7 +30,7 @@ class TestPublisherEmission:
                     yield PriceEvent(symbol="AAPL", price=p)
 
             received = []
-            async for event in mesh.subscribe(agent="ticker", timeout=2.0):
+            async for event in mesh.subscribe(agent="finance.ticker", timeout=2.0):
                 received.append(event["price"])
                 if len(received) == 3:
                     break

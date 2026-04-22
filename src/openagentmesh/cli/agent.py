@@ -171,7 +171,6 @@ def contract(
     typer.echo(f"name:        {contract.name}")
     typer.echo(f"description: {contract.description}")
     typer.echo(f"version:     {contract.version}")
-    typer.echo(f"channel:     {contract.channel or '-'}")
     typer.echo(f"streaming:   {'yes' if contract.streaming else 'no'}")
     typer.echo(f"invocable:   {'yes' if contract.invocable else 'no'}")
     if contract.tags:

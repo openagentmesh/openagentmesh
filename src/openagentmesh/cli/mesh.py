@@ -245,7 +245,7 @@ def connect(url: str = typer.Argument(..., help="NATS URL, e.g. nats://host:4222
 @mesh_app.command("catalog")
 def catalog(
     url_flag: str | None = typer.Option(None, "--url", help="Override mesh URL."),
-    channel: str | None = typer.Option(None, "--channel", help="Filter by channel."),
+    channel: str | None = typer.Option(None, "--channel", help="Filter by channel prefix."),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON instead of a table."),
 ) -> None:
     """List registered agents from the catalog."""
@@ -263,10 +263,10 @@ def catalog(
         return
 
     rows = [
-        [e.name, e.channel or "-", "yes" if e.streaming else "no", e.description]
+        [e.name, "yes" if e.streaming else "no", e.description]
         for e in entries
     ]
-    typer.echo(table(rows, headers=["NAME", "CHANNEL", "STREAMING", "DESCRIPTION"]))
+    typer.echo(table(rows, headers=["NAME", "STREAMING", "DESCRIPTION"]))
 
 
 @mesh_app.command("listen")

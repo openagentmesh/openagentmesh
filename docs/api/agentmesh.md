@@ -76,8 +76,7 @@ from openagentmesh import AgentMesh, AgentSpec
 mesh = AgentMesh()
 
 spec = AgentSpec(
-    name="summarizer",
-    channel="nlp",
+    name="nlp.summarizer",
     description="Summarizes text to a target length.",
     tags=["text", "summarization"],
 )
@@ -157,12 +156,12 @@ Subscribe to events on a subject, agent, or channel. Returns an async generator 
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `agent` | `str \| None` | `None` | Agent name (resolves to event subject) |
-| `channel` | `str \| None` | `None` | Channel name (wildcard for all events) |
+| `agent` | `str \| None` | `None` | Agent's dotted name (resolves to its event subject) |
+| `channel` | `str \| None` | `None` | Channel prefix (subscribes to `mesh.agent.{channel}.>`) |
 | `subject` | `str \| None` | `None` | Raw NATS subject |
 | `timeout` | `float \| None` | `None` | Inactivity timeout in seconds |
 
-At least one of `agent`, `channel`, or `subject` must be provided. `agent` and `subject` are mutually exclusive. `channel` can accompany `agent` to override the default channel.
+At least one of `agent`, `channel`, or `subject` must be provided. `agent` and `subject` are mutually exclusive.
 
 ```python
 # Subscribe to an agent's event stream
@@ -187,7 +186,7 @@ Lightweight listing of registered agents. Returns typed `CatalogEntry` objects.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `channel` | `str \| None` | `None` | Filter by channel |
+| `channel` | `str \| None` | `None` | Filter by name prefix (an entry matches when its name equals `channel` or starts with `channel + "."`) |
 | `tags` | `list[str] \| None` | `None` | Filter by tags (all must match) |
 | `streaming` | `bool \| None` | `None` | Filter by streaming capability |
 | `invocable` | `bool \| None` | `None` | Filter by invocable capability |
@@ -208,25 +207,24 @@ Full `AgentContract` objects for all matching agents.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `channel` | `str \| None` | `None` | Filter by channel |
+| `channel` | `str \| None` | `None` | Filter by name prefix (same semantics as `catalog(channel=...)`) |
 
 **Returns:** `list[AgentContract]`
 
-### `await mesh.contract(name, *, channel=None)`
+### `await mesh.contract(name)`
 
 Fetch a single agent's full contract. This is the authoritative source.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `name` | `str` | required | Agent name |
-| `channel` | `str \| None` | `None` | Channel hint for registry key lookup |
+| `name` | `str` | required | Agent's dotted name |
 
 **Returns:** `AgentContract`
 
 ```python
-contract = await mesh.contract("summarizer")
+contract = await mesh.contract("nlp.summarizer")
 
-contract.name             # "summarizer"
+contract.name             # "nlp.summarizer"
 contract.description      # "Summarizes text..."
 contract.input_schema     # JSON Schema dict
 contract.output_schema    # JSON Schema dict

@@ -36,8 +36,7 @@ class SummarizeOutput(BaseModel):
 
 async def main(mesh: AgentMesh) -> None:
     @mesh.agent(AgentSpec(
-        name="summarizer",
-        channel="nlp",
+        name="nlp.summarizer",
         description="Summarizes text to a target length. Input: raw text and optional max_length.",
     ))
     async def summarize(req: SummarizeInput) -> SummarizeOutput:
@@ -51,7 +50,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Call by name
     result = await mesh.call(
-        "summarizer",
+        "nlp.summarizer",
         SummarizeInput(
             text="AgentMesh connects agents over NATS. Agents register, discover, and invoke each other at runtime.",
             max_length=40,
@@ -93,7 +92,7 @@ mesh = AgentMesh()
 from openagentmesh import AgentSpec
 from mesh import mesh
 
-@mesh.agent(AgentSpec(name="researcher", channel="analysts", description="Researches a topic."))
+@mesh.agent(AgentSpec(name="analysts.researcher", description="Researches a topic."))
 async def research(req: Query) -> ResearchResult:
     return ResearchResult(findings=f"Research on {req.topic}: ...")
 ```
@@ -118,7 +117,7 @@ import agents.researcher
 
 async def test_researcher():
     async with mesh.local():
-        result = await mesh.call("researcher", {"topic": "NATS"})
+        result = await mesh.call("analysts.researcher", {"topic": "NATS"})
         assert "NATS" in result["findings"]
 ```
 

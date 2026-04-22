@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** agent names are now dotted identifiers (ADR-0049). The `channel` field on `AgentSpec`, `CatalogEntry`, and `AgentContract` is removed; the channel hierarchy is encoded as leading dot-segments of `name` (e.g. `finance.risk.scorer` instead of `name="scorer", channel="finance.risk"`). Wire subjects are unchanged. `catalog(channel=X)` now performs prefix matching on the name; `subscribe(channel=X)` still subscribes to `mesh.agent.{X}.>`; `contract()` no longer accepts a `channel` argument.
+
+### Added
+
+- Name validation at registration time: names must be a non-empty sequence of dot-separated segments matching `[a-zA-Z0-9_-]+` (ADR-0049).
+
 ## [0.1.6] - 2026-04-21
 
 ### Fixed

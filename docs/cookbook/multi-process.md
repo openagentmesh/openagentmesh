@@ -25,8 +25,7 @@ class SummarizeOutput(BaseModel):
 
 async def main(mesh: AgentMesh) -> None:
     @mesh.agent(AgentSpec(
-        name="summarizer",
-        channel="nlp",
+        name="nlp.summarizer",
         description="Summarizes text to a target length. Input: raw text and optional max_length.",
     ))
     async def summarize(req: SummarizeInput) -> SummarizeOutput:
@@ -40,7 +39,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Call by name
     result = await mesh.call(
-        "summarizer",
+        "nlp.summarizer",
         SummarizeInput(
             text="AgentMesh connects agents over NATS. Agents register, discover, and invoke each other at runtime.",
             max_length=40,
@@ -72,13 +71,13 @@ sequenceDiagram
     participant NATS
     participant Consumer as consumer.py
 
-    Provider->>NATS: Register "summarizer" contract
+    Provider->>NATS: Register "nlp.summarizer" contract
     Provider->>NATS: Subscribe to mesh.agent.nlp.summarizer
 
     Consumer->>NATS: mesh.catalog()
-    NATS-->>Consumer: [CatalogEntry(name="summarizer", ...)]
+    NATS-->>Consumer: [CatalogEntry(name="nlp.summarizer", ...)]
 
-    Consumer->>NATS: mesh.call("summarizer", payload)
+    Consumer->>NATS: mesh.call("nlp.summarizer", payload)
     NATS->>Provider: Deliver request
     Provider->>NATS: Return SummarizeOutput
     NATS-->>Consumer: {"summary": "..."}

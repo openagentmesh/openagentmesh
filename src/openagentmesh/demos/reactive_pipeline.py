@@ -29,8 +29,7 @@ class Summary(BaseModel):
 async def main(mesh: AgentMesh) -> None:
     # Stage 1: Ingest agent writes raw document to KV
     @mesh.agent(AgentSpec(
-        name="ingest",
-        channel="pipeline",
+        name="pipeline.ingest",
         description="Accepts a document and writes it to pipeline KV for downstream processing.",
     ))
     async def ingest(req: Document) -> Document:
@@ -71,7 +70,7 @@ async def main(mesh: AgentMesh) -> None:
 
     # Submit a document
     print("Submitting document...")
-    await mesh.call("ingest", Document(
+    await mesh.call("pipeline.ingest", Document(
         id="doc-001",
         title="Quarterly Report",
         body="Revenue at Acme Corp grew 15% in Q3. The Berlin office expanded headcount. Alice and Bob led the new initiative.",
