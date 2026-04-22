@@ -30,7 +30,6 @@ from ._models import (
 from ._subjects import (
     compute_error_subject,
     compute_event_subject,
-    compute_registry_key,
     compute_subject,
 )
 
@@ -263,7 +262,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     except Exception:
                         pass
                     try:
-                        await self._registry_kv.delete(compute_registry_key(name))
+                        await self._registry_kv.delete(name)
                     except Exception:
                         pass
 
@@ -686,8 +685,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _publish_contract(self, contract: AgentContract) -> None:
         assert self._registry_kv is not None
-        key = compute_registry_key(contract.name)
-        await self._registry_kv.put(key, contract.to_registry_json().encode())
+        await self._registry_kv.put(contract.name, contract.to_registry_json().encode())
 
     async def _update_catalog(self, contract: AgentContract, *, add: bool) -> None:
         assert self._catalog_kv is not None

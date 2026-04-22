@@ -6,7 +6,6 @@ import json
 from typing import TYPE_CHECKING
 
 from ._models import AgentContract, CatalogEntry, MeshError
-from ._subjects import compute_registry_key
 
 if TYPE_CHECKING:
     from ._mesh import AgentMesh
@@ -55,7 +54,7 @@ class DiscoveryMixin:
             return c
 
         try:
-            entry = await self._registry_kv.get(compute_registry_key(name))
+            entry = await self._registry_kv.get(name)
         except Exception:
             raise MeshError(code="not_found", message=f"Agent '{name}' not found")
 
