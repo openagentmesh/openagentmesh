@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-22
+
 ### Changed
 
 - **Breaking:** agent names are now dotted identifiers (ADR-0049). The `channel` field on `AgentSpec`, `CatalogEntry`, and `AgentContract` is removed; the channel hierarchy is encoded as leading dot-segments of `name` (e.g. `finance.risk.scorer` instead of `name="scorer", channel="finance.risk"`). Wire subjects are unchanged. `catalog(channel=X)` now performs prefix matching on the name; `subscribe(channel=X)` still subscribes to `mesh.agent.{X}.>`; `contract()` no longer accepts a `channel` argument.
@@ -76,7 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release. History before this point not documented.
 
-[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/openagentmesh/openagentmesh/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/openagentmesh/openagentmesh/compare/v0.1.3...v0.1.4
