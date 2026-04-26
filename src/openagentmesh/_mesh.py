@@ -83,6 +83,16 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._publisher_tasks: dict[str, asyncio.Task] = {}
         self._watcher_tasks: dict[str, asyncio.Task] = {}
 
+    @property
+    def url(self) -> str:
+        """NATS URL this mesh connects to."""
+        return self._url
+
+    def __repr__(self) -> str:
+        status = "connected" if self._nc is not None else "disconnected"
+        mode = "local" if self._embedded is not None else "remote"
+        return f"<AgentMesh url={self._url} mode={mode} status={status} agents={len(self._agents)}>"
+
     # --- Async context manager ---
 
     async def __aenter__(self) -> AgentMesh:

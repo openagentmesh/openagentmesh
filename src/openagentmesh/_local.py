@@ -142,6 +142,7 @@ class EmbeddedNats:
             try:
                 nc = await nats.connect(self.url)
                 await nc.close()
+                print(f"[openagentmesh] embedded NATS at {self.url}")
                 return
             except Exception:
                 continue
