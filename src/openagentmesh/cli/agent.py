@@ -8,8 +8,8 @@ import sys
 
 import typer
 
+from .._errors import InvocationMismatch, MeshError
 from .._mesh import AgentMesh
-from .._models import InvocationMismatch, MeshError
 from ._config import resolve_url
 from ._output import as_json
 

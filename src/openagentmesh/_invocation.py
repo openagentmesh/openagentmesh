@@ -6,11 +6,12 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any, AsyncIterator, TYPE_CHECKING
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 import nats
 
-from ._models import ChunkSequenceError, MeshError, MeshTimeout
+from ._errors import ChunkSequenceError, MeshError, MeshTimeout, from_envelope
 
 if TYPE_CHECKING:
     from ._mesh import AgentMesh
@@ -41,13 +42,14 @@ class InvocationMixin:
 
         if status == "error":
             err = json.loads(response.data)
-            raise MeshError(
-                code=err.get("code", "unknown"),
-                message=err.get("message", "Unknown error"),
-                agent=err.get("agent", name),
-                request_id=request_id,
-                details=err.get("details", {}),
-            )
+            envelope = {
+                "code": err.get("code", "unknown"),
+                "message": err.get("message", "Unknown error"),
+                "agent": err.get("agent", name),
+                "request_id": request_id,
+                "details": err.get("details", {}),
+            }
+            raise from_envelope(envelope)
 
         return json.loads(response.data) if response.data else {}
 
@@ -72,13 +74,14 @@ class InvocationMixin:
 
             if is_error and msg.data:
                 err = json.loads(msg.data)
-                await chunks.put(MeshError(
-                    code=err.get("code", "handler_error"),
-                    message=err.get("message", "Unknown streaming error"),
-                    agent=err.get("agent", name),
-                    request_id=request_id,
-                    details=err.get("details", {}),
-                ))
+                envelope = {
+                    "code": err.get("code", "handler_error"),
+                    "message": err.get("message", "Unknown streaming error"),
+                    "agent": err.get("agent", name),
+                    "request_id": request_id,
+                    "details": err.get("details", {}),
+                }
+                await chunks.put(from_envelope(envelope))
                 return
 
             if is_end:
@@ -111,9 +114,7 @@ class InvocationMixin:
             while True:
                 remaining = deadline - asyncio.get_event_loop().time()
                 if remaining <= 0:
-                    raise MeshError(
-                        code="timeout", message="Stream timed out", agent=name
-                    )
+                    raise MeshTimeout(subject=stream_subject, timeout=timeout)
                 chunk = await asyncio.wait_for(chunks.get(), timeout=remaining)
                 if chunk is None:
                     break
@@ -166,13 +167,14 @@ class InvocationMixin:
 
             if is_error and msg.data:
                 err = json.loads(msg.data)
-                await items.put(MeshError(
-                    code=err.get("code", "unknown"),
-                    message=err.get("message", "Unknown error"),
-                    agent=err.get("agent", ""),
-                    request_id=err.get("request_id", ""),
-                    details=err.get("details", {}),
-                ))
+                envelope = {
+                    "code": err.get("code", "unknown"),
+                    "message": err.get("message", "Unknown error"),
+                    "agent": err.get("agent", ""),
+                    "request_id": err.get("request_id", ""),
+                    "details": err.get("details", {}),
+                }
+                await items.put(from_envelope(envelope))
                 return
 
             if msg.data:
@@ -189,8 +191,8 @@ class InvocationMixin:
                 if timeout is not None:
                     try:
                         item = await asyncio.wait_for(items.get(), timeout=timeout)
-                    except asyncio.TimeoutError:
-                        raise MeshTimeout(subject=resolved, timeout=timeout)
+                    except TimeoutError as e:
+                        raise MeshTimeout(subject=resolved, timeout=timeout) from e
                 else:
                     item = await items.get()
 

@@ -9,8 +9,7 @@ import asyncio
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, MeshError
-from openagentmesh._models import InvocationMismatch
+from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, InvocationMismatch, MeshError
 
 
 # --- Test models ---

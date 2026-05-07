@@ -10,7 +10,14 @@ import random
 
 from pydantic import BaseModel
 
-from openagentmesh import AgentMesh, AgentSpec, MeshError
+from openagentmesh import (
+    AgentMesh,
+    AgentSpec,
+    HandlerError,
+    InvalidInput,
+    MeshError,
+    NotFound,
+)
 
 
 class SummarizeInput(BaseModel):
@@ -25,9 +32,10 @@ async def call_with_retry(mesh: AgentMesh, agent: str, payload, retries: int = 3
     for attempt in range(retries):
         try:
             return await mesh.call(agent, payload)
+        except (NotFound, InvalidInput):
+            # Caller faults: retrying with the same input won't help.
+            raise
         except MeshError as e:
-            if e.code == "not_found":
-                raise
             if attempt == retries - 1:
                 raise
             delay = base_delay * (2 ** attempt)
@@ -40,12 +48,13 @@ async def call_with_fallback(mesh: AgentMesh, agents: list[str], payload):
     for agent in agents:
         try:
             return await mesh.call(agent, payload, timeout=5.0)
-        except MeshError as e:
+        except InvalidInput:
+            # Bad payload: every fallback will reject it the same way.
+            raise
+        except (NotFound, HandlerError) as e:
             last_error = e
             print(f"  {agent} failed ({e.code}), trying next...")
-            if e.code in ("not_found", "handler_error"):
-                continue
-            raise
+            continue
     raise last_error
 
 
@@ -97,8 +106,8 @@ asyncio.run(run())
 
 Key properties:
 
-- **Structured errors everywhere.** Every failure produces a `MeshError` with `code`, `agent`, and `request_id`. No raw exceptions leak through the mesh.
-- **Retry selectively.** `not_found` means the agent doesn't exist; retrying won't help. `handler_error` and `timeout` are potentially transient.
+- **Structured errors everywhere.** Every failure produces a `MeshError` subclass with `code`, `agent`, and `request_id`. No raw exceptions leak through the mesh.
+- **Branch on type, not strings.** `NotFound` and `InvalidInput` are caller faults — retrying won't help. `HandlerError` and `MeshTimeout` are potentially transient. Catching subclasses is more robust than matching `e.code` strings.
 - **Fallback across agents.** When multiple agents can handle the same task, try them in preference order. The catalog and contracts enable this pattern at runtime via `mesh.discover()`.
 - **Dead-letter stream.** Every error is published to `mesh.errors.{name}` regardless of whether the caller handles it. Subscribe for monitoring, alerting, or audit logging.
 

@@ -1,6 +1,5 @@
 """LLM-driven tool selection: discover agents at runtime, no hardcoded tool list."""
 
-import asyncio
 import json
 
 from pydantic import BaseModel

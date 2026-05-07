@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 import nats
+import pydantic
 from nats.aio.client import Client as NatsClient
 from nats.js import JetStreamContext
 from nats.js.kv import KeyValue
@@ -16,22 +18,27 @@ from pydantic import BaseModel
 
 from ._context import KVStore
 from ._discovery import DiscoveryMixin
+from ._errors import (
+    ConnectionFailed,
+    HandlerError,
+    InvalidInput,
+    InvocationMismatch,
+    MeshError,
+)
 from ._handler import HandlerInfo, inspect_handler
 from ._invocation import InvocationMixin
-from ._workspace import Workspace
 from ._local import EmbeddedNats
 from ._models import (
     AgentContract,
     AgentSpec,
     CatalogEntry,
-    InvocationMismatch,
-    MeshError,
 )
 from ._subjects import (
     compute_error_subject,
     compute_event_subject,
     compute_subject,
 )
+from ._workspace import Workspace
 
 _log = logging.getLogger("openagentmesh")
 
@@ -120,8 +127,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 error_cb=self._nats_error_cb,
             )
         except Exception as e:
-            raise MeshError(
-                code="connection_failed",
+            raise ConnectionFailed(
                 message=f"Could not connect to mesh at {self._url}. Is it running? Try: oam mesh up",
             ) from e
         self._js = self._nc.jetstream()
@@ -436,23 +442,42 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 wants_stream = msg.headers.get("X-Mesh-Stream") == "true"
 
             try:
+                # Pre-flight verb/shape check (ADR-0047)
                 if wants_stream and not info.streaming:
                     raise InvocationMismatch(agent=name, request_id=request_id, message=f"Agent '{name}' does not support streaming. Use call() instead")
                 if not wants_stream and info.streaming:
                     raise InvocationMismatch(agent=name, request_id=request_id, message=f"Agent '{name}' is streaming-only. Use stream() instead")
 
-                if info.streaming:
-                    await self._handle_streaming(msg, info, name, request_id)
-                else:
-                    await self._handle_responder(msg, info, name, request_id)
-            except Exception as e:
-                error = (
-                    e if isinstance(e, MeshError)
-                    else MeshError(
-                        code="handler_error", message=str(e),
-                        agent=name, request_id=request_id,
-                    )
-                )
+                # Input validation (ADR-0057): caller-fault stops here
+                try:
+                    if info.input_adapter and msg.data:
+                        payload = info.input_adapter.validate_json(msg.data)
+                    else:
+                        payload = None
+                except pydantic.ValidationError as ve:
+                    raise InvalidInput(
+                        agent=name,
+                        request_id=request_id,
+                        message=f"Input failed validation for agent '{name}'",
+                        details={"errors": ve.errors(include_url=False)},
+                    ) from ve
+
+                # Handler execution (ADR-0057): provider-fault is wrapped as HandlerError
+                try:
+                    if info.streaming:
+                        await self._handle_streaming(msg, info, name, request_id, payload)
+                    else:
+                        await self._handle_responder(msg, info, name, request_id, payload)
+                except MeshError:
+                    raise
+                except Exception as e:
+                    raise HandlerError(
+                        agent=name,
+                        request_id=request_id,
+                        message=str(e),
+                    ) from e
+            except MeshError as e:
+                error = e
                 if wants_stream:
                     stream_subject = f"mesh.stream.{request_id}"
                     await self._nc.publish(
@@ -485,12 +510,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
+        payload: Any,
     ) -> None:
-        if info.input_adapter and msg.data:
-            payload = info.input_adapter.validate_json(msg.data)
-        else:
-            payload = None
-
         if payload is not None:
             result = await info.func(payload)
         else:
@@ -518,13 +539,9 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
+        payload: Any,
     ) -> None:
         stream_subject = f"mesh.stream.{request_id}"
-
-        if info.input_adapter and msg.data:
-            payload = info.input_adapter.validate_json(msg.data)
-        else:
-            payload = None
 
         gen = info.func(payload) if payload is not None else info.func()
         seq = 0
@@ -615,9 +632,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 pass
         except Exception as e:
             _log.warning("Publisher '%s' failed: %s", name, e)
-            error = MeshError(
-                code="handler_error", message=str(e), agent=name,
-            )
+            error = HandlerError(message=str(e), agent=name)
             try:
                 await self._nc.publish(
                     event_subject,
@@ -674,7 +689,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     async def _resolve_event_subject(self, name: str) -> str:
         """Resolve an agent name to its event subject.
 
-        Raises MeshError(code="not_found") if the agent is unknown locally
+        Raises NotFound (a MeshError subclass) if the agent is unknown locally
         and absent from the registry. Without this check subscribe(agent=...)
         would block forever on a subject that nobody publishes to.
         """
