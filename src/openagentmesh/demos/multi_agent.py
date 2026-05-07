@@ -1,6 +1,5 @@
 """Provider and consumer in one process: register an agent, discover it, call it."""
 
-import asyncio
 
 from pydantic import BaseModel
 

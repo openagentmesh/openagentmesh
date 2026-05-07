@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nats.js.kv import KeyValue

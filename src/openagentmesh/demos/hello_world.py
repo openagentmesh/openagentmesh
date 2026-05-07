@@ -6,6 +6,7 @@ import signal
 import sys
 from datetime import datetime
 from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from openagentmesh import AgentMesh, AgentSpec
@@ -68,11 +69,11 @@ async def main(mesh: AgentMesh) -> None:
     url_file.write_text(f"{mesh._url}\n")
 
     print("\n  Mesh is live. In another terminal, try:")
-    print(f"    oam mesh catalog")
-    print(f"    oam agent contract greeter")
-    print(f"    oam agent call greeter '{{\"name\": \"Alice\"}}'")
-    print(f"    oam agent stream counter '0'")
-    print(f"    oam agent subscribe ticker")
+    print("    oam mesh catalog")
+    print("    oam agent contract greeter")
+    print("    oam agent call greeter '{\"name\": \"Alice\"}'")
+    print("    oam agent stream counter '0'")
+    print("    oam agent subscribe ticker")
     print("\n  Press Ctrl+C to stop.\n")
 
     stop = asyncio.Event()
