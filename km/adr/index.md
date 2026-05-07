@@ -49,7 +49,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
 | [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | discussion | |
 | [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | superseded by ADR-0045 | feature/cli-demos |
-| [ADR-0042](0042-watcher-agent-pattern.md) | Watcher agent pattern (fourth capability combination) | documented | feature/watcher-agent |
+| [ADR-0042](0042-watcher-agent-pattern.md) | Watcher agent pattern (fourth capability combination) | superseded by ADR-0055 | feature/watcher-agent |
 | [ADR-0043](0043-trigger-handler-pattern.md) | Trigger handler pattern (invocable, no input) | documented | feature/watcher-agent |
 | [ADR-0044](0044-handler-shape-rename-responder-streamer.md) | Rename handler shapes to Responder/Streamer | documented | feature/handler-shape-rename |
 | [ADR-0045](0045-unlink-cookbook-from-demos.md) | Unlink cookbook docs from demo modules (supersedes ADR-0041) | implemented | |
@@ -59,3 +59,8 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0049](0049-dotted-agent-name-as-identifier.md) | Dotted agent name as sole identifier (removes `channel` field) | documented | |
 | [ADR-0050](0050-docstring-as-description-fallback.md) | Docstring as fallback for `AgentSpec.description` | discussion | |
 | [ADR-0051](0051-notebook-ergonomics-for-local-embedded-nats.md) | Notebook ergonomics for `AgentMesh.local()`: sync entry, atexit, idempotent reuse | discussion | |
+| [ADR-0052](0052-generic-agent-sources.md) | Generic agent sources (decorator extension; subsumes ADR-0042 watcher narrowness) | spec | |
+| [ADR-0053](0053-chat-integration-framework-and-discord-bridge.md) | Chat integration framework + DiscordBridge as first impl | spec | |
+| [ADR-0054](0054-wildfire-incident-response-demo.md) | Wildfire incident response demo (multi-fleet portfolio project) | spec | |
+| [ADR-0055](0055-agent-lifecycle-gates.md) | Agent lifecycle gates (`active_when`): declarative on/off based on watch conditions | spec | |
+| [ADR-0056](0056-admin-ui.md) | OAM Admin UI: agent registry browser, invocation sandbox, event feed | spec | |
