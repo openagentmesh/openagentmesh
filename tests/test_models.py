@@ -3,8 +3,14 @@
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentSpec, CatalogEntry, InvocationMismatch, MeshError, MeshTimeout
-from openagentmesh._models import ChunkSequenceError
+from openagentmesh import (
+    AgentSpec,
+    CatalogEntry,
+    ChunkSequenceError,
+    InvocationMismatch,
+    MeshError,
+    MeshTimeout,
+)
 from openagentmesh._handler import inspect_handler
 
 

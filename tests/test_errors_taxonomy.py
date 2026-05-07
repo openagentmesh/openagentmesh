@@ -362,7 +362,7 @@ class TestMeshTimeoutSubclassUsedConsistently:
                     offenders.append(f"{py}:{lineno}")
         assert not offenders, (
             "Use MeshTimeout(...) instead of MeshError(code='timeout', ...). "
-            f"Offenders:\n  " + "\n  ".join(offenders)
+            "Offenders:\n  " + "\n  ".join(offenders)
         )
 
     def test_no_raw_meshError_not_found_in_source(self):
@@ -380,7 +380,7 @@ class TestMeshTimeoutSubclassUsedConsistently:
                     offenders.append(f"{py}:{lineno}")
         assert not offenders, (
             "Use NotFound(...) instead of MeshError(code='not_found', ...). "
-            f"Offenders:\n  " + "\n  ".join(offenders)
+            "Offenders:\n  " + "\n  ".join(offenders)
         )
 
     def test_no_raw_meshError_connection_failed_in_source(self):
@@ -398,5 +398,5 @@ class TestMeshTimeoutSubclassUsedConsistently:
                     offenders.append(f"{py}:{lineno}")
         assert not offenders, (
             "Use ConnectionFailed(...) instead of MeshError(code='connection_failed', ...). "
-            f"Offenders:\n  " + "\n  ".join(offenders)
+            "Offenders:\n  " + "\n  ".join(offenders)
         )

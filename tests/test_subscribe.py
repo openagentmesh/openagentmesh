@@ -10,8 +10,7 @@ import json
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentMesh, AgentSpec, MeshError
-from openagentmesh._models import MeshTimeout
+from openagentmesh import AgentMesh, AgentSpec, MeshError, MeshTimeout
 
 
 class EchoOutput(BaseModel):

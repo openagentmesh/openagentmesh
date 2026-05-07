@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import copy
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
-
 
 _NAME_SEGMENT_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
@@ -85,7 +84,7 @@ class AgentContract(BaseModel):
     input_schema: dict[str, Any] | None = None
     output_schema: dict[str, Any] | None = None
     chunk_schema: dict[str, Any] | None = None
-    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def to_tool_schema(self) -> dict[str, Any]:
         """Provider-neutral tool triple: name + description + input_schema."""
@@ -240,80 +239,4 @@ def _strict_clean_node(node: dict[str, Any]) -> dict[str, Any]:
     return node
 
 
-class MeshError(Exception):
-    """Structured error from the mesh (local or remote)."""
-
-    def __init__(
-        self,
-        code: str,
-        message: str,
-        agent: str = "",
-        request_id: str = "",
-        details: dict[str, Any] | None = None,
-    ):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.agent = agent
-        self.request_id = request_id
-        self.details = details or {}
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "code": self.code,
-            "message": str(self),
-            "agent": self.agent,
-            "request_id": self.request_id,
-            "details": self.details,
-        }
-
-    def to_json(self) -> bytes:
-        import json
-
-        return json.dumps(self.to_dict()).encode()
-
-
-class InvocationMismatch(MeshError):
-    """Raised when the invocation verb doesn't match the agent's capabilities (ADR-0047)."""
-
-    def __init__(self, agent: str = "", message: str = "", request_id: str = ""):
-        super().__init__(
-            code="invocation_mismatch",
-            message=message or f"Invocation mismatch for agent '{agent}'",
-            agent=agent,
-            request_id=request_id,
-        )
-
-
-class ChunkSequenceError(MeshError):
-    """Raised when stream chunks arrive out of order (ADR-0005)."""
-
-    def __init__(
-        self,
-        agent: str = "",
-        request_id: str = "",
-        details: dict[str, Any] | None = None,
-    ):
-        details = details or {}
-        super().__init__(
-            code="chunk_sequence_error",
-            message=(
-                f"Expected chunk seq {details.get('expected_seq', '?')}, "
-                f"got {details.get('got_seq', '?')}"
-            ),
-            agent=agent,
-            request_id=request_id,
-            details=details,
-        )
-
-
-class MeshTimeout(MeshError):
-    """Raised when no message arrives within the timeout window (ADR-0034)."""
-
-    def __init__(self, subject: str, timeout: float):
-        super().__init__(
-            code="timeout",
-            message=f"No message on {subject} within {timeout}s",
-        )
-        self.subject = subject
-        self.timeout = timeout
+# Error classes moved to ._errors per ADR-0057.

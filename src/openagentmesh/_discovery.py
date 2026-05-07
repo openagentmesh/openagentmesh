@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from ._models import AgentContract, CatalogEntry, MeshError
+from ._errors import MeshError, NotFound
+from ._models import AgentContract, CatalogEntry
 
 if TYPE_CHECKING:
     from ._mesh import AgentMesh
@@ -55,8 +56,8 @@ class DiscoveryMixin:
 
         try:
             entry = await self._registry_kv.get(name)
-        except Exception:
-            raise MeshError(code="not_found", message=f"Agent '{name}' not found")
+        except Exception as e:
+            raise NotFound(agent=name) from e
 
         data = json.loads(entry.value)
         xam = data.get("x-agentmesh", {})
