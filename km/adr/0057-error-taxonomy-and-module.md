@@ -2,7 +2,7 @@
 
 - **Type:** api-design / structure
 - **Date:** 2026-05-07
-- **Status:** implemented
+- **Status:** documented
 - **Amends:** ADR-0001 (error envelope), ADR-0005 (streaming codes), ADR-0034 (`MeshTimeout`), ADR-0044 (responder/streamer rename), ADR-0047 (`InvocationMismatch`)
 - **Source:** v1.0 milestone audit — original REQ TRAN-05 (`validation_error` code) never lifted into an ADR; review surfaced broader scattering of error classes inside `_models.py` and inconsistent code-vs-class usage
 
