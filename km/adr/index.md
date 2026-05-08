@@ -59,7 +59,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0049](0049-dotted-agent-name-as-identifier.md) | Dotted agent name as sole identifier (removes `channel` field) | documented | |
 | [ADR-0050](0050-docstring-as-description-fallback.md) | Docstring as fallback for `AgentSpec.description` | discussion | |
 | [ADR-0051](0051-notebook-ergonomics-for-local-embedded-nats.md) | Notebook ergonomics for `AgentMesh.local()`: sync entry, atexit, idempotent reuse | discussion | |
-| [ADR-0052](0052-generic-agent-sources.md) | Generic agent sources (decorator extension; subsumes ADR-0042 watcher narrowness) | spec | |
+| [ADR-0052](0052-generic-agent-sources.md) | Generic agent sources (decorator extension; subsumes ADR-0042 watcher narrowness) | spec | feature/agent-sources |
 | [ADR-0053](0053-chat-integration-framework-and-discord-bridge.md) | Chat integration framework + DiscordBridge as first impl | spec | |
 | [ADR-0054](0054-wildfire-incident-response-demo.md) | Wildfire incident response demo (multi-fleet portfolio project) | spec | feature/wildfire-demo |
 | [ADR-0055](0055-agent-lifecycle-gates.md) | Agent lifecycle gates (`active_when`): declarative on/off based on watch conditions | spec | |
