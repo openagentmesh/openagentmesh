@@ -49,3 +49,18 @@ If tests fail, report the failures before starting work. Do not proceed with a b
 ### 5. Start the TDD cycle
 
 Extract the ADR code samples into failing tests under `tests/`. Follow the DDD pipeline: test (red), implement (green), refactor, finalize docs.
+
+### 5b. Optional: bootstrap inner GSD for multi-wave work
+
+If the claimed ADR (or related ADR group) is too large for a single coding session -- multiple waves of work, coupled across components, expected to span days -- bootstrap inner GSD inside the worktree:
+
+```bash
+# inside the worktree, after uv sync and baseline pytest
+/gsd-new-project
+```
+
+Inner GSD creates `.planning/PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md` scoped to this single feature. Phase plans land under `.planning/phases/`. Use `km/specs/<feature>/` as the design input; do not re-derive.
+
+`.planning/` is gitignored at the project level, so all of this stays in the worktree's local filesystem and never reaches main on merge. See `km/workflow/during-a-session.md` "Multi-wave work" section and `CLAUDE.md` "Inner workflow" section.
+
+For simple single-session ADRs, skip this step and proceed straight to the TDD cycle in 5.

@@ -6,9 +6,10 @@ Before merging, verify:
 
 1. All tests pass (`pytest`).
 2. Code samples in `docs/` match the implementation.
-3. ADR statuses are updated in the worktree's copy of `km/adr/index.md` (e.g., `spec` to `implemented` or `documented`).
+3. ADR statuses are updated in the worktree's copy of `km/adr/index.md` (e.g., `spec` to `implemented` or `documented`). For multi-wave inner-GSD features, the umbrella ADR moves once when all phases land — not per phase.
 4. `CHANGELOG.md` updated: add entries under `[Unreleased]` for user-visible changes. Write for users, not developers.
 5. No unrelated changes crept in (`git diff main...HEAD`).
+6. **Inner-GSD only:** confirm `.planning/` is gitignored on this branch (it inherits main's `.gitignore` rule). Phase artifacts stay worktree-local and must not appear in `git diff main...HEAD`. If they do, fix the gitignore inheritance before merging.
 
 ## Optional: visual diff review
 
