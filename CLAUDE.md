@@ -4,11 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-- `km/` -- Internal knowledge management. Rough specs, ideas, and ADRs (`km/adr/`). Working material, not user-facing.
+- `km/` -- Internal knowledge management. Working material, not user-facing.
+  - `km/adr/` -- Architecture Decision Records. `km/adr/index.md` is the canonical work tracker (status per decision).
+  - `km/specs/` -- Per-feature detailed design specs that extend an ADR (e.g., `km/specs/wildfire/` per-agent + UI + SDK desiderata files).
+  - `km/codebase/` -- Architecture, conventions, structure, integrations, testing, concerns. Shared reference for all worktrees. Regenerable but slow-changing.
+  - `km/research/` -- External research artifacts (NATS, ecosystem, packaging). Slow-changing reference.
+  - `km/notes/` -- Brainstorming, scenarios, historical milestone audits, dated investigation notes.
+  - `km/workflow/` -- Step-by-step procedures for the parallel worktree workflow.
 - `docs/` -- Official documentation (Zensical/MkDocs). Source of truth for users. Code samples here drive development (see Workflow below).
 - `docs/cookbook/` -- Practical recipes with embedded code samples. These code samples are the DX contract.
-- `km/adr/index.md` -- ADR tracking index with status per decision.
 - `tests/cookbook/` -- Executable versions of docs/cookbook code samples, wrapped in pytest. Thin wrappers: same code, plus assertions and fixtures (e.g. `AgentMesh.local()`).
+- `.planning/` -- **Gitignored.** Used only inside worktrees by inner GSD machinery (see Workflow below). Empty / nonexistent on main.
 
 ## What OpenAgentMesh Is
 
@@ -59,7 +65,21 @@ Internal specs in `km/` contain deeper rationale and rough design notes:
 
 OAM is a protocol and SDK where the primary value is developer experience. The documentation is the source of truth for users: it teaches them how to use the protocol and SDK through both explanation and code samples. Those code samples are the pivot point of the entire development workflow.
 
-**Work tracker:** `km/adr/index.md` is the canonical work tracker (status: discussion → spec → test → implemented → documented). The `.planning/` directory holds static reference material only (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, codebase map, research). GSD phase commands (`/gsd-progress`, `/gsd-plan-phase`, `/gsd-discuss-phase`, etc.) are not used in this project. Do not suggest them.
+**Work tracker:** `km/adr/index.md` is the canonical work tracker (status: discussion → spec → test → implemented → documented).
+
+### Outer workflow (project level)
+
+ADR-driven. One feature branch per ADR (or related ADR group) per `km/workflow/`. GSD phase commands (`/gsd-progress`, `/gsd-plan-phase`, `/gsd-discuss-phase`, etc.) are NOT used at the project level — do not suggest them for routine ADR work. Main is the thinking space; code changes happen inside worktrees.
+
+### Inner workflow (worktree level, optional)
+
+Within a single worktree, when an ADR is large enough to span multiple coding sessions or distinct waves of work (e.g., the wildfire demo with 5 build waves coupled to admin UI development), GSD phase commands MAY be invoked inside the worktree to structure the implementation. Inner-GSD provides:
+
+- `.planning/PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `phases/` for execution state
+- Phase-by-phase atomic commits, deviation handling, plan-checker, executor
+- Resume artifacts for fresh context windows mid-flight
+
+`.planning/` is gitignored so worktree-local GSD state never reaches main on merge. Inner GSD is bootstrapped per worktree (typically with `/gsd-new-milestone`) using `km/specs/<feature>/` as the design input. The km/specs/ files remain the source of truth on main; PLAN.md per phase is execution scaffolding only.
 
 ### The pipeline
 
