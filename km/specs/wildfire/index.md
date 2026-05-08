@@ -42,6 +42,10 @@ The demo runs two UIs side by side; see [admin-ui-integration.md](admin-ui-integ
 
 - [SDK desiderata](sdk-desiderata.md): API gaps surfaced while shaping the demo. Drives ADR amendments / new ADRs.
 
+## Contracts
+
+- [Frozen contracts](contracts.md): final Pydantic models (DetectionRecord, DispatchOrder/Ack, FleetMemberState, IncidentState, etc.). Source of truth until the demo's contracts.py module exists.
+
 ## Status
 
 Each file carries its own `Status:` line. Pipeline: `discussion` -> `decided` -> `implemented` -> `documented`. A spec at `decided` can be implemented in parallel with others as long as it does not depend on a still-`discussion` desideratum.
