@@ -6,6 +6,7 @@
 - **Depends on:** Phase 1 SDK (AgentMesh, `@mesh.agent`, pub/sub, request/reply, queue groups, KV). For the public-mesh variant: ADR-0038 (NATS auth).
 - **Related:** ADR-0019 (OAM vs MCP differentiation by topology), ADR-0007 (plain Pydantic for structured I/O), ADR-0042 (Watcher pattern), ADR-0048 (mesh-native observability).
 - **Source:** conversation 2026-05-04 (portfolio demo design; converged on multi-fleet wildfire response after rejecting newsroom and document-pipeline alternatives).
+- **Detailed specs:** [`km/specs/wildfire/`](../specs/wildfire/index.md) holds per-agent specs, the dashboard spec, and an `sdk-desiderata.md` collecting API gaps that surfaced while shaping the demo. This ADR remains the umbrella decision (scenario lock, frozen contracts, frozen subject map, scope fences); the specs folder is where each agent's behaviour is iteratively shaped and where SDK requirements that bubble up are tracked toward their own ADRs.
 
 ## Context
 
