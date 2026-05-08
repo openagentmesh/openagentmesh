@@ -59,6 +59,8 @@ Internal specs in `km/` contain deeper rationale and rough design notes:
 
 OAM is a protocol and SDK where the primary value is developer experience. The documentation is the source of truth for users: it teaches them how to use the protocol and SDK through both explanation and code samples. Those code samples are the pivot point of the entire development workflow.
 
+**Work tracker:** `km/adr/index.md` is the canonical work tracker (status: discussion → spec → test → implemented → documented). The `.planning/` directory holds static reference material only (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, codebase map, research). GSD phase commands (`/gsd-progress`, `/gsd-plan-phase`, `/gsd-discuss-phase`, etc.) are not used in this project. Do not suggest them.
+
 ### The pipeline
 
 ```
