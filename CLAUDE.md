@@ -116,9 +116,26 @@ Before creating a worktree, the session must claim the target ADRs in `km/adr/in
 - Branch naming: `feature/<short-name>` (descriptive slug, not ADR numbers).
 - A branch can span multiple related ADRs.
 
-### PR workflow
+### Merge workflow
 
-When implementation is complete (tests pass, docs updated), push the branch and open a draft PR referencing the implemented ADRs. The user reviews and merges on their schedule. After merge, clean up the worktree; the branch name stays in the ADR index as a historical record.
+When implementation is complete (tests pass, docs updated), merge the branch directly into `main` with a non-fast-forward merge:
+
+```bash
+git checkout main
+git merge --no-ff feature/<name>
+git push origin main
+```
+
+`--no-ff` preserves the branch shape in `git log --graph` and keeps individual commits intact (no squash). The atomic commit history you built during the session stays useful in the log.
+
+After merge, clean up the worktree; the branch name stays in the ADR index as a historical record.
+
+**No PRs by default.** This is a solo project with no CI gate and no reviewers — PRs add ceremony without value. Re-introduce them when:
+- CI must gate merges (status checks become meaningful)
+- External contributors arrive
+- A release-cut moment wants a PR-as-changelog anchor
+
+If you do want a quick visual diff review before merging, use `gh browse main...feature/<name>` to read the diff in GitHub's UI without opening a PR.
 
 ### Detailed procedures
 
