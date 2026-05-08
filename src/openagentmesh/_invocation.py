@@ -1,15 +1,17 @@
-"""Invocation primitives: call, stream, subscribe, send."""
+"""Invocation primitives: call, stream, subscribe, send, publish."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
 import nats
+from pydantic import BaseModel
 
 from ._errors import ChunkSequenceError, MeshError, MeshTimeout, from_envelope
 
@@ -17,6 +19,12 @@ if TYPE_CHECKING:
     from ._mesh import AgentMesh
 
 _log = logging.getLogger("openagentmesh")
+
+# NATS subjects: dot-separated alphanumeric segments. No wildcards in publish.
+_VALID_PUBLISH_SUBJECT = re.compile(r"^[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)*$")
+
+X_MESH_REQUEST_ID = "X-Mesh-Request-Id"
+X_MESH_CONTENT_TYPE = "X-Mesh-Content-Type"
 
 
 class InvocationMixin:
@@ -262,3 +270,59 @@ class InvocationMixin:
                 base["X-Mesh-Reply-To"] = reply_to
             headers = self._with_instance_id(base)
             await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")
+
+    async def publish(
+        self: AgentMesh,
+        subject: str,
+        payload: BaseModel | bytes | str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        """Publish a payload to an arbitrary NATS subject (ADR-0058).
+
+        Accepts:
+        - ``BaseModel``: JSON-encoded via ``model_dump_json``.
+        - ``bytes``: published as-is.
+        - ``str``: encoded as UTF-8.
+
+        The SDK auto-stamps OAM headers:
+        - ``X-Mesh-Request-Id`` (uuid4 hex)
+        - ``X-Mesh-Instance-Id`` (this mesh's id, ADR-0059)
+        - ``X-Mesh-Content-Type`` (application/json | application/octet-stream | text/plain)
+
+        User-supplied headers take priority. Wildcard subjects raise ``ValueError``.
+        """
+        assert self._nc is not None, "Not connected. Use 'async with mesh:' first."
+
+        if not subject or not _VALID_PUBLISH_SUBJECT.match(subject):
+            if "*" in subject or ">" in subject:
+                raise ValueError(
+                    f"Subject {subject!r} contains a wildcard. "
+                    "Wildcards are valid only in subscriptions, not publish."
+                )
+            raise ValueError(f"Invalid NATS subject: {subject!r}")
+
+        if isinstance(payload, BaseModel):
+            data = payload.model_dump_json().encode()
+            content_type = "application/json"
+        elif isinstance(payload, bytes):
+            data = payload
+            content_type = "application/octet-stream"
+        elif isinstance(payload, str):
+            data = payload.encode()
+            content_type = "text/plain"
+        else:
+            raise TypeError(
+                f"publish payload must be BaseModel, bytes, or str; got {type(payload).__name__}"
+            )
+
+        request_id = uuid.uuid4().hex
+        merged: dict[str, str] = {
+            X_MESH_REQUEST_ID: request_id,
+            X_MESH_CONTENT_TYPE: content_type,
+        }
+        merged = self._with_instance_id(merged)
+        if headers:
+            merged.update(headers)
+
+        await self._nc.publish(subject, data, headers=merged)

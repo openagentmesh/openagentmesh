@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `mesh.instance_id`: stable per-process identifier (UUID4 hex), auto-stamped as `X-Mesh-Instance-Id` header on every outbound message (ADR-0059). Lets receivers attribute messages to a specific replica when multiple instances of the same agent name are running.
+- `mesh.publish(subject, payload, *, headers=None)`: public method to publish a Pydantic model, bytes, or str to an arbitrary NATS subject (ADR-0058). Auto-stamps OAM headers (`X-Mesh-Request-Id`, `X-Mesh-Instance-Id`, `X-Mesh-Content-Type`); rejects wildcard subjects. Replaces the need to reach into `mesh._nc.publish` for flat domain subjects.
 
 ## [0.2.1] - 2026-04-23
 
