@@ -6,15 +6,30 @@ ADR-0054 is the high-level decision: scenario lock, frozen contracts, frozen sub
 
 ## Agents
 
-- [Fire simulator](fire-sim.md): publishes the thermal grid that drives the cascade.
-- [UAV (high-altitude)](uav.md): wide-area thermal sweep, emits detections.
-- [Drone (low-altitude)](drone.md): close-range survey, queue-grouped fleet.
-- [Medevac (ground)](medevac.md): people recovery, queue-grouped fleet, status feed.
-- [Firefighter unit](firefighter.md): human-in-the-loop CLI, dispatches medevac.
-- [Briefer (LLM)](briefer.md): structured incident briefings from raw events.
-- [Tasker (LLM)](tasker.md): NL to typed `TaskCommand`, request/reply.
-- [Stats ticker](stats-ticker.md): deterministic 10s counters.
-- [Narrator (LLM)](narrator.md): 5-minute paragraph summaries.
+Agents are organized by altitude/zone channel, with action fleets dispatched via queue group and singleton coordinators (briefer, tasker, narrator, ticker) running once per scenario.
+
+**Intelligence + observation:**
+
+- [Fire simulator](fire-sim.md) (`fire-sim`): publishes the thermal grid that drives the cascade.
+- [UAV high-altitude](uav.md) (`high-alt.uav`): wide-area thermal surveillance; writes pending detections to KV.
+- [Drone low-altitude](drone.md) (`low-alt.drone`): KV-driven election; closest free drone surveys each detection.
+
+**Action fleets** (queue-grouped dispatch from operator):
+
+- [Heli low-altitude water-bomber](heli.md) (`low-alt.heli`): aerial fire suppression by water drop.
+- [Ground firefighter unit](ffunit.md) (`ground.ffunit`): on-site fire suppression.
+- [Medevac](medevac.md) (`ground.medevac`): people recovery.
+
+**LLM peers + reporting:**
+
+- [Briefer](briefer.md) (`briefer`): correlates detections + surveys into incident briefings.
+- [Tasker](tasker.md) (`tasker`): translates operator NL into typed `TaskCommand`.
+- [Stats ticker](stats-ticker.md) (`stats-ticker`): aggregate fleet/incident counters every 10s.
+- [Narrator](narrator.md) (`narrator`): 5-minute paragraph summaries.
+
+**Human in the loop:**
+
+- [Firefighter operator CLI](firefighter.md): plain caller process, drives dispatch decisions for action fleets.
 
 ## UIs
 

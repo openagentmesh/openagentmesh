@@ -1,55 +1,55 @@
 # Medevac (ground)
 
 **Status:** discussion
+**Identity:** `ground.medevac` (default 3 instances)
 
 ## Purpose
 
-People recovery. Two distinct surfaces:
-1. Request/reply dispatch endpoint: a firefighter calls `mesh.medevac.dispatch` with a `MedevacDispatch`, the nearest available unit responds with `MedevacAck`.
-2. Status broadcast: each active unit emits state transitions (`en_route`, `on_site`, `extracting`, `returning`, `available`).
+People recovery. Receives dispatch orders from the operator, drives to coords, extracts persons in need, transports to a holding point. Like ffunit and heli, medevac is an action fleet — not an intelligence provider.
 
 ## Triggers
 
-- **Dispatch (request/reply):** `mesh.medevac.dispatch` queue group. One request -> one unit.
-- **Status (publisher):** internal state machine drives emissions.
+- Invocable: `mesh.call("ground.medevac", DispatchOrder)`. Queue-grouped; first available wins.
 
 ## Outputs
 
-- **Dispatch:** returns `MedevacAck` (synchronous reply).
-- **Status:** publishes `MedevacStatus` to `mesh.medevac.{id}.status`. Frequency: on state transition (event-driven), plus optional heartbeat at lower rate.
+- Returns `DispatchAck` synchronously.
+- KV write: own fleet state at `wildfire.fleet.ground.medevac.{instance_id}`.
+- Pubsub: `mesh.action.medevac.{instance_id}.status` with `MedevacStatus`: `dispatched`, `en_route`, `on_site`, `extracting`, `returning`, `available`.
 
 ## State
 
-- Internal: own ID, position, current state, current incident assignment.
-- KV: none in v1. Could write `medevac.{id}.state` to KV for dashboard read.
+- Internal: position, busy/free, current order, capacity (persons currently transported).
+- KV (own): position record matching the standard fleet shape.
 
 ## Lifecycle
 
-- Always-on. 5-10 instances. Each independent process.
+- Always-on. 3 instances default. Independent processes.
 
 ## Reliability
 
-- Dispatch: standard `@mesh.agent` queue group works today (this surface compiles on current SDK).
-- Status: needs a way to publish on a custom subject. Today: only via Publisher pattern (publishes to `mesh.agent.{name}.events`, not `mesh.medevac.{id}.status`) or `mesh._nc.publish` (private). Drives SDK desideratum #2.
+- Standard Responder pattern. Works today.
 
 ## Behaviour notes
 
-- Dispatch decision: nearest-available unit wins. Same problem as drones; naive queue-group selection picks an arbitrary subscriber, which then nak's if not nearest-available.
-- Travel: simulated by `await asyncio.sleep(distance / speed)`.
-- Persons recovered: drawn from `MedevacDispatch.persons_estimated` plus jitter.
+- Travel speed: ground vehicle, slower than heli, faster than ffunit (reasonable medevac driver).
+- Capacity: 4 persons per unit; on full, must return before next dispatch.
+- Extraction time: short (`await asyncio.sleep(extraction_time)`).
+- Reject dispatch (`accepted=False`) if at capacity or unavailable.
 
 ## Open questions
 
-- Is the dispatch surface the agent's invocation subject (auto-mapped from name `medevac.dispatch`) or a custom subject `mesh.medevac.dispatch`? ADR-0054 subject map says the latter, but that requires custom subject mapping. The cleaner option is to lean on the auto-mapped subject and update the ADR's subject map. See SDK desideratum #5.
-- Status emissions: agent or separate publisher? Cleanest if same agent registers a publisher source bound to a custom subject (depends on SDK desiderata #1, #2).
-- How does a medevac unit signal "I am the closest" without a coordinator? Naive: check, then nak. JetStream nak would route the message to another consumer (#4). Alternative: drone-style query/reply where the dispatcher polls candidates first; rejected because it adds a hop.
+- Should medevac dispatch include `persons_estimated` and the unit decline if it cannot fit them all? v1: yes; reject with `reason="capacity"` and let operator dispatch a second unit.
+- Holding point: single base or multiple drop-off locations? Single for v1.
+- Coordination with ffunit: same as ffunit doc — operator owns the cross-fleet decision.
 
-## Subject contracts
+## Subject + KV contracts
 
-Inbound: `MedevacDispatch`. Outbound: `MedevacAck` (sync reply), `MedevacStatus` (broadcast).
+- Inbound: `mesh.call("ground.medevac", DispatchOrder)` -> auto-mapped per ADR-0049.
+- KV (own): `wildfire.fleet.ground.medevac.{instance_id}`.
+- Outbound pubsub: `mesh.action.medevac.{instance_id}.status`.
 
 ## SDK shape needed
 
-- The dispatch endpoint mostly works today (request/reply queue-group via `@mesh.agent`).
-- Custom outbound subject for status (#2 + #5).
-- Possibly JetStream nak for nearest-available (#4).
+- Plain Responder: **compiles on current SDK.**
+- Same profile as heli and ffunit.

@@ -1,51 +1,79 @@
 # Drone (low-altitude)
 
 **Status:** discussion
+**Identity:** `low-alt.drone` (default 5 instances)
 
 ## Purpose
 
-Close-range survey. Reacts to a thermal detection by flying to the location, performing a survey, and emitting a structured `SurveyResult`. The fleet load-balances naturally via NATS queue groups so the same detection is handled by exactly one drone.
+Close-range survey. Watches the KV detection queue, elects the closest free drone for each pending detection via CAS, surveys the area, and writes the survey result. Drones are intelligence providers: they do not suppress fires or extract people.
 
 ## Triggers
 
-- Subscribes: `mesh.detection.thermal` via queue group `drones`. One detection -> one drone.
+- KV-watch source: `wildfire.detection.*`. New `pending` records trigger the election logic.
+- KV-watch source: `wildfire.fleet.low-alt.drone.*`. Peer position changes are observed (used to recompute fitness when peers transition free/busy).
 
 ## Outputs
 
-- Publishes: `SurveyResult` to `mesh.survey.{drone_id}` (broadcast, drone-id-suffixed for routing observability).
+- KV write: detection record CAS-transitions `pending -> assigned:{drone_instance_id} -> surveyed`. Survey payload attached on the `surveyed` write.
+- KV write: own fleet state at `wildfire.fleet.low-alt.drone.{instance_id}` (heartbeat + state changes).
+- Pubsub: `mesh.survey.{instance_id}` (broadcast event with the `SurveyResult` payload). Used by the briefer for fast reactions and by the admin UI for the live event feed. KV write remains the source of truth.
 
 ## State
 
-- Internal: own ID, position, busy/free, last detection assigned.
-- KV: none in v1. Position trail could go to KV for the dashboard.
+- Internal: position, busy/free flag, current assignment.
+- KV (own): `wildfire.fleet.low-alt.drone.{instance_id}` carrying `coords`, `state`, `current_detection_id`, `last_updated`.
 
 ## Lifecycle
 
-- Always-on. 20-50 instances per scenario. Independent processes. Killing one is part of the chaos story.
+- Always-on. 5 instances default. Independent processes. Killing one is a chaos demo.
+
+## Election protocol
+
+When a `pending` detection is observed (either via KV-watch OR upon transitioning free):
+
+1. **Read peers.** `mesh.kv.list("wildfire.fleet.low-alt.drone")` returns all peer position records (#9).
+2. **Filter free peers.** Drop self and any peer whose `state != "free"`.
+3. **Compute fitness.** Distance from each free drone (including self) to the detection coords.
+4. **Bail if not closest.** If any free peer is closer than self, do nothing this round. The closer peer will attempt the CAS.
+5. **Attempt claim.** `try_cas` on the detection record:
+   - Re-read inside the CAS context. If `state != "pending"`, exit without writing.
+   - Otherwise, set `state = "assigned:{my_instance_id}"`. CAS-write.
+   - On success: own the detection.
+   - On failure (someone else CAS'd in the meantime): exit silently.
+6. **Survey.** Set self `state = "busy"`. Fly to coords (simulated `await asyncio.sleep(distance/speed + survey_time)`). Compute `SurveyResult` (persons detected, structures visible, etc.).
+7. **Complete.** CAS the detection: `state = "surveyed"`, attach `survey_result` payload. Publish pubsub event on `mesh.survey.{instance_id}` for visibility. Set self back to `free`.
+8. **Drain backlog.** On `free` transition, scan `wildfire.detection.*` for `state == pending` records and run the election on the closest one.
 
 ## Reliability
 
-- Queue group means a crashed drone after `subscribe` but before `survey` complete leaves NATS to redeliver to a sibling. Whether redelivery happens automatically depends on JetStream consumer settings on the queue group; raw NATS core has no redelivery for unacked queue messages.
-- If we want redelivery on crash, we need JetStream-backed subscription, not core NATS pubsub. This is an SDK design call (desideratum #4).
+- CAS resolves all races deterministically: exactly one drone wins per pending detection.
+- A killed drone mid-survey leaves its assignment hanging. Mitigation: timeout watchdog (briefer or separate cleaner agent observes `assigned:` state with old `last_updated` and reverts to `pending`). v1 may skip this; chaos demo prefers showing the consequence.
+- Missed peer position updates: handled implicitly by re-running the election on every relevant KV change.
 
 ## Behaviour notes
 
-- Selection: nearest-available drone wins. Naive implementation: queue group picks any subscriber, the chosen drone checks distance + availability and either accepts (proceeds with survey) or `nak`s (returns early so the message goes back to the queue). Without JetStream + nak, "let another drone take it" requires re-publishing.
-- Survey time: simulated `await asyncio.sleep(distance / speed + survey_duration)`. No real flight.
-- Survey output: `SurveyResult` with `persons_detected` (random within bounds), `structures_visible`, etc.
+- Speed: configurable km/sec; default such that a typical survey completes in 5-15s.
+- Survey duration: 3-10s simulated work after arrival.
+- `SurveyResult` carries: drone instance ID, detection ID, coords, fire visible, persons detected, structures visible, ts.
+- Drones do not actively pursue distant detections; if a drone is too far for any plausible response time, the position record's `state=free` with bounded sensor range can disqualify it. v1: no such disqualification, the closest drone always wins regardless of distance.
 
 ## Open questions
 
-- Does `nak` and "let another drone take it" need JetStream? If yes, this is the second SDK desideratum: queue groups with redelivery semantics, not just core NATS broadcast load-balancing.
-- Should drones publish their position periodically (`mesh.drone.{id}.position`)? Useful for the dashboard, opens visualization. Add as a publisher capability on the same agent.
-- Per-drone process or pool of drones in one process? ADR-0054 says one process per drone for the topology story; verify scale at 20-50 processes works on a laptop (NATS handles it; OS process count is the concern).
+- Stale-assignment cleanup: who owns the watchdog? Briefer or a dedicated `wildfire.cleaner` agent? Defer; v1 lives without it, document as known limitation.
+- Position update rate: 1Hz heartbeat OR event-driven (state change only)? Both. Heartbeat carries `last_updated`; freshness drives liveness.
+- Should the drone publish a "considering" intent (so multiple drones don't all start the survey computation in parallel)? No: CAS is the single source of truth, computation is cheap.
+- Pubsub event on survey complete: useful for the demo's narrative (fast-moving cascade visible in admin UI), but introduces dual-write semantics. Lean toward keeping it; document KV as authoritative.
 
-## Subject contracts
+## Subject + KV contracts
 
-Inbound: `ThermalDetection`. Outbound: `SurveyResult`.
+- KV-watch (source): `wildfire.detection.*`, `wildfire.fleet.low-alt.drone.*`.
+- KV write (state): `wildfire.detection.{id}` (CAS), `wildfire.fleet.low-alt.drone.{instance_id}` (heartbeat).
+- Pubsub (event): `mesh.survey.{instance_id}` carries `SurveyResult`.
 
 ## SDK shape needed
 
-- Declarative subject subscription with queue group (SDK desiderata #1, #3).
-- Public `mesh.publish(subject, model)` (#2).
-- Possibly: JetStream-backed source with ack/nak semantics (#4) if we want crash redelivery.
+- Declarative KV-watch source on the decorator (#1).
+- `mesh.kv.list(prefix)` for one-shot peer reads (#9).
+- `mesh.kv.try_cas(key)` (or equivalent) so race-loss is data not exception (#9).
+- `mesh.instance_id` (#8) for self-ID and KV record key.
+- `mesh.publish(subject, model)` (#2) for survey event emission.

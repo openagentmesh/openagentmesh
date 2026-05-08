@@ -1,54 +1,72 @@
 # Briefer (LLM peer)
 
 **Status:** discussion
+**Identity:** `briefer` (2 instances in queue group `briefers` for cadence redundancy)
 
 ## Purpose
 
-Turn raw event flow into human-readable, schema-validated incident briefings. The briefer subscribes to detections and surveys, correlates them into incidents (heuristic clustering by coords + time), and on a 30s cadence (or threshold) emits `IncidentBriefing` per active incident.
+Turn raw event flow into human-readable, schema-validated incident briefings. The briefer watches the KV detection namespace + survey pubsub, correlates events into incidents (heuristic clustering by coords + time), and on a 30s cadence (or threshold) emits `IncidentBriefing`.
 
 ## Triggers
 
-- Subscribes: `mesh.detection.thermal` AND `mesh.survey.>`.
-- Internal timer: every 30s, or when an incident's event buffer crosses a threshold.
+- KV-watch source: `wildfire.detection.*` (state transitions + survey results).
+- Pubsub source: `mesh.survey.>` (fast-reaction visibility into surveys; same data as KV but pubsub gives the admin UI feed).
+- Internal timer: every 30s OR when an incident's event buffer crosses threshold.
 
 ## Outputs
 
-- Publishes: `IncidentBriefing` to `mesh.briefing.{incident_id}` (broadcast).
+- Pubsub: `mesh.briefing.{incident_id}` (broadcast `IncidentBriefing`).
+- KV: `wildfire.incident.{incident_id}` (durable incident state, including the latest briefing snapshot).
 
 ## State
 
-- KV bucket: `mesh-context` per ADR-0025 (or a dedicated `wildfire-incidents` bucket). Each incident's events accumulate under `incident.{id}.events`.
+- KV (shared incident store): `wildfire.incident.{incident_id}` carries `IncidentState` (events list, briefings history, current severity, recommended actions).
 - Internal: in-memory cache mirroring KV for fast briefing assembly.
 
 ## Lifecycle
 
-- Always-on. Two instances in a queue group `briefers` so a crash does not interrupt the briefing cadence. Both instances see all events; the queue group is on a "produce briefing" trigger, not on the event subscriptions, to avoid both instances briefing the same incident simultaneously.
+- Always-on. 2 instances in queue group `briefers` for the **periodic-tick** semantics: only one instance produces a briefing per tick.
+- KV-watch on detections runs on both instances independently (both observe everything).
+- The "produce a briefing" trigger is gated by a CAS on `wildfire.incident.{id}.last_briefing_at`. The instance that wins the CAS produces the briefing; the other yields.
 
 ## Reliability
 
-- The LLM call may fail (timeout, rate limit, malformed structured output). On failure: log, retry once with exponential backoff, then publish a degraded `IncidentBriefing` with `summary="Briefing unavailable, see raw events"`. Pydantic validation ensures the published model is always well-formed.
-- KV writes are CAS to handle two-briefer concurrent updates.
+- LLM call may fail (timeout, rate limit, malformed structured output). On failure: log, retry once with exponential backoff, then emit a degraded `IncidentBriefing` with `summary="Briefing unavailable, see KV record"`. Pydantic validation guarantees a well-formed payload.
+- KV writes use CAS for incident state mutations to handle concurrent updates from both briefer instances.
+
+## Correlation logic
+
+- New detection (KV `state == pending`): create or merge into an incident.
+  - Merge if any existing incident has a detection within 500m and 60s.
+  - Otherwise create new incident `inc-{shortuuid}`.
+- New survey (KV `state == surveyed` OR pubsub `mesh.survey.>`): attach to the relevant incident.
+- Incident "open" while it has any active fleet activity (assigned drone, dispatched action fleet) OR pending detections within the cluster window.
+- Incident "resolved" when no fleet is active on it AND fire-sim reports temperature back below threshold for the cluster.
 
 ## Behaviour notes
 
-- Incident correlation: a new detection within 500m and 60s of an existing incident merges into it; otherwise a new incident is created. ID generation: `inc-{shortuuid}`.
-- Briefing trigger: `events.count >= 5` OR `now - last_briefing >= 30s`. Whichever first.
-- LLM prompt: structured fields only (incident metadata, event list as JSON). No free-text from external sources flows into the prompt.
-- Output validation: `IncidentBriefing` Pydantic model. Recommended actions are constrained to the literal list in the contract.
+- Briefing trigger: `events.count >= 5` OR `now - last_briefing >= 30s`.
+- LLM prompt: structured fields only (incident metadata, event list as JSON). No raw text from external sources.
+- Output validation: `IncidentBriefing` Pydantic model. `recommended_actions` constrained to literal list.
+- LLM choice: Sonnet for briefer (richer reasoning).
 
 ## Open questions
 
-- Two-instance briefer with one queue group: how does only-one-fires-per-tick work? Easiest: both instances run a timer, but the briefing publish is request/reply via a third "briefing-coordinator" subject... too much. Alternative: use a JetStream KV lease (CAS on `incident.{id}.last_briefing_at`) so only one instance wins each tick. This is mesh-native and transferable.
-- Should briefings include a confidence / sources score so the dashboard can render them with quality cues? Yes; add `confidence: float = 1.0` to `IncidentBriefing`, defaulting to 1.0.
-- LLM choice: Sonnet for now per ADR-0054. Consider Haiku if the structured output stays simple enough. Decision: Sonnet, log token usage, switch later if cost is a problem.
+- Is the resolution detection logic part of the briefer, or a separate `wildfire.cleaner` agent? Lean: briefer for v1, factor out if it grows.
+- Confidence score on briefings: add `confidence: float = 1.0` to the contract for dashboard rendering cues. Decision: yes.
+- Stale-assignment cleanup (drone died mid-survey, detection stuck `assigned:`): briefer adopts this as a side responsibility v1, with a watchdog scan every tick. Document as known limitation; factor out later.
+- Should the briefer recommend specific instance IDs (`heli.alpha-1`) or just fleet types? Just types. Operator picks; queue-group dispatch handles the actual instance.
 
-## Subject contracts
+## Subject + KV contracts
 
-Inbound: `ThermalDetection`, `SurveyResult`. Outbound: `IncidentBriefing`.
+- KV-watch: `wildfire.detection.*`.
+- Pubsub-sub: `mesh.survey.>`.
+- KV-write: `wildfire.incident.{id}` (CAS).
+- Pubsub-write: `mesh.briefing.{id}`.
 
 ## SDK shape needed
 
-- Two-subject subscription on a single agent: SDK desideratum #1 with multiple sources.
-- KV access (`mesh.kv`): exists today.
-- Custom-subject publish (#2).
-- LLM provider abstraction: out of scope for the SDK; the demo wires its own `claude-api` client.
+- Multi-source declarative subscription on a single agent (#1, multiple sources).
+- Queue group on the periodic-tick logic (#3) — actually mediated by KV CAS on `last_briefing_at`, so the queue group itself is on the source decoration only for catalog visibility, not for tick gating.
+- KV ergonomics for CAS + list (#9).
+- `mesh.publish(subject, model)` for briefing emission (#2).

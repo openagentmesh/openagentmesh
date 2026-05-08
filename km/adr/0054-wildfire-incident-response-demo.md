@@ -30,52 +30,93 @@ LLM agents are **peers on the mesh, not coordinators above it**. Reactive cascad
 
 ### Fleet inventory
 
-| Fleet | Process model | Count (baseline) | Role |
-|---|---|---|---|
-| **High-altitude UAV** | Own process, asyncio tasks | 3-5 UAVs | Wide-area thermal sweep |
-| **Low-altitude drone** | Own process, asyncio tasks | 20-50 drones | Close-range survey, photo |
-| **Medical evacuation (ground)** | Own process, asyncio tasks | 5-10 units | People recovery, triggered by firefighter signal |
-| **Firefighter unit** | Own process + CLI/UI | 3-5 units | Human-controlled tasking and decisions |
-| **Briefer (LLM peer)** | Own process, queue group of 2 | 2 instances | Subscribes to detections + surveys; publishes structured briefings |
-| **Tasker (LLM peer)** | Own process | 1 instance | Translates firefighter NL input into typed task commands |
-| **Stats ticker** | Own process | 1 instance | Deterministic counters every 10s |
-| **Narrator (LLM peer)** | Own process | 1 instance | Human-readable paragraph summary every 5 min |
+> **Amended 2026-05-08** during shaping in `km/specs/wildfire/`. Original inventory had per-fleet flat names and overstated default scale; amendment introduces zone-channel naming (`high-alt`, `low-alt`, `ground`), drop the per-instance UAV multiplicity, add water-bombing helicopter as a low-alt action fleet, and split the original "firefighter unit" into the in-world `ground.ffunit` action fleet plus a separate operator CLI process. Action fleets (heli, ffunit, medevac) are queue-grouped on dispatch. Drones are intelligence-only (survey).
 
-Five fleet types live in five separate Python packages under `demos/wildfire/fleets/`. Each is independently runnable. The polyglot story (Python + TS + Go fleets) is deferred to a Phase 4 follow-up; v1 is Python-only with the architecture proving the protocol-first claim within one language.
+| Fleet | Channel-prefixed name | Process model | Default count | Role |
+|---|---|---|---|---|
+| UAV (high-altitude) | `high-alt.uav` | own process | 1 | Wide-area thermal surveillance; writes pending detections to KV |
+| Drone (low-altitude) | `low-alt.drone` | own process per instance | 5 | Close-range survey via KV-driven election; writes survey results |
+| Heli (water-bombing) | `low-alt.heli` | own process per instance | 1-2 | Water-drop suppression; queue-group dispatch |
+| Firefighter unit (ground) | `ground.ffunit` | own process per instance | 3 | On-site fire suppression; queue-group dispatch |
+| Medevac (ground) | `ground.medevac` | own process per instance | 3 | People recovery; queue-group dispatch |
+| Briefer (LLM) | `briefer` | own process, queue group `briefers` | 2 | Correlates detections + surveys into briefings |
+| Tasker (LLM) | `tasker` | own process | 1 | Translates operator NL into typed `TaskCommand` |
+| Stats ticker | `stats-ticker` | own process | 1 | Aggregate fleet/incident counters every 10s |
+| Narrator (LLM) | `narrator` | own process | 1 | Paragraph summaries every 5 min |
+| Fire simulator | `fire-sim` | own process | 1 | Publishes thermal grid; consumes spawn + suppression events |
 
-### Reactive cascade
+Plus one **firefighter operator CLI** process (not a registered agent; plain `mesh.call` caller).
 
-The end-to-end scenario (canonical recording):
+Total default scale: ~16 fleet processes + scenario UI + admin UI + embedded NATS = workable on any laptop. Scaling up (e.g., 50 drones for production demos) is a CLI flag on the orchestrator.
 
-1. **Fire-sim** publishes thermal map updates to `mesh.environment.thermal` at 1Hz.
-2. **UAV** subscribes to the thermal map (its sensor model). On detection over threshold, publishes `mesh.detection.thermal` with coordinates and confidence.
-3. **Drone fleet** subscribes to `mesh.detection.thermal` via queue group. Nearest-available drone is dispatched (queue group naturally load-balances). Drone publishes `mesh.survey.{drone_id}` with photo metadata + people-detected count.
-4. **Briefer (LLM peer)** subscribes to detection and survey events. Every 30 seconds (or on incident threshold), publishes `mesh.briefing.{incident_id}` with a structured `IncidentBriefing` model.
-5. **Firefighter unit** subscribes to briefings. Human operator (or a deterministic policy agent for autonomous demos) decides next action.
-6. Firefighter publishes `mesh.medevac.dispatch` request when survivors are found in the briefing.
-7. **Medevac fleet** subscribes via queue group; nearest unit dispatches. Publishes `mesh.medevac.{id}.status` updates.
-8. **Tasker (LLM peer)** offers a request/reply endpoint at `mesh.task.translate`. Firefighter UI sends NL strings; tasker responds with a typed `TaskCommand`. The UI then publishes that command to the relevant fleet subject. Tasker never publishes commands itself.
-9. **Stats ticker** publishes `mesh.swarm.stats` every 10s. Narrator publishes `mesh.swarm.narrative` every 5 min.
-10. **Dashboard** (web, separate from mesh) subscribes to `mesh.>` and renders a 2D map, fleet positions, fire spread, briefing feed, narrative feed, stats counters.
+### Reactive cascade (amended)
 
-### Subject map
+The cascade combines pubsub events (fast-moving notifications) with KV state (durable coordination):
 
-Frozen in this ADR. New subjects require an ADR amendment.
+1. **Fire-sim** publishes `ThermalGrid` to `mesh.environment.thermal` at 1Hz.
+2. **UAV** subscribes to the thermal map. On detection over threshold, **creates a KV record** at `wildfire.detection.{id}` with `state=pending`. UAV does NOT pubsub-publish detections; durability is the point.
+3. **All drones** watch `wildfire.detection.*` via KV-watch source. On a new pending detection:
+   - Each free drone reads peer position records from `wildfire.fleet.low-alt.drone.*` and computes "am I the closest free drone?"
+   - The closest free drone attempts a CAS transition `pending -> assigned:{drone_instance_id}`. CAS resolves all races deterministically.
+   - The owning drone surveys the area, then CAS-transitions `assigned -> surveyed` with a `SurveyResult` payload attached. It also publishes `mesh.survey.{instance_id}` for fast-reaction visibility.
+   - If all drones are busy when a detection arrives, the record stays `pending`. Drones drain the backlog as they free up.
+4. **Briefer (LLM)** watches `wildfire.detection.*` and subscribes to `mesh.survey.>`. Correlates events into incidents (cluster by coords + time). On a 30s tick (gated by CAS on the incident's `last_briefing_at`), produces an `IncidentBriefing` and publishes to `mesh.briefing.{incident_id}` + persists in `wildfire.incident.{incident_id}` (KV).
+5. **Firefighter operator CLI** subscribes to `mesh.briefing.>`. Operator decides what to do, types NL into the CLI.
+6. **Tasker (LLM)** receives `mesh.call("tasker", TaskTranslateRequest)`, translates to a typed `TaskCommand` (target: `heli`, `ffunit`, or `medevac`) constrained by available action fleets from `mesh.catalog()`.
+7. **Operator CLI** receives the typed command, optionally confirms with the human, and dispatches via `mesh.call("low-alt.heli", ...)` / `"ground.ffunit"` / `"ground.medevac"`. Each action fleet is a queue-grouped Responder; the first available unit acks with ETA.
+8. **Action fleet** (heli / ffunit / medevac) drives or flies to coords, performs its action (water-drop, suppression, extraction), publishes status events on `mesh.action.{type}.{instance_id}.status`, updates own KV record. Optionally feeds suppression events back to fire-sim, closing the loop.
+9. **Stats ticker** reads KV every 10s and publishes `SwarmStats` to `mesh.swarm.stats`. **Narrator** publishes 5-min `Narrative` summaries to `mesh.swarm.narrative`.
+10. **Scenario UI** (`demos/wildfire/scenario_ui`) renders the world: map, fire spread, fleet positions (from KV), incident markers, briefings, narrative. Provides a map-click write surface for `mesh.fire.spawn` and a chaos-kill button (publishes to a chaos subject). **Admin UI** (ADR-0056) renders the mesh control plane: agent registry, contract viewer, invocation sandbox, event feed. The two UIs together are the demo's full visualization.
+
+### Subject + KV map (amended)
+
+Frozen in this ADR after the amendment. New subjects/keys require an ADR amendment.
+
+**Pubsub subjects:**
 
 | Subject | Direction | Payload |
 |---|---|---|
 | `mesh.environment.thermal` | broadcast | `ThermalGrid` |
-| `mesh.detection.thermal` | broadcast | `ThermalDetection` |
-| `mesh.survey.{drone_id}` | broadcast | `SurveyResult` |
+| `mesh.fire.spawn` | broadcast (from scenario UI) | `FireSpawn { coords, magnitude }` |
+| `mesh.fire.suppress` | broadcast (from action fleets, optional) | `FireSuppress { coords, intensity }` |
+| `mesh.survey.{drone_instance_id}` | broadcast | `SurveyResult` |
 | `mesh.briefing.{incident_id}` | broadcast | `IncidentBriefing` |
-| `mesh.medevac.dispatch` | request/reply via queue group | `MedevacDispatch` → `MedevacAck` |
-| `mesh.medevac.{id}.status` | broadcast | `MedevacStatus` |
-| `mesh.fire.{unit_id}.intent` | broadcast | `FirefighterIntent` |
-| `mesh.task.translate` | request/reply | `TaskTranslateRequest` → `TaskCommand` |
+| `mesh.action.heli.{instance_id}.status` | broadcast | `HeliStatus` |
+| `mesh.action.ffunit.{instance_id}.status` | broadcast | `FFUnitStatus` |
+| `mesh.action.medevac.{instance_id}.status` | broadcast | `MedevacStatus` |
+| `mesh.fire.{operator_id}.intent` | broadcast | `FirefighterIntent` |
 | `mesh.swarm.stats` | broadcast | `SwarmStats` |
 | `mesh.swarm.narrative` | broadcast | `Narrative` |
+| `mesh.chaos.kill.{instance_id}` | broadcast (from scenario UI) | empty payload, instance self-terminates |
+
+**Auto-mapped invocation subjects** (per ADR-0049, derived from agent name):
+
+| Agent | Invocation subject (auto) | Payload |
+|---|---|---|
+| `low-alt.heli` (queue group) | `mesh.agent.low-alt.heli` | `DispatchOrder` -> `DispatchAck` |
+| `ground.ffunit` (queue group) | `mesh.agent.ground.ffunit` | `DispatchOrder` -> `DispatchAck` |
+| `ground.medevac` (queue group) | `mesh.agent.ground.medevac` | `DispatchOrder` -> `DispatchAck` |
+| `tasker` | `mesh.agent.tasker` | `TaskTranslateRequest` -> `TaskCommand` |
+
+**KV namespace** (in `mesh-context` bucket per ADR-0025):
+
+| Key pattern | Owner | Payload |
+|---|---|---|
+| `wildfire.detection.{id}` | UAV creates; drones CAS-update; briefer reads | `DetectionRecord` (state, coords, severity, ts, detector_id, optional survey_result) |
+| `wildfire.fleet.{zone}.{type}.{instance_id}` | each fleet member writes own | `FleetMemberState` (coords, state, last_updated) |
+| `wildfire.incident.{id}` | briefer (CAS) | `IncidentState` (events list, briefings history, current severity, recommended_actions, last_briefing_at) |
 
 ### Frozen contracts
+
+> **Amendment note.** The contracts below are pre-amendment. Several have evolved during shaping in `km/specs/wildfire/`:
+> - `ThermalDetection` becomes a richer `DetectionRecord` with a `state` field (KV-stored); see `uav.md`, `drone.md`.
+> - `MedevacDispatch` / `MedevacAck` generalize to `DispatchOrder` / `DispatchAck` shared across heli, ffunit, medevac.
+> - `MedevacStatus` joins peers `HeliStatus` and `FFUnitStatus` with the same shape, parametric on action type.
+> - `TaskCommand.target_fleet` now `Literal["heli", "ffunit", "medevac"]` (action fleets only).
+> - `SwarmStats` gains `helis_active`, `ffunits_active`; renames `medevac_active` -> `medevacs_active`.
+> - New contracts: `FireSpawn`, `FireSuppress`, `FleetMemberState`, `IncidentState`, `DetectionRecord`.
+>
+> Final contracts will be written into `demos/wildfire/contracts.py` during implementation. The list below is preserved for historical reference; the per-agent specs are the working source of truth for v1.
 
 ```python
 from pydantic import BaseModel, Field

@@ -1,58 +1,65 @@
-# Firefighter unit
+# Firefighter operator (CLI)
 
 **Status:** discussion
+**Identity:** plain caller process; not a registered agent.
 
 ## Purpose
 
-Human-in-the-loop tasking. A firefighter operator types natural language commands; the unit translates them via the Tasker LLM, then issues mesh calls (medevac dispatch, drone surveys) based on the resulting typed `TaskCommand`. The unit also subscribes to briefings to keep situational awareness.
+Human-in-the-loop dispatcher. Single operator drives all action-fleet decisions: when to send heli, ffunit, medevac, and where. The operator is a thin CLI that reads briefings, accepts NL commands, calls the Tasker for typed translation, and dispatches via standard `mesh.call` to action fleets.
+
+This is intentionally narrow for v1. Multi-operator, per-instance targeting, and cross-fleet coordination policies are deferred (see `admin-ui-integration.md` and `sdk-desiderata.md`).
 
 ## Triggers
 
-- **CLI input:** stdin loop, no mesh trigger.
-- **Subscribes:** `mesh.briefing.{incident_id}` (subscribe with wildcard `mesh.briefing.>` to follow all incidents in v1).
+- Stdin: human types commands.
+- Subscribes (background): `mesh.briefing.>` (briefing feed prints to a side panel).
 
 ## Outputs
 
-- **Calls:** `mesh.call("tasker", TaskTranslateRequest(...))` then `mesh.call("medevac.dispatch", ...)` etc. depending on `TaskCommand.target_fleet`.
-- **Publishes:** `FirefighterIntent` to `mesh.fire.{unit_id}.intent` (raw NL, audit log).
+- Calls: `mesh.call("tasker", ...)` for NL translation, then `mesh.call("low-alt.heli", ...)` / `"ground.ffunit"` / `"ground.medevac"` based on the typed `TaskCommand`.
+- Pubsub: `mesh.fire.{operator_id}.intent` carries raw NL text for audit.
 
 ## State
 
-- Internal: unit ID, current incident under attention, briefing log buffer for the operator.
+- Internal: operator ID (uuid generated at startup), current briefings buffer for display.
 - KV: none in v1.
 
 ## Lifecycle
 
-- Always-on while the human operator is at the terminal. Multiple firefighter units can run in parallel.
+- One process per scenario. Killing it stops dispatch but the cascade continues (existing missions complete).
 
 ## Reliability
 
-- This is the human-facing surface. If `mesh.call("tasker")` fails, the CLI prints the error and asks again. No retry loops.
+- This is a thin caller. Errors print to stderr; operator retries.
+- No retries on failed dispatches; operator decides what to do next.
 
 ## Behaviour notes
 
-- The CLI is a simple `prompt_toolkit` or plain `input()` loop. Stretch goal: TUI with a pane for live briefings.
+- CLI loop: plain `input()` for v1; consider `prompt_toolkit` if a TUI grows.
 - Translation flow:
   1. Read NL from stdin.
-  2. Publish `FirefighterIntent` (audit).
-  3. `cmd = await mesh.call("tasker", TaskTranslateRequest(unit_id=UNIT, text=text))`.
-  4. Show the resolved `TaskCommand` to the operator with a y/n confirmation (or auto-accept above a confidence threshold).
-  5. Issue `mesh.call(target, ...)` based on `cmd.target_fleet`.
-  6. Print the result (medevac ack ETA, etc.).
-
-- Briefing sub runs in a background task that prints to a side pane / scrolling log.
+  2. Publish `FirefighterIntent` audit record.
+  3. `cmd = await mesh.call("tasker", TaskTranslateRequest(operator_id=ID, text=text))`.
+  4. Show resolved `TaskCommand` to operator with y/n confirmation (CLI flag `--auto-accept` for unattended demo recording).
+  5. Issue `mesh.call(target_agent, ...)` based on `cmd.target_fleet`. Target maps:
+     - `cmd.target_fleet == "heli"` -> `mesh.call("low-alt.heli", DispatchOrder)`
+     - `cmd.target_fleet == "ffunit"` -> `mesh.call("ground.ffunit", DispatchOrder)`
+     - `cmd.target_fleet == "medevac"` -> `mesh.call("ground.medevac", DispatchOrder)`
+  6. Print the dispatch ack: `accepted`, `instance_id`, `eta_seconds`, optional `reason` if rejected.
+- Briefing feed runs in a background task printing to a scrolling region. v1: simple stdout interleave with input prompt.
 
 ## Open questions
 
-- Does the firefighter need its own typed agent surface (so other components can `mesh.call("firefighter.unit-3", ...)`)? Probably no for v1 - the unit is a sink, not a service.
-- Should the operator confirmation be skippable for unattended demo recordings? Yes; CLI flag `--auto-accept` for video capture.
-- How does the firefighter pick a target (which medevac dispatch, which drone) when the LLM returns a generic `target_fleet`? It calls the fleet's logical name (`medevac.dispatch`) and lets the queue group pick a unit. The firefighter does not address individual fleet members.
+- TUI vs plain CLI: plain CLI is enough for v1; revisit if scenario UI/CLI ergonomics need attention.
+- Auto-accept policy: confidence threshold from Tasker output, or operator flag? v1: flag only.
+- Should the operator's intent record cause the fleet to also see the original NL (for audit context)? No: fleets see typed `TaskCommand` only. Audit record is for the dashboard / forensics.
 
-## Subject contracts
+## Subject + KV contracts
 
-Inbound subscription: `IncidentBriefing` on `mesh.briefing.>`. Outbound: `FirefighterIntent`. Calls: `tasker`, `medevac.dispatch`, etc.
+- Inbound subscription: `mesh.briefing.>` (consumes `IncidentBriefing`).
+- Outbound pubsub: `mesh.fire.{operator_id}.intent` carries `FirefighterIntent`.
+- Calls: `tasker`, `low-alt.heli`, `ground.ffunit`, `ground.medevac`.
 
 ## SDK shape needed
 
-- For the briefing subscription, today's `mesh.subscribe(subject="mesh.briefing.>")` works. The CLI is a plain caller, not a registered agent, so it does not need decorator changes.
-- For the `FirefighterIntent` publish, public `mesh.publish(subject, model)` (#2).
+- Plain caller, no decorator usage. **Works on current SDK** modulo `mesh.publish(subject, model)` (#2) for the audit pubsub.
