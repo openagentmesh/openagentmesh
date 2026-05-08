@@ -61,7 +61,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0051](0051-notebook-ergonomics-for-local-embedded-nats.md) | Notebook ergonomics for `AgentMesh.local()`: sync entry, atexit, idempotent reuse | discussion | |
 | [ADR-0052](0052-generic-agent-sources.md) | Generic agent sources (decorator extension; subsumes ADR-0042 watcher narrowness) | spec | |
 | [ADR-0053](0053-chat-integration-framework-and-discord-bridge.md) | Chat integration framework + DiscordBridge as first impl | spec | |
-| [ADR-0054](0054-wildfire-incident-response-demo.md) | Wildfire incident response demo (multi-fleet portfolio project) | spec | |
+| [ADR-0054](0054-wildfire-incident-response-demo.md) | Wildfire incident response demo (multi-fleet portfolio project) | spec | feature/wildfire-demo |
 | [ADR-0055](0055-agent-lifecycle-gates.md) | Agent lifecycle gates (`active_when`): declarative on/off based on watch conditions | spec | |
 | [ADR-0056](0056-admin-ui.md) | OAM Admin UI: agent registry browser, invocation sandbox, event feed | spec | |
 | [ADR-0057](0057-error-taxonomy-and-module.md) | Error taxonomy and dedicated `_errors` module (adds `InvalidInput`, `HandlerError`, `NotFound`, `ConnectionFailed`) | documented | feature/error-taxonomy |
