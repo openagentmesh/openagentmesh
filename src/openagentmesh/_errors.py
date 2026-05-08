@@ -111,6 +111,19 @@ class ConnectionFailed(MeshError):
     code: ClassVar[str] = "connection_failed"
 
 
+class KVKeyExists(MeshError):
+    """A KV ``create()`` call collided with an existing key (ADR-0060)."""
+
+    code: ClassVar[str] = "kv_key_exists"
+
+    def __init__(self, *, key: str = "", message: str = ""):
+        super().__init__(
+            message=message or f"KV key already exists: {key!r}",
+            details={"key": key},
+        )
+        self.key = key
+
+
 class MeshTimeout(MeshError):
     """No reply within the deadline (ADR-0034)."""
 
@@ -156,6 +169,7 @@ _CODE_TO_CLASS: dict[str, type[MeshError]] = {
         InvocationMismatch,
         NotFound,
         ConnectionFailed,
+        KVKeyExists,
         MeshTimeout,
         ChunkSequenceError,
     )
