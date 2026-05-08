@@ -164,6 +164,32 @@ await mesh.send("summarizer", payload)
 await mesh.send("summarizer", payload, reply_to="mesh.results.abc")
 ```
 
+### `await mesh.publish(subject, payload, *, headers=None)`
+
+Publish a payload to an arbitrary NATS subject without addressing a specific agent. Use for broadcasting events to a flat domain subject (sensors, tickers, scenario commands, status feeds) rather than to an agent's auto-mapped invocation subject.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `subject` | `str` | required | NATS subject (no wildcards) |
+| `payload` | `BaseModel \| bytes \| str` | required | Payload to publish |
+| `headers` | `dict[str, str] \| None` | `None` | Optional user headers (override SDK defaults) |
+
+The SDK auto-stamps three headers: `X-Mesh-Request-Id` (uuid hex), `X-Mesh-Instance-Id` (this mesh's id, ADR-0059), and `X-Mesh-Content-Type` (`application/json` for `BaseModel`, `application/octet-stream` for `bytes`, `text/plain` for `str`). User-supplied headers take priority.
+
+Wildcards (`*`, `>`) raise `ValueError`. Subscribe-side wildcards are still supported via `mesh.subscribe(subject=...)`.
+
+```python
+class Reading(BaseModel):
+    sensor_id: str
+    value: float
+
+await mesh.publish("sensor.temperature", Reading(sensor_id="s1", value=42.0))
+await mesh.publish("logs.audit", "user-x logged in")
+await mesh.publish("binary.frames", b"\x00\x01\x02...")
+```
+
+See [ADR-0058](https://github.com/lucasorgiacomo/openagentmesh/blob/main/km/adr/0058-public-mesh-publish.md).
+
 ## Subscription
 
 ### `async for msg in mesh.subscribe(*, agent, channel, subject, timeout)`
