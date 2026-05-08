@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `create(key, value)` is put-if-absent; raises `KVKeyExists` if the key collides.
   - Pydantic helpers (`put_model`, `get_model`, `cas_model`, `try_cas_model`, `list_models`) cut JSON round-trip boilerplate.
   - New `KVEntry` public dataclass and `KVKeyExists` error joining the ADR-0057 taxonomy.
+- Agent sources (ADR-0052): `@mesh.agent(spec, sources=[...])` binds an agent to declarative trigger surfaces. `mesh.subject_source(subject, *, queue_group=None)` and `mesh.kv_source(pattern, *, queue_group=None, on_init="replay"|"skip")` create source objects. The handler's first-parameter type hint drives input dispatch: `bytes`, a Pydantic model, `KVEntry[T]` (full KV envelope), or `MeshMessage[T]` (full NATS envelope). Source-driven agents with envelope inputs are non-invocable; sources are runtime wiring not part of the catalog. Replaces (and supersedes the narrow form of) the ADR-0042 watcher pattern.
 
 ## [0.2.1] - 2026-04-23
 

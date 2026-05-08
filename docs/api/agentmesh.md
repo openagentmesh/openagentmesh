@@ -104,6 +104,41 @@ async def summarize(req: SummarizeInput) -> SummarizeOutput:
 
 Capabilities are inferred from the handler shape at decoration time. `AgentSpec` carries only human-authored metadata; `invocable` and `streaming` are never declared manually.
 
+### `@mesh.agent(spec, *, sources=[...])`
+
+Bind an agent to one or more declarative trigger surfaces (ADR-0052). Sources are runtime wiring; they do not appear in the catalog. The handler's first-parameter type hint determines what the source dispatches:
+
+| Annotation | Receives |
+|---|---|
+| `bytes` | Raw payload bytes |
+| `Model` (Pydantic) | Validated `Model` instance |
+| `KVEntry[Model]` | Full KV entry (key, value, revision, operation) with `value` validated to `Model`. Use `KVEntry[bytes]` to skip validation. |
+| `MeshMessage[Model]` | Full NATS envelope (subject, headers, payload) with `payload` validated to `Model`. |
+
+When the handler takes `KVEntry` or `MeshMessage`, the agent is **not invocable** via `mesh.call` (the runtime cannot synthesize an envelope from a wire payload). Use plain Pydantic input or no input for invocable shapes.
+
+```python
+from openagentmesh import AgentMesh, AgentSpec, KVEntry
+
+mesh = AgentMesh()
+
+@mesh.agent(
+    AgentSpec(name="watcher", description="reacts to detection records"),
+    sources=[mesh.kv_source("wildfire.detection.*")],
+)
+async def react(entry: KVEntry[DetectionRecord]) -> None:
+    if entry.operation == "PUT" and entry.value.state == "pending":
+        ...
+```
+
+#### `mesh.subject_source(subject, *, queue_group=None)`
+
+NATS subject source. Wildcards (`*`, `>`) are supported. `queue_group` enables at-most-one-of-N delivery across replicas.
+
+#### `mesh.kv_source(pattern, *, queue_group=None, on_init="replay")`
+
+KV-watch source on the `mesh-context` bucket. `on_init="replay"` (default) fires the handler for every existing entry under the pattern at agent startup, then continues with live updates. `on_init="skip"` waits for the initial snapshot to drain and then triggers only on subsequent changes. `queue_group` is reserved for JetStream-backed consumers (raises `NotImplementedError` in v1).
+
 | Handler shape | `invocable` | `streaming` | Consumer API |
 |---------------|-------------|-------------|--------------|
 | `async def f(req) -> Out: return ...` | `True` | `False` | `mesh.call()` |
