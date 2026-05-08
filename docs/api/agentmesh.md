@@ -309,6 +309,44 @@ Watch a key for changes. Yields the new value on each update.
 
 Delete a key.
 
+### `await mesh.kv.list(prefix)`
+
+One-shot snapshot of all entries under a prefix or wildcard pattern (ADR-0060). NATS subject wildcards (`*`, `>`) are accepted. Returns `list[KVEntry[bytes]]` with `key`, `value`, `revision`, and `operation`.
+
+```python
+entries = await mesh.kv.list("wildfire.detection.*")
+for e in entries:
+    print(e.key, e.revision, len(e.value))
+```
+
+### `async with mesh.kv.try_cas(key) as entry`
+
+Non-raising compare-and-swap (ADR-0060). On conflict, `entry.committed` is `False` and no exception is raised. Use for election semantics where losing the race is data, not error.
+
+```python
+async with mesh.kv.try_cas("election.key") as entry:
+    if entry.value == "pending":
+        entry.value = f"assigned:{mesh.instance_id}"
+
+if entry.committed:
+    # I won the race
+    ...
+```
+
+### `await mesh.kv.create(key, value)`
+
+Put-if-absent (ADR-0060). Returns the new revision number on success. Raises `KVKeyExists` if the key already exists. Accepts `BaseModel`, `bytes`, or `str`.
+
+### Pydantic helpers
+
+`mesh.kv.put_model(key, model)`, `mesh.kv.get_model(key, Model)`, `mesh.kv.cas_model(key, Model)`, `mesh.kv.try_cas_model(key, Model)`, `mesh.kv.list_models(prefix, Model)`. Same semantics as the bytes-shaped methods, with serialization to/from `model.model_dump_json()` handled internally.
+
+```python
+async with mesh.kv.try_cas_model("wildfire.detection.d1", DetectionRecord) as entry:
+    if entry.value.state == "pending":
+        entry.value.state = f"assigned:{mesh.instance_id}"
+```
+
 ## Workspace (Object Store)
 
 Shared binary artifact storage backed by the NATS JetStream Object Store (`mesh-artifacts` bucket). Use for files, images, embeddings, or any binary payload too large for the KV store.
