@@ -33,6 +33,22 @@ async with AgentMesh.local() as mesh:
     # NATS stops when context exits
 ```
 
+### `mesh.instance_id`
+
+A read-only attribute holding a stable per-process identifier (UUID4 hex). Each `AgentMesh()` instance generates its own at construction; it does not change for the lifetime of the instance.
+
+```python
+mesh = AgentMesh()
+print(mesh.instance_id)
+# => "e7b3a91d4f8c2d6a8b5e9c1f0d3a7b2e"
+```
+
+The SDK auto-stamps `X-Mesh-Instance-Id: {mesh.instance_id}` on every outbound NATS message (call, send, stream, agent replies, publisher emissions). Receivers can read the header to attribute messages to a specific replica when multiple instances of the same agent name are deployed.
+
+User-supplied headers (where the API accepts them) take priority: the SDK only sets a default when the header is not already present.
+
+See [ADR-0059](https://github.com/lucasorgiacomo/openagentmesh/blob/main/km/adr/0059-mesh-instance-id.md) for design rationale.
+
 ## Lifecycle
 
 Two lifecycle models, one for each [participation pattern](../concepts/participation.md).

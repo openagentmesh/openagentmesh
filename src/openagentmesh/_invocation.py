@@ -33,7 +33,7 @@ class InvocationMixin:
 
         response = await self._nc.request(
             subject, data, timeout=timeout,
-            headers={"X-Mesh-Request-Id": request_id},
+            headers=self._with_instance_id({"X-Mesh-Request-Id": request_id}),
         )
 
         status = ""
@@ -104,10 +104,10 @@ class InvocationMixin:
 
         try:
             data = self._serialize_payload(payload)
-            headers = {
+            headers = self._with_instance_id({
                 "X-Mesh-Request-Id": request_id,
                 "X-Mesh-Stream": "true",
-            }
+            })
             await self._nc.publish(subject, data, headers=headers)
 
             deadline = asyncio.get_event_loop().time() + timeout
@@ -254,10 +254,11 @@ class InvocationMixin:
 
             asyncio.create_task(_callback_task())
 
-            headers: dict[str, str] = {"X-Mesh-Request-Id": request_id}
+            headers = self._with_instance_id({"X-Mesh-Request-Id": request_id})
             await self._nc.publish(subject, data, headers=headers, reply=reply_subject)
         else:
-            headers = {"X-Mesh-Request-Id": request_id}
+            base: dict[str, str] = {"X-Mesh-Request-Id": request_id}
             if reply_to:
-                headers["X-Mesh-Reply-To"] = reply_to
+                base["X-Mesh-Reply-To"] = reply_to
+            headers = self._with_instance_id(base)
             await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")

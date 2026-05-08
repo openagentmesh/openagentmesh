@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -48,6 +49,8 @@ _CONTEXT_BUCKET = "mesh-context"
 _ARTIFACTS_BUCKET = "mesh-artifacts"
 _CATALOG_KEY = "catalog"
 
+X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
+
 
 class AgentMesh(InvocationMixin, DiscoveryMixin):
     """Client and host for OpenAgentMesh agents.
@@ -70,6 +73,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     def __init__(self, url: str = "nats://localhost:4222"):
         self._url = url
+        self.instance_id: str = uuid.uuid4().hex
         self._nc: NatsClient | None = None
         self._js: JetStreamContext | None = None
         self._catalog_kv: KeyValue | None = None
@@ -99,6 +103,15 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         status = "connected" if self._nc is not None else "disconnected"
         mode = "local" if self._embedded is not None else "remote"
         return f"<AgentMesh url={self._url} mode={mode} status={status} agents={len(self._agents)}>"
+
+    def _with_instance_id(self, headers: dict[str, str] | None = None) -> dict[str, str]:
+        """Return headers with ``X-Mesh-Instance-Id`` defaulted to this mesh's id.
+
+        User-supplied values for the header are preserved (caller wins).
+        """
+        result = dict(headers) if headers else {}
+        result.setdefault(X_MESH_INSTANCE_ID, self.instance_id)
+        return result
 
     # --- Async context manager ---
 
@@ -483,22 +496,28 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     await self._nc.publish(
                         stream_subject,
                         error.to_json(),
-                        headers={
+                        headers=self._with_instance_id({
                             "X-Mesh-Stream-End": "true",
                             "X-Mesh-Status": "error",
                             "X-Mesh-Request-Id": request_id,
-                        },
+                        }),
                     )
                 elif msg.reply:
                     await self._nc.publish(
                         msg.reply,
                         error.to_json(),
-                        headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
+                        headers=self._with_instance_id({
+                            "X-Mesh-Status": "error",
+                            "X-Mesh-Request-Id": request_id,
+                        }),
                     )
                 await self._nc.publish(
                     compute_error_subject(name),
                     error.to_json(),
-                    headers={"X-Mesh-Status": "error", "X-Mesh-Request-Id": request_id},
+                    headers=self._with_instance_id({
+                        "X-Mesh-Status": "error",
+                        "X-Mesh-Request-Id": request_id,
+                    }),
                 )
 
         sub = await self._nc.subscribe(subject, queue=queue, cb=handler)
@@ -526,11 +545,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             await self._nc.publish(
                 msg.reply,
                 response_data,
-                headers={
+                headers=self._with_instance_id({
                     "X-Mesh-Status": "ok",
                     "X-Mesh-Source": agent_name,
                     "X-Mesh-Request-Id": request_id,
-                },
+                }),
             )
 
     async def _handle_streaming(
@@ -554,11 +573,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             await self._nc.publish(
                 stream_subject,
                 chunk_data,
-                headers={
+                headers=self._with_instance_id({
                     "X-Mesh-Stream-Seq": str(seq),
                     "X-Mesh-Stream-End": "false",
                     "X-Mesh-Request-Id": request_id,
-                },
+                }),
             )
             await self._nc.flush()
             seq += 1
@@ -566,11 +585,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         await self._nc.publish(
             stream_subject,
             b"",
-            headers={
+            headers=self._with_instance_id({
                 "X-Mesh-Stream-Seq": str(seq),
                 "X-Mesh-Stream-End": "true",
                 "X-Mesh-Request-Id": request_id,
-            },
+            }),
         )
         await self._nc.flush()
 
@@ -603,30 +622,30 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await self._nc.publish(
                     event_subject,
                     data,
-                    headers={
+                    headers=self._with_instance_id({
                         "X-Mesh-Stream-Seq": str(seq),
                         "X-Mesh-Stream-End": "false",
-                    },
+                    }),
                 )
                 seq += 1
 
             await self._nc.publish(
                 event_subject,
                 b"",
-                headers={
+                headers=self._with_instance_id({
                     "X-Mesh-Stream-Seq": str(seq),
                     "X-Mesh-Stream-End": "true",
-                },
+                }),
             )
         except asyncio.CancelledError:
             try:
                 await self._nc.publish(
                     event_subject,
                     b"",
-                    headers={
+                    headers=self._with_instance_id({
                         "X-Mesh-Stream-Seq": str(seq),
                         "X-Mesh-Stream-End": "true",
-                    },
+                    }),
                 )
             except Exception:
                 pass
@@ -637,15 +656,15 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await self._nc.publish(
                     event_subject,
                     error.to_json(),
-                    headers={
+                    headers=self._with_instance_id({
                         "X-Mesh-Stream-End": "true",
                         "X-Mesh-Status": "error",
-                    },
+                    }),
                 )
                 await self._nc.publish(
                     compute_error_subject(name),
                     error.to_json(),
-                    headers={"X-Mesh-Status": "error"},
+                    headers=self._with_instance_id({"X-Mesh-Status": "error"}),
                 )
             except Exception:
                 pass
