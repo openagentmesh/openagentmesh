@@ -51,10 +51,12 @@ Total default scale: ~16 fleet processes + scenario UI + admin UI + embedded NAT
 
 ### Reactive cascade (amended)
 
-The cascade combines pubsub events (fast-moving notifications) with KV state (durable coordination):
+> **Second amendment 2026-05-09** — pure-KV world grid. Steps 1-2 (thermal pubsub + UAV subject_source) are replaced by per-cell KV writes under `wildfire.world.cell.*`. fire-sim and UAV both bind a `kv_source` to that namespace. Scenario UI clicks and action-fleet suppression are peer writers; no `mesh.fire.spawn` / `mesh.fire.suppress` pubsub. See `km/specs/wildfire/fire-sim.md` and `uav.md` for the new data flow.
 
-1. **Fire-sim** publishes `ThermalGrid` to `mesh.environment.thermal` at 1Hz.
-2. **UAV** subscribes to the thermal map. On detection over threshold, **creates a KV record** at `wildfire.detection.{id}` with `state=pending`. UAV does NOT pubsub-publish detections; durability is the point.
+The cascade combines KV state (durable coordination, world + fleet) with pubsub events (fast-moving notifications):
+
+1. **Fire-sim** maintains an in-process 50×50 thermal grid + spread model. Each tick (1 Hz default), it writes `CellState` records to `wildfire.world.cell.<x_idx>.<y_idx>` for cells whose temperature changed materially. Cells decaying to ambient are deleted (sparse-KV invariant). fire-sim also has a `kv_source` on the same namespace and integrates external writes (clicks, action-fleet suppression) into its grid; it filters out self-writes via `last_modified_by == mesh.instance_id`.
+2. **UAV** has a `kv_source` on `wildfire.world.cell.*`. On each cell update whose temperature crosses threshold inside the UAV's sensor footprint, it **creates a KV record** at `wildfire.detection.{id}` with `state=pending` (idempotent via dedup hash). UAV does NOT pubsub-publish detections; durability is the point.
 3. **All drones** watch `wildfire.detection.*` via KV-watch source. On a new pending detection:
    - Each free drone reads peer position records from `wildfire.fleet.low-alt.drone.*` and computes "am I the closest free drone?"
    - The closest free drone attempts a CAS transition `pending -> assigned:{drone_instance_id}`. CAS resolves all races deterministically.
@@ -66,19 +68,18 @@ The cascade combines pubsub events (fast-moving notifications) with KV state (du
 7. **Operator CLI** receives the typed command, optionally confirms with the human, and dispatches via `mesh.call("low-alt.heli", ...)` / `"ground.ffunit"` / `"ground.medevac"`. Each action fleet is a queue-grouped Responder; the first available unit acks with ETA.
 8. **Action fleet** (heli / ffunit / medevac) drives or flies to coords, performs its action (water-drop, suppression, extraction), publishes status events on `mesh.action.{type}.{instance_id}.status`, updates own KV record. Optionally feeds suppression events back to fire-sim, closing the loop.
 9. **Stats ticker** reads KV every 10s and publishes `SwarmStats` to `mesh.swarm.stats`. **Narrator** publishes 5-min `Narrative` summaries to `mesh.swarm.narrative`.
-10. **Scenario UI** (`demos/wildfire/scenario_ui`) renders the world: map, fire spread, fleet positions (from KV), incident markers, briefings, narrative. Provides a map-click write surface for `mesh.fire.spawn` and a chaos-kill button (publishes to a chaos subject). **Admin UI** (ADR-0056) renders the mesh control plane: agent registry, contract viewer, invocation sandbox, event feed. The two UIs together are the demo's full visualization.
+10. **Scenario UI** (`demos/wildfire/dashboard`) renders the world: map, fire spread (from `wildfire.world.cell.*` KV), fleet positions (from `wildfire.fleet.>` KV), incident markers (from `wildfire.detection.*`), briefings, narrative. Provides a map-click write surface that writes `CellState` records directly to KV (small/medium/large temperature; "off" deletes the cell key) and a chaos-kill button (publishes to a chaos subject). **Admin UI** (ADR-0056) renders the mesh control plane: agent registry, contract viewer, invocation sandbox, event feed. The two UIs together are the demo's full visualization.
 
 ### Subject + KV map (amended)
 
 Frozen in this ADR after the amendment. New subjects/keys require an ADR amendment.
 
+> **Second amendment 2026-05-09** — pure-KV world grid pivot. Removed `mesh.environment.thermal`, `mesh.fire.spawn`, `mesh.fire.suppress` from the pubsub map. Added `wildfire.world.cell.*` KV namespace carrying `CellState`. World mutations (clicks, action-fleet suppression, fire-sim spread deltas) all write to the same namespace; LOOP-01 (action-fleet feedback into fire-sim) collapses into the same path.
+
 **Pubsub subjects:**
 
 | Subject | Direction | Payload |
 |---|---|---|
-| `mesh.environment.thermal` | broadcast | `ThermalGrid` |
-| `mesh.fire.spawn` | broadcast (from scenario UI) | `FireSpawn { coords, magnitude }` |
-| `mesh.fire.suppress` | broadcast (from action fleets, optional) | `FireSuppress { coords, intensity }` |
 | `mesh.survey.{drone_instance_id}` | broadcast | `SurveyResult` |
 | `mesh.briefing.{incident_id}` | broadcast | `IncidentBriefing` |
 | `mesh.action.heli.{instance_id}.status` | broadcast | `HeliStatus` |
@@ -98,10 +99,11 @@ Frozen in this ADR after the amendment. New subjects/keys require an ADR amendme
 | `ground.medevac` (queue group) | `mesh.agent.ground.medevac` | `DispatchOrder` -> `DispatchAck` |
 | `tasker` | `mesh.agent.tasker` | `TaskTranslateRequest` -> `TaskCommand` |
 
-**KV namespace** (in `mesh-context` bucket per ADR-0025):
+**KV namespace** (in the `wildfire` JetStream KV bucket — separate from OAM-internal `mesh-context` per ADR-0025):
 
 | Key pattern | Owner | Payload |
 |---|---|---|
+| `wildfire.world.cell.<x_idx>.<y_idx>` | fire-sim spread tick + dashboard click + action-fleet suppression (peer writers) | `CellState` (coords, temperature, last_modified_at, last_modified_by). Sparse — ambient cells have no key. |
 | `wildfire.detection.{id}` | UAV creates; drones CAS-update; briefer reads | `DetectionRecord` (state, coords, severity, ts, detector_id, optional survey_result) |
 | `wildfire.fleet.{zone}.{type}.{instance_id}` | each fleet member writes own | `FleetMemberState` (coords, state, last_updated) |
 | `wildfire.incident.{id}` | briefer (CAS) | `IncidentState` (events list, briefings history, current severity, recommended_actions, last_briefing_at) |
@@ -114,9 +116,10 @@ Frozen in this ADR after the amendment. New subjects/keys require an ADR amendme
 > - `MedevacStatus` joins peers `HeliStatus` and `FFUnitStatus` with the same shape, parametric on action type.
 > - `TaskCommand.target_fleet` now `Literal["heli", "ffunit", "medevac"]` (action fleets only).
 > - `SwarmStats` gains `helis_active`, `ffunits_active`; renames `medevac_active` -> `medevacs_active`.
-> - New contracts: `FireSpawn`, `FireSuppress`, `FleetMemberState`, `IncidentState`, `DetectionRecord`.
+> - New contracts: `FleetMemberState`, `IncidentState`, `DetectionRecord`.
+> - **Second amendment 2026-05-09:** removed `ThermalGrid`, `FireSpawn`, `FireSuppress` (the pubsub-based world-state contracts). Added `CellState` for the per-cell KV records under `wildfire.world.cell.*` per the pure-KV world grid pivot.
 >
-> Final contracts will be written into `demos/wildfire/contracts.py` during implementation. The list below is preserved for historical reference; the per-agent specs are the working source of truth for v1.
+> Final contracts will be written into `demos/wildfire/core/contracts.py` during implementation. The list below is preserved for historical reference; the per-agent specs and `km/specs/wildfire/contracts.md` are the working source of truth for v1.
 
 ```python
 from pydantic import BaseModel, Field
@@ -310,16 +313,12 @@ async def cli_loop():
 
 ### Visualization
 
-A web dashboard (separate from the mesh, runs as a NATS subscriber-only client) renders:
+Two web UIs run side by side (per `km/specs/wildfire/admin-ui-integration.md`):
 
-- 2D map with fire spread, drone trails, UAV sweep paths, medevac routes.
-- Live incident list (from KV, with state transitions).
-- Briefing feed (paragraph briefings as they publish).
-- Narrative feed (5-min LLM summaries).
-- Stats counters (drone count, incidents open/resolved, persons recovered).
-- A "kill an agent" button that publishes a chaos event for live fault-tolerance demos.
+- **Scenario UI** (`demos/wildfire/dashboard/`) renders the world: map with fire spread (from `wildfire.world.cell.*` KV), fleet positions + trails (from `wildfire.fleet.>` KV), incident markers (from `wildfire.detection.*`), briefing + narrative feeds. Map-click writes `CellState` records to KV (small/medium/large temperature; "off" deletes the key). Stack: **Svelte 5 + Vite + plain HTMLCanvas + FastAPI + WebSocket** (per amended `dashboard.md`).
+- **Admin UI** (ADR-0056, amended) renders the mesh control plane: agent registry, contract viewer, invocation sandbox, event feed. Stack: **React + Vite + Tailwind + nats.ws + tiny static-asset server** — the browser is a first-class mesh client.
 
-Stack: FastAPI + WebSocket + a minimal HTMX or vanilla JS map renderer. No React. Boring on purpose.
+Two narratives, two stacks, both supported by OAM. The recording shows them side by side.
 
 ### Hosting and cost
 
