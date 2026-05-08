@@ -51,6 +51,8 @@ _CATALOG_KEY = "catalog"
 
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
 
+_SENTINEL = object()  # marker for "handler takes no positional input"
+
 
 class AgentMesh(InvocationMixin, DiscoveryMixin):
     """Client and host for OpenAgentMesh agents.
@@ -85,6 +87,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
+        self._agent_sources: dict[str, list[Any]] = {}
         self._subscribed: set[str] = set()
         self._subscriptions: list[Any] = []
         self._embedded: EmbeddedNats | None = None
@@ -93,6 +96,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._catalog_watcher_task: asyncio.Task | None = None
         self._publisher_tasks: dict[str, asyncio.Task] = {}
         self._watcher_tasks: dict[str, asyncio.Task] = {}
+        self._source_subscriptions: list[Any] = []
+        self._source_tasks: list[asyncio.Task] = []
 
     @property
     def url(self) -> str:
@@ -180,9 +185,18 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         )
                         self._publisher_tasks[name] = task
                 else:
-                    if name not in self._watcher_tasks:
+                    # Source-driven or legacy watcher. ADR-0052 sources bind
+                    # below; ADR-0042 watchers (no input, no return, no sources)
+                    # run a watch loop in the handler body.
+                    has_sources = bool(self._agent_sources.get(name))
+                    if not has_sources and name not in self._watcher_tasks:
                         task = asyncio.create_task(self._run_watcher(name, info))
                         self._watcher_tasks[name] = task
+
+                # Bind ADR-0052 sources for this agent.
+                for src in self._agent_sources.get(name, []):
+                    await self._bind_source(name, info, src)
+
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
@@ -268,6 +282,24 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             except (asyncio.CancelledError, Exception):
                 pass
         self._publisher_tasks.clear()
+
+        # 3b. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
+        # source-driven NATS subscriptions.
+        for task in self._source_tasks:
+            task.cancel()
+        for task in self._source_tasks:
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._source_tasks.clear()
+
+        for sub in self._source_subscriptions:
+            try:
+                await sub.unsubscribe()
+            except Exception:
+                pass
+        self._source_subscriptions.clear()
 
         # 4. Unsubscribe invocable-agent subscriptions so the broker stops
         # routing requests to this process before we tear down the registry.
@@ -367,7 +399,12 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     # --- Registration ---
 
-    def agent(self, spec: AgentSpec):
+    def agent(
+        self,
+        spec: AgentSpec,
+        *,
+        sources: list[Any] | None = None,
+    ):
         """Decorator to register an async function as a mesh agent.
 
         Usage::
@@ -377,6 +414,15 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             @mesh.agent(spec)
             async def echo(req: EchoInput) -> EchoOutput:
                 return EchoOutput(reply=f"Echo: {req.message}")
+
+        Source-driven agents (ADR-0052)::
+
+            @mesh.agent(
+                AgentSpec(name="watcher", description="reacts to detections"),
+                sources=[mesh.kv_source("wildfire.detection.*")],
+            )
+            async def watcher(entry: KVEntry[DetectionRecord]) -> None:
+                ...
         """
 
         def decorator(func):
@@ -408,9 +454,52 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 contract.output_schema = None
 
             self._agents[spec.name] = (spec, info, contract)
+            if sources:
+                self._agent_sources[spec.name] = list(sources)
             return func
 
         return decorator
+
+    # --- Source factories (ADR-0052) ---
+
+    def subject_source(self, subject: str, *, queue_group: str | None = None):
+        """Create a NATS subject source (ADR-0052).
+
+        Wildcards (``*``, ``>``) are supported. ``queue_group`` enables
+        load-balancing across replicas: at-most-one of N consumers receives
+        each message.
+        """
+        from ._sources import SubjectSource
+        return SubjectSource(subject=subject, queue_group=queue_group)
+
+    def kv_source(
+        self,
+        pattern: str,
+        *,
+        queue_group: str | None = None,
+        on_init: str = "replay",
+    ):
+        """Create a KV-watch source on the ``mesh-context`` bucket (ADR-0052).
+
+        ``pattern`` is a NATS subject wildcard (``*`` or ``>``). ``on_init``
+        controls whether the initial KV snapshot is replayed to the handler:
+
+        - ``"replay"`` (default): every existing entry under the pattern fires
+          the handler at agent startup, then live updates continue.
+        - ``"skip"``: the initial replay is drained silently; only updates
+          observed after the agent starts trigger the handler.
+
+        ``queue_group`` is reserved; v1 raises ``NotImplementedError`` if set.
+        """
+        if queue_group is not None:
+            raise NotImplementedError(
+                "queue_group on kv_source requires JetStream-backed consumers; "
+                "not implemented in v1. Use CAS-based coordination instead."
+            )
+        if on_init not in ("replay", "skip"):
+            raise ValueError(f"on_init must be 'replay' or 'skip'; got {on_init!r}")
+        from ._sources import KVSource
+        return KVSource(pattern=pattern, queue_group=queue_group, on_init=on_init)
 
     # --- Lifecycle ---
 
@@ -668,6 +757,145 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 )
             except Exception:
                 pass
+
+    # --- Source binding (ADR-0052) ---
+
+    async def _bind_source(self, name: str, info: HandlerInfo, source: Any) -> None:
+        """Subscribe an agent's source. Tracks teardown handles."""
+        from ._sources import KVSource, SubjectSource
+
+        if isinstance(source, SubjectSource):
+            await self._bind_subject_source(name, info, source)
+        elif isinstance(source, KVSource):
+            await self._bind_kv_source(name, info, source)
+        else:
+            raise TypeError(
+                f"Unknown source type for agent '{name}': {type(source).__name__}"
+            )
+
+    async def _bind_subject_source(self, name: str, info: HandlerInfo, source: Any) -> None:
+        from ._sources import MeshMessage
+
+        async def cb(msg):
+            try:
+                payload = self._build_source_input(
+                    info,
+                    raw_value=msg.data,
+                    source_kind="subject",
+                    subject=msg.subject,
+                    headers=dict(msg.headers or {}),
+                )
+                await info.func(payload) if payload is not _SENTINEL else await info.func()
+            except Exception as e:
+                _log.warning("Source handler for '%s' raised: %s", name, e)
+
+        sub = await self._nc.subscribe(
+            source.subject,
+            queue=source.queue_group,
+            cb=cb,
+        )
+        self._source_subscriptions.append(sub)
+
+    async def _bind_kv_source(self, name: str, info: HandlerInfo, source: Any) -> None:
+        watcher = await self._context_kv.watch(source.pattern)
+        task = asyncio.create_task(
+            self._drain_kv_source(name, info, source, watcher)
+        )
+        self._source_tasks.append(task)
+
+    async def _drain_kv_source(self, name: str, info: HandlerInfo, source: Any, watcher: Any) -> None:
+        skip_initial = source.on_init == "skip"
+        init_done = False
+        try:
+            async for entry in watcher:
+                if entry is None:
+                    init_done = True
+                    continue
+                if entry.value is None:
+                    continue
+                if skip_initial and not init_done:
+                    continue
+
+                op = (
+                    "DELETE"
+                    if str(getattr(entry, "operation", "PUT")).upper().endswith("DELETE")
+                    else "PUT"
+                )
+                try:
+                    payload = self._build_source_input(
+                        info,
+                        raw_value=entry.value,
+                        source_kind="kv",
+                        kv_key=entry.key,
+                        kv_revision=entry.revision,
+                        kv_operation=op,
+                    )
+                    await info.func(payload) if payload is not _SENTINEL else await info.func()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    _log.warning("KV source handler for '%s' raised on key %r: %s", name, entry.key, e)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            try:
+                await watcher.stop()
+            except Exception:
+                pass
+
+    def _build_source_input(
+        self,
+        info: HandlerInfo,
+        *,
+        raw_value: bytes,
+        source_kind: str,
+        subject: str | None = None,
+        headers: dict[str, str] | None = None,
+        kv_key: str | None = None,
+        kv_revision: int | None = None,
+        kv_operation: str | None = None,
+    ) -> Any:
+        """Build the payload to pass to a source handler based on its type hint."""
+        from ._context import KVEntry
+        from ._sources import MeshMessage
+
+        kind = info.source_param_kind
+        model_cls = info.source_param_model
+
+        def _validate_or_pass(value: bytes, cls: type | None) -> Any:
+            if cls is None or cls is bytes:
+                return value
+            if isinstance(cls, type) and issubclass(cls, BaseModel):
+                return cls.model_validate_json(value)
+            return value
+
+        if kind == "none":
+            return _SENTINEL
+
+        if kind == "bytes":
+            return raw_value
+
+        if kind == "model":
+            return _validate_or_pass(raw_value, model_cls)
+
+        if kind == "kv_entry":
+            value = _validate_or_pass(raw_value, model_cls)
+            return KVEntry(
+                key=kv_key or "",
+                value=value,
+                revision=kv_revision or 0,
+                operation=kv_operation or "PUT",  # type: ignore[arg-type]
+            )
+
+        if kind == "mesh_message":
+            payload = _validate_or_pass(raw_value, model_cls)
+            return MeshMessage(
+                subject=subject or "",
+                headers=headers or {},
+                payload=payload,
+            )
+
+        return _SENTINEL
 
     # --- Capability checks (ADR-0047) ---
 
