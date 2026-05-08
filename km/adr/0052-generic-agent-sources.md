@@ -121,6 +121,105 @@ Sources are NOT part of the catalog projection. The catalog describes what an ag
 
 A future ADR may add a separate observability surface that lists trigger sources per running instance, but it would be deployment-state, not contract.
 
+### KV source concretization (added 2026-05-08)
+
+The wildfire demo (ADR-0054) leans heavily on KV sources. Shaping in `km/specs/wildfire/` surfaced gaps in the original sketch above. This section concretizes them.
+
+#### Factory and shape
+
+```python
+mesh.kv_source(
+    pattern: str,                       # NATS subject wildcard ("wildfire.detection.*", "wildfire.detection.>")
+    *,
+    queue_group: str | None = None,     # at-most-one-of-N replicas (JetStream consumer required if set; v1 may defer)
+    on_init: Literal["replay", "skip"] = "replay",  # whether the initial KV snapshot fires the handler
+) -> Source
+```
+
+`pattern` matches the `KeyValue` watch underlying API (which already accepts NATS subject wildcards — confirmed by probe). `queue_group` is reserved for future JetStream-backed consumer semantics; v1 may raise `NotImplementedError` if set, since the simpler use cases coordinate via CAS, not queue groups (see briefer pattern in `km/specs/wildfire/briefer.md`).
+
+`on_init="replay"` (default) fires the handler for every existing KV entry under the pattern at agent startup, then continues with live updates. This is the natural fit for "drone joins late and picks up backlog" semantics. `on_init="skip"` waits for the initial snapshot to drain, then fires only on subsequent changes.
+
+#### Handler input — type-hint driven (extends ADR-0031)
+
+The KV source determines what the handler receives by inspecting the parameter's type hint:
+
+```python
+# (a) Bytes value only — minimal, matches ADR-0042 watcher legacy form.
+@mesh.agent(spec, sources=[mesh.kv_source("pipeline.*.raw")])
+async def extract(value: bytes) -> None: ...
+
+# (b) Pydantic model — SDK validates value JSON against the model.
+@mesh.agent(spec, sources=[mesh.kv_source("wildfire.detection.*")])
+async def watch_detections(detection: DetectionRecord) -> None: ...
+
+# (c) Full KV entry — for handlers that need key + revision + operation.
+@mesh.agent(spec, sources=[mesh.kv_source("wildfire.detection.*")])
+async def drone(entry: KVEntry[DetectionRecord]) -> None:
+    if entry.operation != "PUT": return
+    detection_id = entry.key.split(".")[-1]
+    if entry.value.state != "pending": return
+    # ... election + try_cas using entry.revision as a stale-data signal
+```
+
+`KVEntry` is a public dataclass:
+
+```python
+class KVEntry(Generic[T]):
+    key: str                                # full KV key, e.g. "wildfire.detection.abc123"
+    value: T                                # validated payload (bytes if no model parameter)
+    revision: int                           # KV revision number (CAS use)
+    operation: Literal["PUT", "DELETE"]
+    is_init_replay: bool                    # True for entries delivered as initial backfill
+    timestamp: float                        # KV-recorded modification time
+```
+
+The handler signature decides shape:
+- `value: bytes` -> get raw bytes (legacy).
+- `value: SomeModel` -> SDK validates JSON against model; handler gets the model instance.
+- `entry: KVEntry` or `entry: KVEntry[SomeModel]` -> handler gets the full entry.
+- Multiple positional parameters are NOT supported; one positional input matching one of the shapes above. Additional dependencies should be accessed via `mesh.kv`, `mesh.publish`, etc. inside the handler body.
+
+#### Source-driven agents and capabilities
+
+A source-only agent (no invocable surface) has `capabilities.invocable=False, capabilities.streaming=False` per ADR-0031. It IS still in the catalog with its `AgentSpec`, just with the inbound-call surface absent. Operationally it is what ADR-0042 called a "Watcher" (now generalized).
+
+Description text matters for these agents: the catalog's `description` field carries the trigger surface meaning, since sources themselves are not catalog-projected. By convention, source-driven agent descriptions name the trigger (e.g., "Reacts to new detection records under `wildfire.detection.*`").
+
+#### Naming the NATS-subject source
+
+The Discord bridge sample uses `discord.channel(...)`, which is a custom Source. For a generic NATS-subject Source (without a custom integration), the SDK exposes:
+
+```python
+mesh.subject_source(
+    subject: str,                        # NATS subject (wildcards allowed)
+    *,
+    queue_group: str | None = None,
+) -> Source
+```
+
+This complements `mesh.kv_source(...)`. Both return `Source` Protocol-compatible objects.
+
+```python
+@mesh.agent(spec, sources=[mesh.subject_source("mesh.environment.thermal")])
+async def fire_sim_consumer(grid: ThermalGrid) -> None: ...
+```
+
+Type-hint driven input applies symmetrically: declare `bytes`, a Pydantic model, or `MeshMessage` (if the handler needs headers + subject + payload).
+
+`MeshMessage` is the symmetric counterpart of `KVEntry` for NATS subjects:
+
+```python
+class MeshMessage(Generic[T]):
+    subject: str                         # the actual subject the message arrived on (e.g. "mesh.action.heli.alpha-1.status")
+    headers: dict[str, str]              # OAM + user headers
+    payload: T                           # validated payload (bytes if no model parameter)
+```
+
+#### Subscribe class deferred
+
+Earlier wildfire drafts referenced `Subscribe(subject)` as a stand-in. With `mesh.subject_source(...)` providing the same surface and being symmetric to `kv_source`, no separate `Subscribe` class is needed. Drop from the public API.
+
 ### Subsumption of ADR-0042
 
 The Watcher pattern (`async def f() -> None: ...` with KV watching inside the body) is now expressible as an agent with one source:

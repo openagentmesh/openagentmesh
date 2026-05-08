@@ -17,7 +17,7 @@ Sequencing is not implied by ID. Ranking and decisions happen during the discuss
 
 **Why now.** Without it, half the fleet types are scripts using the mesh as transport, not registered agents. Catalog has no entry; admin UI registry shows nothing for them.
 
-**Candidate ADR.** ADR-0052 (generic agent sources). Sources cover both NATS subjects and KV patterns. The wildfire build should validate the source Protocol against both kinds.
+**Candidate ADR.** ADR-0052 (generic agent sources). API shape **concretized 2026-05-08** with KV-source factory (`mesh.kv_source`), subject-source factory (`mesh.subject_source`), type-hint-driven handler input (`bytes` | Pydantic model | `KVEntry[T]` | `MeshMessage[T]`), and `on_init` replay control. Ready for implementation.
 
 ## #2. Public `mesh.publish(subject, model)` on arbitrary subjects
 
