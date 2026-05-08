@@ -3,13 +3,15 @@
 **Status:** discussion
 **Identity:** `high-alt.uav` (single instance v1)
 
+> **Amended 2026-05-09** — kv_source on the world-cell namespace replaces the subject_source on `mesh.environment.thermal`. UAV reacts to per-cell updates as they happen, instead of scanning a 2500-cell snapshot 1×/sec. See ADR-0054 amended subject + KV map and `fire-sim.md` for the world-grid pivot.
+
 ## Purpose
 
-Wide-area thermal surveillance. Subscribes to the simulated thermal grid, applies a sensor model, and creates a pending detection record in KV when temperature exceeds a threshold within sensor footprint.
+Wide-area thermal surveillance. Watches the shared world-cell KV namespace, applies a sensor model, and creates a pending detection record in KV when temperature exceeds a threshold within sensor footprint.
 
 ## Triggers
 
-- Subscribes (pubsub): `mesh.environment.thermal` (broadcast). Receives every grid update.
+- KV-watch source: `wildfire.world.cell.*`. Fires once per cell update (whether from fire-sim's spread tick or external mutation). UAV evaluates each updated cell against its sensor model.
 
 ## Outputs
 
@@ -20,7 +22,7 @@ The UAV does NOT publish detection events on a NATS subject. Detections are dura
 ## State
 
 - Internal: own position (static for v1), sensor footprint, temperature threshold, recent-detection dedup window.
-- Position record (KV): `wildfire.fleet.high-alt.uav.{instance_id}` with `coords`, `state=active`, `last_updated`. Updated every 1Hz heartbeat.
+- Position record (KV): `wildfire.fleet.high-alt.uav.{instance_id}` with `coords`, `state=free`, `last_updated`. Updated every 1 Hz heartbeat.
 
 ## Lifecycle
 
@@ -33,10 +35,11 @@ The UAV does NOT publish detection events on a NATS subject. Detections are dura
 
 ## Behaviour notes
 
-- Sensor footprint: circular, radius configurable (e.g. 5km), centered on UAV position.
-- Threshold: `temp > 100C` AND inside footprint AND confidence heuristic `(temp - 100) / 700` clipped to `[0, 1]` AND `confidence > 0.5`.
-- Dedup: hash `(round(coords.x, -2), round(coords.y, -2), floor(now / 30))` to bucket detections by 100m grid + 30s window. Avoids flooding KV when a hot cell persists across many grid ticks.
-- A detection record carries: `state`, `coords`, `severity`, `ts`, `detector_id`. `severity` derived from temperature.
+- Sensor footprint: circular, radius configurable (e.g. 5 km), centered on UAV position.
+- Threshold: `cell.temperature > 100 °C` AND `cell.coords` inside footprint AND confidence heuristic `(temp - 100) / 700` clipped to `[0, 1]` AND `confidence > 0.5`.
+- Dedup: hash `(round(coords.x, -2), round(coords.y, -2), floor(now / 30))` to bucket detections by 100 m grid + 30 s window. Avoids flooding KV when a hot cell persists across many spread ticks.
+- A detection record carries: `state`, `coords`, `severity`, `ts`, `detector_instance_id`. `severity` derived from temperature.
+- Cell-deletion handling: when a `CellState` key is deleted (cell decayed back to ambient or was suppressed), the kv_source callback fires with a delete event. UAV ignores deletes — detection records aren't retracted; the briefer (Phase 3) handles incident-resolution semantics.
 
 ## Open questions
 
@@ -46,13 +49,14 @@ The UAV does NOT publish detection events on a NATS subject. Detections are dura
 
 ## Subject + KV contracts
 
-- Inbound: `mesh.environment.thermal` carries `ThermalGrid`.
-- Outbound (KV): `wildfire.detection.{id}` carries the detection record (Pydantic model TBD; either reuse existing `ThermalDetection` with extra `state` field, or define a `DetectionRecord`).
-- Position (KV): `wildfire.fleet.high-alt.uav.{instance_id}` carries `FleetMemberState` (TBD model: coords, state, last_updated).
+- KV-watch source (inbound): `wildfire.world.cell.*` carries `CellState` (per `km/specs/wildfire/contracts.md`).
+- KV writes (outbound): `wildfire.detection.{id}` carries `DetectionRecord`.
+- Position (KV): `wildfire.fleet.high-alt.uav.{instance_id}` carries `FleetMemberState`.
 
 ## SDK shape needed
 
-- Declarative subject sub on the decorator (#1) for `mesh.environment.thermal`.
-- `mesh.kv.create(key, value)` (#9) for put-if-absent on detection writes.
-- `mesh.instance_id` (#8) to populate `detector_id` and key the position record.
-- Pydantic model helpers on KV (#9) reduce boilerplate.
+- `kv_source(pattern)` (ADR-0052) for the world-cell watch.
+- `mesh.kv.create(key, value)` (ADR-0060) for put-if-absent on detection writes.
+- `mesh.instance_id` (ADR-0059) to populate `detector_instance_id` and key the position record.
+- Pydantic model helpers on KV (ADR-0060) reduce boilerplate.
+- All shipped on main as of 2026-05-08.
