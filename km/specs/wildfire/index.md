@@ -16,9 +16,12 @@ ADR-0054 is the high-level decision: scenario lock, frozen contracts, frozen sub
 - [Stats ticker](stats-ticker.md): deterministic 10s counters.
 - [Narrator (LLM)](narrator.md): 5-minute paragraph summaries.
 
-## UI
+## UIs
 
-- [Dashboard](dashboard.md): map, feeds, counters, chaos controls.
+The demo runs two UIs side by side; see [admin-ui-integration.md](admin-ui-integration.md) for why.
+
+- [Scenario UI](dashboard.md): world view (map, fleet pointers, briefings, narrative) plus map-click fire spawn and chaos-kill. Read-mostly mesh consumer.
+- [Admin UI integration](admin-ui-integration.md): pairing with ADR-0056 (OAM Admin UI). Captures what the demo needs from the admin UI, what the admin UI gets from the demo, and the build cadence.
 
 ## SDK
 
