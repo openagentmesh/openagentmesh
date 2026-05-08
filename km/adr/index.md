@@ -67,4 +67,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0057](0057-error-taxonomy-and-module.md) | Error taxonomy and dedicated `_errors` module (adds `InvalidInput`, `HandlerError`, `NotFound`, `ConnectionFailed`) | documented | feature/error-taxonomy |
 | [ADR-0058](0058-public-mesh-publish.md) | Public `mesh.publish(subject, payload)` for arbitrary-subject emission | documented | feature/mesh-publish |
 | [ADR-0059](0059-mesh-instance-id.md) | `mesh.instance_id` stable per-process identifier + auto-stamped header | documented | feature/instance-id |
-| [ADR-0060](0060-kv-ergonomics-extensions.md) | KV ergonomics: `list`, `try_cas`, `create`, model helpers (amends ADR-0025) | spec | |
+| [ADR-0060](0060-kv-ergonomics-extensions.md) | KV ergonomics: `list`, `try_cas`, `create`, model helpers (amends ADR-0025) | spec | feature/kv-ergonomics |
