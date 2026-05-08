@@ -2,7 +2,9 @@
 
 **Status:** discussion
 
-Final Pydantic models for the wildfire demo. These supersede the pre-amendment contracts in ADR-0054. They will land verbatim in `demos/wildfire/contracts.py` once implementation begins; this file is the working source of truth until then.
+> **Amended 2026-05-09** — pure-KV world grid pivot. Removed `ThermalGrid`, `FireSpawn`, `FireSuppress` (the pubsub-based world-state contracts). Added `CellState` for the per-cell KV records under `wildfire.world.cell.*`. See `fire-sim.md`, `uav.md`, and ADR-0054 amended subject + KV map.
+
+Final Pydantic models for the wildfire demo. These supersede the pre-amendment contracts in ADR-0054. They will land verbatim in `demos/wildfire/core/contracts.py` once implementation begins; this file is the working source of truth until then.
 
 Coordinates are 2D km-scale in a square centered at origin, bounds `[-5, +5]` per axis.
 
@@ -33,28 +35,25 @@ ActionState = Literal[
 FleetMemberState_StateLit = Literal["free", "busy", "offline"]
 ```
 
-## Environment + scenario
+## World state (KV-stored, per-cell)
+
+The thermal grid is sparse `CellState` records under `wildfire.world.cell.<x_idx>.<y_idx>`. Ambient cells are represented by **absence of a key**, not by a key carrying ambient temperature. fire-sim writes spread deltas; the dashboard backend writes click events; action fleets (heli, ffunit) write cooling deltas. All writers populate `last_modified_by` so fire-sim's kv_source can filter its own deltas.
 
 ```python
-class ThermalGrid(BaseModel):
-    """Snapshot of the simulated thermal field."""
-    timestamp: float
-    cells: list[tuple[Coords, float]]  # cell center + temperature in degrees C
+class CellState(BaseModel):
+    """KV value at wildfire.world.cell.<x_idx>.<y_idx>.
 
+    Sparse: ambient cells have no key. Cells decaying to ambient are deleted.
+    """
+    coords: Coords                      # cell center, snapped to the 200m grid
+    temperature: float                  # degrees Celsius, expected range [25, 800]
+    last_modified_at: float
+    last_modified_by: str               # writer's mesh.instance_id (used by fire-sim self-write filter)
+```
 
-class FireSpawn(BaseModel):
-    """User-driven hotspot creation from the scenario UI."""
-    coords: Coords
-    magnitude: float                   # initial temperature, degrees C
+## Scenario inputs
 
-
-class FireSuppress(BaseModel):
-    """Action-fleet feedback closing the loop into fire-sim."""
-    source_instance_id: str
-    coords: Coords
-    intensity: float                   # 0..1, fraction of local fire reduced this tick
-
-
+```python
 class ChaosKill(BaseModel):
     """Scenario UI -> targeted instance: self-terminate."""
     target_instance_id: str
