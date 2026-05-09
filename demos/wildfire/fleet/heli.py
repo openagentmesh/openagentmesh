@@ -1,31 +1,25 @@
-"""low-alt.heli: Responder agent (boot + register + heartbeat only this phase, D-08, SCN-05).
+"""low-alt.heli: warm Responder agent driven by ActionFleetAgent (D-41/D-46, SCN-05).
 
-The heli is an action-fleet Responder whose ``DispatchOrder -> DispatchAck``
-handler exists for catalog correctness (so the admin UI sandbox in Phase 3
-can introspect the contract) but is never called this phase. Phase 2 wires
-the operator -> tasker -> dispatch path; until then the stub returns
-``DispatchAck(accepted=False, reason="phase 1 stub: ...")``.
+Phase 2 promotes the Phase 1 cold stub into a warm Responder. The handler
+delegates entirely to the shared ``ActionFleetAgent`` base class, which
+owns the single-writer task (D-41), the simulation lifecycle (transit ->
+drop -> return), and the per-transition status pubsub on
+``mesh.action.heli.{instance_id}.status`` (D-45).
 
-Phase 1 responsibilities (per D-08, D-11):
+Subclass-specific bits:
 
-- Register catalog entry under name ``low-alt.heli`` so the admin UI
-  registry shows the row.
-- Run the shared 1 Hz heartbeat to ``wildfire.fleet.low-alt.heli.{instance_id}``
-  so the admin UI's reader-side staleness check (D-10) flips the row to
-  "live" within ~3 s.
-- Stay at HQ (D-11). The heli does not move in Phase 1; the dispatch path
-  that would move it is not exercised.
+  - ``zone="low-alt"`` / ``fleet_type="heli"``.
+  - Speed and action duration tuned via ``HELI_SPEED_KM_S`` and
+    ``HELI_ACTION_DURATION_S`` in ``demos/wildfire/core/config.py``.
+  - ``_make_status()`` returns a ``HeliStatus`` with linearly-draining
+    ``water_remaining_pct`` during the "acting" leg (1.0 -> 0.0) and a
+    refill ramp on the "returning" leg back to 1.0 by the time the heli
+    is "free" again.
+  - ``_act()`` logs a loud "dropping water at ..." line for demo narration.
 
-Phase 1 explicitly excludes (per D-08, A-05, A-08):
-
-- No outbound pubsub (no HeliStatus emission this phase).
-- No subject-driven or KV-watch sources.
-- No throwaway test caller.
-
-Multiple instances spawned by the orchestrator (HELI_COUNT, default 1)
-share the queue group ``q.low-alt.heli`` automatically per
-``src/openagentmesh/_mesh.py:_subscribe_agent`` so first-available-wins
-queue semantics are preserved for free when Phase 2 wires the dispatch.
+Multiple instances spawned by the orchestrator share the queue group
+``q.low-alt.heli`` automatically per ``src/openagentmesh/_mesh.py``, so
+first-available-wins is preserved at the dispatch boundary.
 """
 from __future__ import annotations
 
@@ -33,49 +27,79 @@ import asyncio
 import contextlib
 import logging
 import os
+import time
 
-from demos.wildfire.core.config import HQ
-from demos.wildfire.core.contracts import DispatchAck, DispatchOrder
-from demos.wildfire.core.heartbeat import heartbeat_loop
+from pydantic import BaseModel
+
+from demos.wildfire.core.config import (
+    HELI_ACTION_DURATION_S,
+    HELI_SPEED_KM_S,
+    HQ,
+)
+from demos.wildfire.core.contracts import (
+    ActionState,
+    Coords,
+    DispatchOrder,
+    HeliStatus,
+)
+from demos.wildfire.fleet._action import ActionFleetAgent
 from openagentmesh import AgentMesh
-from openagentmesh._models import AgentSpec
 
 _log = logging.getLogger("wildfire.heli")
 
 
 # ---------------------------------------------------------------------------
-# Agent registration
+# Subclass
 # ---------------------------------------------------------------------------
 
 
-def build_agent(mesh: AgentMesh) -> None:
-    """Register the low-alt.heli Responder agent on ``mesh``.
+class HeliAgent(ActionFleetAgent):
+    """Aerial water-bomber. Warm Responder per D-46."""
 
-    Phase 1: the handler is bound to keep the catalog correct (so the
-    admin UI's invocation sandbox in Phase 3 can introspect the
-    DispatchOrder / DispatchAck schemas). It is not invoked this phase
-    (D-08); a Phase 2 caller will replace the stub body.
-    """
-
-    @mesh.agent(
-        AgentSpec(
-            name="low-alt.heli",
-            description=(
-                "Aerial water-bomber. Accepts DispatchOrder, performs water drop, "
-                "returns DispatchAck. (Phase 1: boot+heartbeat only; handler stub.)"
-            ),
-        ),
-    )
-    async def heli(order: DispatchOrder) -> DispatchAck:
-        # Phase 1: never called per D-08. The stub returns a structured
-        # rejection so any rogue caller surfaces loud rather than silently
-        # appearing to succeed.
-        return DispatchAck(
-            accepted=False,
-            instance_id=mesh.instance_id,
-            eta_seconds=None,
-            reason="phase 1 stub: heli not yet operational",
+    def __init__(self, mesh: AgentMesh) -> None:
+        super().__init__(
+            mesh,
+            zone="low-alt",
+            fleet_type="heli",
+            speed_km_s=HELI_SPEED_KM_S,
+            action_duration_s=HELI_ACTION_DURATION_S,
+            home=HQ,
         )
+
+    def _make_status(
+        self,
+        *,
+        state: ActionState,
+        order_id: str | None,
+        coords: Coords,
+    ) -> BaseModel:
+        # Water gauge: full while transiting, drains during the drop, refills
+        # on return. Simple piecewise mapping per state — refined further if
+        # the demo asks for finer-grained gauges.
+        if state in ("free", "dispatched", "en_route", "on_site"):
+            water_pct = 1.0
+        elif state == "acting":
+            water_pct = 0.0  # dropping; treat as "spent" snapshot
+        elif state == "returning":
+            water_pct = 0.5  # mid-refill on the way home
+        else:
+            water_pct = 1.0
+        return HeliStatus(
+            instance_id=self.mesh.instance_id,
+            order_id=order_id,
+            state=state,
+            coords=coords,
+            water_remaining_pct=water_pct,
+            timestamp=time.time(),
+        )
+
+    async def _act(self, order: DispatchOrder) -> None:
+        _log.info(
+            "heli %s dropping water at (%.2f, %.2f) for order %s",
+            self.mesh.instance_id, order.target_coords.x,
+            order.target_coords.y, order.order_id,
+        )
+        await asyncio.sleep(self.action_duration_s)
 
 
 # ---------------------------------------------------------------------------
@@ -86,27 +110,24 @@ def build_agent(mesh: AgentMesh) -> None:
 async def _main() -> None:
     url = os.environ.get("NATS_URL", "nats://127.0.0.1:4222")
     mesh = AgentMesh(url)
-    build_agent(mesh)
+    agent = HeliAgent(mesh)
+    agent.register_handler(
+        mesh,
+        name="low-alt.heli",
+        description=(
+            "Aerial water-bomber. Accepts DispatchOrder, performs water drop, "
+            "returns DispatchAck."
+        ),
+    )
 
     async with mesh:
-        hb = asyncio.create_task(
-            heartbeat_loop(
-                mesh,
-                zone="low-alt",
-                fleet_type="heli",
-                get_state=lambda: "free",
-                get_coords=lambda: HQ,
-                get_assignment=lambda: None,
-            )
-        )
+        await agent.start()
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
             pass
         finally:
-            hb.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await hb
+            await agent.stop()
 
 
 if __name__ == "__main__":
