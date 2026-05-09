@@ -18,6 +18,14 @@ dependencies = [
     "typer>=0.24.1",
 ]
 
+[project.optional-dependencies]
+# Admin UI extra. Empty per ADR-0056 amendment: the static-asset server
+# is stdlib http.server (no third-party HTTP framework at runtime).
+# Frontend bundle ships at src/openagentmesh/_ui_assets/ via the wheel.
+# The namespace is claimed now so future enterprise/remote-auth deps
+# land here.
+ui = []
+
 [project.scripts]
 oam = "openagentmesh.cli:app"
 
