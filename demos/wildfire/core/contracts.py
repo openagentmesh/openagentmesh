@@ -13,16 +13,19 @@ This module ships the Phase 1 inventory only (per Amendment A-07 in
 - ``DetectionRecord`` + ``SurveyResult`` (detection lifecycle)
 - ``FleetMemberState`` (1 Hz heartbeat KV value)
 - ``DispatchOrder`` + ``DispatchAck`` (action fleet request/reply)
-- ``HeliStatus`` + ``FFUnitStatus`` (action fleet status feeds)
+- ``HeliStatus`` + ``FFUnitStatus`` + ``MedevacStatus`` (action fleet status feeds)
 - Shared ``Literal`` aliases: ``ActionState``, ``FleetMemberState_StateLit``,
   ``DetectionState``
 
-Out of Phase 1 scope (and therefore out of this module): briefer / tasker
+Phase 2 added ``MedevacStatus`` (cascade closure). The model lives next to the
+other action-fleet status feeds so all three share the ``ActionState`` literal.
+
+Out of Phase 1/2 scope (and therefore out of this module): briefer / tasker
 contracts (``IncidentBriefing``, ``IncidentState``, ``TaskCommand``,
 ``TaskTranslateRequest``), narrator (``Narrative``), stats ticker
-(``SwarmStats``), medevac (``MedevacStatus``), chaos (``ChaosKill``), operator
-audit (``FirefighterIntent``). They will land alongside the agents that own
-them in later phases.
+(``SwarmStats``), chaos (``ChaosKill``), operator audit
+(``FirefighterIntent``). They will land alongside the agents that own them
+in later phases.
 """
 
 from __future__ import annotations
@@ -180,4 +183,14 @@ class FFUnitStatus(BaseModel):
     coords: Coords
     reserves_remaining_pct: float = Field(ge=0.0, le=1.0)
     persons_at_risk_observed: int = 0  # surface for operator to dispatch medevac
+    timestamp: float
+
+
+class MedevacStatus(BaseModel):
+    instance_id: str
+    order_id: str | None
+    state: ActionState
+    coords: Coords
+    capacity_used: int  # current persons aboard
+    capacity_max: int = 4
     timestamp: float
