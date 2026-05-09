@@ -1,10 +1,13 @@
-"""Wildfire demo orchestrator (D-01, D-03, D-04).
+"""Wildfire demo orchestrator (D-01, D-03, D-04, D-37, D-39).
 
 Owns one process tree:
 
 * embedded ``nats-server`` (HOCON config with WebSocket listener)
-* fleet child processes (1 fire-sim + 1 uav + 5 drones + 1 heli + 3 ffunits)
+* fleet child processes (1 fire-sim + 1 uav + 5 drones + 1 heli + 3 ffunits +
+  MEDEVAC_COUNT medevacs added in Phase 2 cascade closure)
 * ``oam ui`` static-asset server (admin UI MVP, ADR-0056 amendment)
+* scenario UI dashboard backend (``python -m demos.wildfire.dashboard``,
+  Phase 2; default port DASHBOARD_PORT=8081 with auto-fallback per D-39)
 
 Children are spawned via ``python -m`` with ``NATS_URL`` exported in their env;
 they instantiate plain ``AgentMesh()`` and connect to the embedded bus. Stdout
@@ -34,19 +37,28 @@ from urllib.parse import urlparse
 
 from openagentmesh._local import AGENTMESH_DIR, download_nats_server, find_nats_server
 
-from .config import DRONE_COUNT, FFUNIT_COUNT, HELI_COUNT, UAV_COUNT
+from .config import (
+    DASHBOARD_PORT,
+    DRONE_COUNT,
+    FFUNIT_COUNT,
+    HELI_COUNT,
+    MEDEVAC_COUNT,
+    UAV_COUNT,
+)
 from .nats_config import write_nats_config
 
 # Logical fleet name -> (python -m module, instance count).
 # The orchestrator does NOT import these modules; they are spawned as
 # subprocesses, so they need not exist when the orchestrator class is imported.
-# Counts come from ``demos.wildfire.core.config`` (D-08).
+# Counts come from ``demos.wildfire.core.config`` (D-08, plus MEDEVAC_COUNT
+# from 02-CONTEXT.md SCN-07 for the Phase 2 cascade-closure fleet).
 CHILD_SPECS: dict[str, tuple[str, int]] = {
     "fire-sim": ("demos.wildfire.world.fire_sim", 1),
     "uav": ("demos.wildfire.fleet.uav", UAV_COUNT),
     "drone": ("demos.wildfire.fleet.drone", DRONE_COUNT),
     "heli": ("demos.wildfire.fleet.heli", HELI_COUNT),
     "ffunit": ("demos.wildfire.fleet.ffunit", FFUNIT_COUNT),
+    "medevac": ("demos.wildfire.fleet.medevac", MEDEVAC_COUNT),  # Phase 2 (SCN-07)
 }
 
 
@@ -77,7 +89,7 @@ async def _wait_for_ready(url: str, timeout: float = 5.0) -> None:
 
 
 class Orchestrator:
-    """Boot embedded NATS, spawn fleet + admin UI, supervise until SIGINT.
+    """Boot embedded NATS, spawn fleet + admin UI + dashboard, supervise until SIGINT.
 
     Attributes:
         nats_port: Standard NATS listener port (clients).
@@ -85,6 +97,10 @@ class Orchestrator:
         http_port: NATS monitoring HTTP endpoint.
         ui_port: ``oam ui`` static-asset server HTTP port (DEFAULTS TO 8088;
             MUST differ from ``ws_port`` to avoid the obvious collision).
+        dashboard_port: scenario UI dashboard HTTP port (D-37, D-39). The
+            dashboard process auto-falls back to the next free port if this
+            one is busy; the orchestrator's banner prints the requested port
+            (the resolved port is visible on the ``[dash]``-tagged log lines).
         run_dir: JetStream store directory + temp scratch space.
     """
 
@@ -95,18 +111,21 @@ class Orchestrator:
         ws_port: int = 4223,
         http_port: int = 8222,
         ui_port: int = 8088,
+        dashboard_port: int = DASHBOARD_PORT,
         run_dir: Path = AGENTMESH_DIR / "run" / "wildfire",
     ) -> None:
         self.nats_port = nats_port
         self.ws_port = ws_port
         self.http_port = http_port
         self.ui_port = ui_port
+        self.dashboard_port = dashboard_port
         self.run_dir = run_dir
         self.nats_url = f"nats://127.0.0.1:{nats_port}"
 
         self._nats_proc: subprocess.Popen[bytes] | None = None
         self._children: dict[str, subprocess.Popen[bytes]] = {}
         self._ui_proc: subprocess.Popen[bytes] | None = None
+        self._dash_proc: subprocess.Popen[bytes] | None = None
         self._config_path: Path | None = None
         self._stop = asyncio.Event()
         self._log_tasks: list[asyncio.Task[None]] = []
@@ -240,6 +259,26 @@ class Orchestrator:
             child_env,
         )
         self._print(f"[orchestrator] admin UI at http://127.0.0.1:{self.ui_port}")
+
+        # 7b. Spawn scenario UI dashboard (D-37, D-39). The dashboard auto-falls
+        # back to the next free port if ``dashboard_port`` is busy; this banner
+        # prints the requested port. The resolved URL appears on [dash]-tagged
+        # log lines so the viewer can recover the actual port if the fallback
+        # kicked in.
+        self._dash_proc = self._spawn(
+            "dash",
+            [
+                sys.executable,
+                "-m",
+                "demos.wildfire.dashboard",
+                "--port",
+                str(self.dashboard_port),
+            ],
+            child_env,
+        )
+        self._print(
+            f"[orchestrator] dashboard at http://127.0.0.1:{self.dashboard_port}"
+        )
         self._print("[orchestrator] ready -- Ctrl+C to stop")
 
         # 8. Supervise.
@@ -282,6 +321,9 @@ class Orchestrator:
             if self._ui_proc is not None and self._ui_proc.poll() is not None:
                 self._print(f"[ui] exited (code={self._ui_proc.returncode})")
                 self._ui_proc = None
+            if self._dash_proc is not None and self._dash_proc.poll() is not None:
+                self._print(f"[dash] exited (code={self._dash_proc.returncode})")
+                self._dash_proc = None
             await asyncio.sleep(0.5)
 
     # ----------------------------------------------------------------- cleanup
@@ -293,10 +335,12 @@ class Orchestrator:
         """
         self._print("[orchestrator] stopping ...")
 
-        # Children first (UI + fleet).
+        # Children first (UI + dashboard + fleet).
         procs: list[subprocess.Popen[bytes]] = list(self._children.values())
         if self._ui_proc is not None:
             procs.append(self._ui_proc)
+        if self._dash_proc is not None:
+            procs.append(self._dash_proc)
         for proc in procs:
             with contextlib.suppress(ProcessLookupError):
                 proc.terminate()
