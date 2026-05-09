@@ -7,6 +7,7 @@ import typer
 from .agent import agent_app
 from .demo import demo
 from .mesh import mesh_app
+from .ui import ui
 
 app = typer.Typer(
     name="oam",
@@ -18,6 +19,7 @@ app = typer.Typer(
 app.add_typer(mesh_app, name="mesh")
 app.add_typer(agent_app, name="agent")
 app.command("demo")(demo)
+app.command("ui")(ui)
 
 
 @app.callback()
