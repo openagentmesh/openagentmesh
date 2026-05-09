@@ -1,32 +1,40 @@
-"""Unit tests for the ground ffunit agent (SCN-06, SCN-13, D-08).
+"""Unit tests for the warm ground ffunit agent (SCN-06, D-41/D-44/D-45/D-46).
 
-Phase 1 ffunit is boot + register + heartbeat ONLY (D-08), same shape as
-heli (plan 01-07 Task 1). Three orchestrator-spawned instances share the
-queue group ``q.ground.ffunit`` automatically per
-``src/openagentmesh/_mesh.py:_subscribe_agent`` (FFUNIT_COUNT=3).
+Phase 2 promotes the Phase 1 cold stub to a warm Responder driven by the
+shared ``ActionFleetAgent`` base class (plan 02-02 Task 1). The Phase 1
+"phase 1 stub" assertion and the heartbeat_loop assertion are retired:
+the warm handler returns ``DispatchAck(accepted=True)`` and the
+single-writer loop in ActionFleetAgent absorbs the heartbeat (D-41).
 
 Asserted invariants:
 
-  - Module exposes ``build_agent(mesh)`` and async ``_main()``
-  - Source text registers ``AgentSpec(name="ground.ffunit", ...)``
-  - Source text uses the shared ``heartbeat_loop`` helper with zone="ground",
-    fleet_type="ffunit"
-  - Source text contains zero references to outbound pubsub or KV-source
-    plumbing (no ``mesh.publish`` / ``subject_source`` / ``kv_source`` --
-    Phase 1 = boot + heartbeat only per D-08)
-  - Stub handler returns ``DispatchAck(accepted=False, ...)`` so a rogue
-    Phase 2 caller surfaces loud.
+  - Module exposes ``FFUnitAgent`` (subclass of ``ActionFleetAgent``) and
+    async ``_main()``.
+  - Source text registers ``AgentSpec(name="ground.ffunit", ...)``.
+  - Source text contains zero references to ``heartbeat_loop`` or to
+    dropped pubsub artefacts.
+  - ``mesh.publish`` IS allowed in Phase 2 (status pubsub on transitions).
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
+import json
+import time
 from pathlib import Path
 
 import pytest
 
+from openagentmesh import AgentMesh
+
+from demos.wildfire.core.contracts import (
+    Coords,
+    DispatchOrder,
+)
+
 ffunit = pytest.importorskip(
     "demos.wildfire.fleet.ffunit",
-    reason="demos.wildfire.fleet.ffunit not yet on disk (plan 01-07 creates it).",
+    reason="demos.wildfire.fleet.ffunit not yet on disk.",
 )
 
 
@@ -35,8 +43,14 @@ ffunit = pytest.importorskip(
 # ---------------------------------------------------------------------------
 
 
-def test_build_agent_is_callable():
-    assert callable(ffunit.build_agent)
+def test_ffunit_module_exposes_ffunit_agent_class():
+    assert hasattr(ffunit, "FFUnitAgent")
+
+
+def test_ffunit_agent_subclasses_action_fleet_agent():
+    from demos.wildfire.fleet._action import ActionFleetAgent
+
+    assert issubclass(ffunit.FFUnitAgent, ActionFleetAgent)
 
 
 def test_main_is_async_coroutine_function():
@@ -44,7 +58,7 @@ def test_main_is_async_coroutine_function():
 
 
 # ---------------------------------------------------------------------------
-# Source-text invariants (Phase 1 boot + heartbeat only, per D-08)
+# Source-text invariants
 # ---------------------------------------------------------------------------
 
 
@@ -53,121 +67,129 @@ _FFUNIT_PATH = Path(ffunit.__file__)
 
 def test_ffunit_module_registers_ground_ffunit_agent_spec():
     text = _FFUNIT_PATH.read_text()
-    assert "AgentSpec(" in text
     assert 'name="ground.ffunit"' in text
 
 
-def test_ffunit_module_uses_heartbeat_loop_helper():
+def test_ffunit_module_does_not_use_heartbeat_loop():
+    """heartbeat_loop is collapsed into ActionFleetAgent's writer (D-41)."""
     text = _FFUNIT_PATH.read_text()
-    assert "heartbeat_loop" in text
+    assert "heartbeat_loop" not in text
 
 
-def test_ffunit_module_heartbeat_uses_ground_ffunit_zone_and_type():
+def test_ffunit_module_does_not_carry_phase1_stub_marker():
+    """Warm handler is no longer a stub."""
     text = _FFUNIT_PATH.read_text()
-    assert 'zone="ground"' in text
-    assert 'fleet_type="ffunit"' in text
+    assert "phase 1 stub" not in text.lower()
+
+
+def test_ffunit_module_subclasses_action_fleet_agent_in_source():
+    text = _FFUNIT_PATH.read_text()
+    assert "class FFUnitAgent(ActionFleetAgent)" in text
 
 
 @pytest.mark.parametrize(
     "needle",
     [
-        "mesh.publish",
         "subject_source",
         "kv_source",
         "ThermalGrid",
         "FireSpawn",
         "FireSuppress",
         "mesh.environment.thermal",
+        "mesh.fire.spawn",
+        "mesh.fire.suppress",
     ],
 )
-def test_ffunit_module_does_not_reference_phase2_or_dropped_artefacts(needle: str):
+def test_ffunit_module_does_not_reference_dropped_artefacts(needle: str):
     text = _FFUNIT_PATH.read_text()
     assert needle not in text, (
-        f"{needle!r} should not appear in {_FFUNIT_PATH.name} "
-        "(Phase 1 = boot + heartbeat only per D-08; pubsub artefacts dropped per A-05/A-08)"
+        f"{needle!r} should not appear in {_FFUNIT_PATH.name}"
     )
 
 
 @pytest.mark.parametrize("needle", ["bucket=", "prefix=", "model="])
 def test_ffunit_module_does_not_use_aspirational_kwargs(needle: str):
-    # A-09: real SDK has no bucket=/prefix=/model= kwargs on KV / source calls.
     text = _FFUNIT_PATH.read_text()
     assert needle not in text, f"{needle!r} is not a real SDK kwarg (A-09)"
 
 
 # ---------------------------------------------------------------------------
-# Stub-handler shape (catalog correctness; never called Phase 1, D-08)
+# Live boot tests against AgentMesh.local()
 # ---------------------------------------------------------------------------
 
 
-def test_ffunit_stub_handler_returns_unaccepted_dispatch_ack():
-    text = _FFUNIT_PATH.read_text()
-    assert "DispatchAck(" in text
-    assert "accepted=False" in text
-    assert "phase 1 stub" in text.lower()
+def _make_order(target: Coords) -> DispatchOrder:
+    return DispatchOrder(
+        order_id="o-ffunit-1",
+        target_coords=target,
+        priority="med",
+        operator_id="op-1",
+        issued_at=time.time(),
+    )
 
 
-# ---------------------------------------------------------------------------
-# Live boot test against AgentMesh.local() (D-08, D-20, plan 01-10)
-# ---------------------------------------------------------------------------
-#
-# Same shape as test_heli's live boot test but for ground.ffunit.
-
-import asyncio  # noqa: E402
-import time  # noqa: E402
-
-from openagentmesh import AgentMesh  # noqa: E402
-from demos.wildfire.core.config import HQ  # noqa: E402
-from demos.wildfire.core.contracts import FleetMemberState  # noqa: E402
-from demos.wildfire.core.heartbeat import heartbeat_loop  # noqa: E402
-from demos.wildfire.core.keys import FLEET_PREFIX  # noqa: E402
-
-# NATS wildcard suffix is REQUIRED on every kv.list call; bare prefixes
-# return [] per src/openagentmesh/_context.py:375-405.
-FFUNIT_FLEET_WILDCARD = f"{FLEET_PREFIX}.ground.ffunit.>"
-
-
-async def test_ffunit_boots_registers_in_catalog_and_emits_heartbeat():
-    """Phase 1 ffunit scope (D-08): boot + register catalog entry + write
-    1 Hz heartbeat. No DispatchOrder caller is exercised this phase.
-    """
+async def test_ffunit_dispatch_returns_accepted_ack():
+    """``mesh.call("ground.ffunit", DispatchOrder(...))`` returns accepted ack within 1 s."""
     async with AgentMesh.local() as mesh:
-        ffunit.build_agent(mesh)
-        entries = await mesh.catalog()
-        names = {e.name for e in entries}
-        assert "ground.ffunit" in names, (
-            f"ground.ffunit should be in the catalog after build_agent + catalog(); "
-            f"saw {names}"
+        agent = ffunit.FFUnitAgent(mesh)
+        agent.register_handler(
+            mesh,
+            name="ground.ffunit",
+            description="Ground firefighter unit.",
+        )
+        async with agent:
+            t0 = time.monotonic()
+            result = await mesh.call(
+                "ground.ffunit",
+                _make_order(Coords(x=0.5, y=0.5)),
+                timeout=1.0,
+            )
+            elapsed = time.monotonic() - t0
+            assert elapsed < 1.0, f"call took {elapsed:.3f}s"
+            assert result["accepted"] is True
+            assert result["instance_id"] == mesh.instance_id
+            assert result["eta_seconds"] is not None
+            assert result["eta_seconds"] > 0
+
+
+async def test_ffunit_publishes_status_on_dispatch():
+    """At least one FFUnitStatus message arrives on mesh.action.ffunit.{id}.status."""
+    async with AgentMesh.local() as mesh:
+        agent = ffunit.FFUnitAgent(mesh)
+        agent.register_handler(
+            mesh,
+            name="ground.ffunit",
+            description="Ground firefighter unit.",
         )
 
-        hb = asyncio.create_task(
-            heartbeat_loop(
-                mesh,
-                zone="ground",
-                fleet_type="ffunit",
-                get_state=lambda: "free",
-                get_coords=lambda: HQ,
-                get_assignment=lambda: None,
-            )
+        observed_states: list[str] = []
+        first_msg = asyncio.Event()
+
+        async def _on_status(msg) -> None:
+            payload = json.loads(msg.data.decode())
+            observed_states.append(payload["state"])
+            first_msg.set()
+
+        sub = await mesh._nc.subscribe(
+            f"mesh.action.ffunit.{mesh.instance_id}.status",
+            cb=_on_status,
         )
-        try:
-            await asyncio.sleep(1.6)
-            ffunit_entries = [
-                e for e in await mesh.kv.list(FFUNIT_FLEET_WILDCARD) if e.value
-            ]
-            assert len(ffunit_entries) >= 1, (
-                f"expected >= 1 ffunit heartbeat record under {FFUNIT_FLEET_WILDCARD}; "
-                f"got {len(ffunit_entries)}"
-            )
-            rec = FleetMemberState.model_validate_json(ffunit_entries[0].value)
-            assert rec.fleet_type == "ffunit"
-            assert rec.zone == "ground"
-            assert rec.state == "free"
-            assert rec.instance_id == mesh.instance_id
-            assert time.time() - rec.last_updated < 2.0
-        finally:
-            hb.cancel()
+
+        async with agent:
             try:
-                await hb
-            except asyncio.CancelledError:
-                pass
+                ack = await mesh.call(
+                    "ground.ffunit",
+                    _make_order(Coords(x=0.2, y=0.2)),
+                    timeout=2.0,
+                )
+                assert ack["accepted"] is True
+                await asyncio.wait_for(first_msg.wait(), timeout=6.0)
+            finally:
+                await sub.unsubscribe()
+
+        assert len(observed_states) >= 1
+        valid = {
+            "free", "dispatched", "en_route", "on_site",
+            "acting", "returning",
+        }
+        assert set(observed_states).issubset(valid)

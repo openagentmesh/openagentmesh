@@ -1,32 +1,44 @@
-"""Unit tests for the low-altitude heli agent (SCN-05, SCN-13, D-08).
+"""Unit tests for the warm low-altitude heli agent (SCN-05, D-41/D-44/D-45/D-46).
 
-Phase 1 heli is boot + register + heartbeat ONLY (D-08). The
-``DispatchOrder -> DispatchAck`` Responder handler exists for catalog
-correctness (so the admin UI sandbox in Phase 3 can introspect the contract)
-but is never called this phase. This unit test file is the TDD RED -> GREEN
-gate for plan 01-07.
+Phase 2 promotes the Phase 1 cold stub to a warm Responder driven by the
+shared ``ActionFleetAgent`` base class (plan 02-02 Task 1). The Phase 1
+"phase 1 stub" assertion and the heartbeat_loop assertion are retired:
+the warm handler returns ``DispatchAck(accepted=True)`` and the
+single-writer loop in ActionFleetAgent absorbs the heartbeat (D-41).
 
 Asserted invariants:
 
-  - Module exposes ``build_agent(mesh)`` and async ``_main()``
-  - Source text registers ``AgentSpec(name="low-alt.heli", ...)``
-  - Source text uses the shared ``heartbeat_loop`` helper
-  - Source text contains zero references to outbound pubsub or KV-source
-    plumbing (no ``mesh.publish`` / ``subject_source`` / ``kv_source`` --
-    Phase 1 = boot + heartbeat only per D-08)
-  - Stub handler returns ``DispatchAck(accepted=False, ...)`` -- if a Phase 2
-    caller ever exists before the real body lands, the stub fails loud.
+  - Module exposes ``HeliAgent`` (subclass of ``ActionFleetAgent``) and
+    async ``_main()``.
+  - Source text registers ``AgentSpec(name="low-alt.heli", ...)``.
+  - Source text contains zero references to ``heartbeat_loop`` (collapsed
+    into the writer per D-41) or to dropped pubsub artefacts (FireSpawn,
+    ThermalGrid, mesh.environment.thermal).
+  - ``mesh.publish`` IS allowed in Phase 2 (status pubsub on transitions).
+  - Live boot test: ``mesh.call("low-alt.heli", DispatchOrder(...))``
+    returns ``accepted=True`` within 1 s; status pubsub fires on
+    ``mesh.action.heli.>.status``.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
+import json
+import time
 from pathlib import Path
 
 import pytest
 
+from openagentmesh import AgentMesh
+
+from demos.wildfire.core.contracts import (
+    Coords,
+    DispatchOrder,
+)
+
 heli = pytest.importorskip(
     "demos.wildfire.fleet.heli",
-    reason="demos.wildfire.fleet.heli not yet on disk (plan 01-07 creates it).",
+    reason="demos.wildfire.fleet.heli not yet on disk.",
 )
 
 
@@ -35,8 +47,14 @@ heli = pytest.importorskip(
 # ---------------------------------------------------------------------------
 
 
-def test_build_agent_is_callable():
-    assert callable(heli.build_agent)
+def test_heli_module_exposes_heli_agent_class():
+    assert hasattr(heli, "HeliAgent")
+
+
+def test_heli_agent_subclasses_action_fleet_agent():
+    from demos.wildfire.fleet._action import ActionFleetAgent
+
+    assert issubclass(heli.HeliAgent, ActionFleetAgent)
 
 
 def test_main_is_async_coroutine_function():
@@ -44,7 +62,7 @@ def test_main_is_async_coroutine_function():
 
 
 # ---------------------------------------------------------------------------
-# Source-text invariants (Phase 1 boot + heartbeat only, per D-08)
+# Source-text invariants
 # ---------------------------------------------------------------------------
 
 
@@ -53,134 +71,133 @@ _HELI_PATH = Path(heli.__file__)
 
 def test_heli_module_registers_low_alt_heli_agent_spec():
     text = _HELI_PATH.read_text()
-    assert "AgentSpec(" in text
     assert 'name="low-alt.heli"' in text
 
 
-def test_heli_module_uses_heartbeat_loop_helper():
+def test_heli_module_does_not_use_heartbeat_loop():
+    """heartbeat_loop is collapsed into ActionFleetAgent's writer (D-41)."""
     text = _HELI_PATH.read_text()
-    assert "heartbeat_loop" in text
+    assert "heartbeat_loop" not in text
 
 
-def test_heli_module_heartbeat_uses_low_alt_heli_zone_and_type():
+def test_heli_module_does_not_carry_phase1_stub_marker():
+    """Warm handler is no longer a stub."""
     text = _HELI_PATH.read_text()
-    assert 'zone="low-alt"' in text
-    assert 'fleet_type="heli"' in text
+    assert "phase 1 stub" not in text.lower()
+
+
+def test_heli_module_subclasses_action_fleet_agent_in_source():
+    text = _HELI_PATH.read_text()
+    assert "class HeliAgent(ActionFleetAgent)" in text
 
 
 @pytest.mark.parametrize(
     "needle",
     [
-        "mesh.publish",
         "subject_source",
         "kv_source",
         "ThermalGrid",
         "FireSpawn",
         "FireSuppress",
         "mesh.environment.thermal",
+        "mesh.fire.spawn",
+        "mesh.fire.suppress",
     ],
 )
-def test_heli_module_does_not_reference_phase2_or_dropped_artefacts(needle: str):
+def test_heli_module_does_not_reference_dropped_artefacts(needle: str):
     text = _HELI_PATH.read_text()
     assert needle not in text, (
-        f"{needle!r} should not appear in {_HELI_PATH.name} "
-        "(Phase 1 = boot + heartbeat only per D-08; pubsub artefacts dropped per A-05/A-08)"
+        f"{needle!r} should not appear in {_HELI_PATH.name}"
     )
 
 
 @pytest.mark.parametrize("needle", ["bucket=", "prefix=", "model="])
 def test_heli_module_does_not_use_aspirational_kwargs(needle: str):
-    # A-09: real SDK has no bucket=/prefix=/model= kwargs on KV / source calls.
     text = _HELI_PATH.read_text()
     assert needle not in text, f"{needle!r} is not a real SDK kwarg (A-09)"
 
 
 # ---------------------------------------------------------------------------
-# Stub-handler shape (catalog correctness; never called Phase 1, D-08)
+# Live boot tests against AgentMesh.local()
 # ---------------------------------------------------------------------------
 
 
-def test_heli_stub_handler_returns_unaccepted_dispatch_ack():
-    """If a rogue Phase 2 caller ever invokes the Phase 1 stub, the
-    response must be a structured ``DispatchAck(accepted=False, ...)`` so
-    the failure surfaces loud instead of looking like a silent success.
-    """
-    text = _HELI_PATH.read_text()
-    assert "DispatchAck(" in text
-    assert "accepted=False" in text
-    assert "phase 1 stub" in text.lower()
+def _make_order(target: Coords) -> DispatchOrder:
+    return DispatchOrder(
+        order_id="o-heli-1",
+        target_coords=target,
+        priority="med",
+        operator_id="op-1",
+        issued_at=time.time(),
+    )
 
 
-# ---------------------------------------------------------------------------
-# Live boot test against AgentMesh.local() (D-08, D-20, plan 01-10)
-# ---------------------------------------------------------------------------
-#
-# Boots an embedded NATS, registers the heli agent, runs the heartbeat loop,
-# asserts the catalog entry is visible and a FleetMemberState record is
-# written under wildfire.fleet.low-alt.heli.{instance_id}. No mesh.call()
-# in Phase 1 (D-08).
-
-import asyncio  # noqa: E402
-import time  # noqa: E402
-
-from openagentmesh import AgentMesh  # noqa: E402
-from demos.wildfire.core.config import HQ  # noqa: E402
-from demos.wildfire.core.contracts import FleetMemberState  # noqa: E402
-from demos.wildfire.core.heartbeat import heartbeat_loop  # noqa: E402
-from demos.wildfire.core.keys import FLEET_PREFIX  # noqa: E402
-
-# NATS wildcard suffix is REQUIRED on every kv.list call; bare prefixes
-# return [] per src/openagentmesh/_context.py:375-405. Heli keys are
-# wildfire.fleet.low-alt.heli.{instance_id} (one segment after the
-# fleet+type prefix), but `>` is safer and consistent across fleets.
-HELI_FLEET_WILDCARD = f"{FLEET_PREFIX}.low-alt.heli.>"
-
-
-async def test_heli_boots_registers_in_catalog_and_emits_heartbeat():
-    """Phase 1 heli scope (D-08): boot + register catalog entry + write
-    1 Hz heartbeat. No DispatchOrder caller is exercised this phase.
-    """
+async def test_heli_dispatch_returns_accepted_ack():
+    """``mesh.call("low-alt.heli", DispatchOrder(...))`` returns accepted ack within 1 s."""
     async with AgentMesh.local() as mesh:
-        heli.build_agent(mesh)
-        # _subscribe_pending only runs at __aenter__ and on catalog()/call();
-        # call catalog() to bind the responder subscription + populate cache.
-        entries = await mesh.catalog()
-        names = {e.name for e in entries}
-        assert "low-alt.heli" in names, (
-            f"low-alt.heli should be in the catalog after build_agent + catalog(); "
-            f"saw {names}"
+        agent = heli.HeliAgent(mesh)
+        agent.register_handler(
+            mesh,
+            name="low-alt.heli",
+            description="Aerial water-bomber.",
+        )
+        async with agent:
+            t0 = time.monotonic()
+            result = await mesh.call(
+                "low-alt.heli",
+                _make_order(Coords(x=1.0, y=1.0)),
+                timeout=1.0,
+            )
+            elapsed = time.monotonic() - t0
+            assert elapsed < 1.0, f"call took {elapsed:.3f}s"
+            # mesh.call returns the dict-decoded JSON of DispatchAck.
+            assert result["accepted"] is True
+            assert result["instance_id"] == mesh.instance_id
+            assert result["eta_seconds"] is not None
+            assert result["eta_seconds"] > 0
+
+
+async def test_heli_publishes_status_on_dispatch():
+    """At least one HeliStatus message arrives on mesh.action.heli.{id}.status."""
+    async with AgentMesh.local() as mesh:
+        agent = heli.HeliAgent(mesh)
+        agent.register_handler(
+            mesh,
+            name="low-alt.heli",
+            description="Aerial water-bomber.",
         )
 
-        hb = asyncio.create_task(
-            heartbeat_loop(
-                mesh,
-                zone="low-alt",
-                fleet_type="heli",
-                get_state=lambda: "free",
-                get_coords=lambda: HQ,
-                get_assignment=lambda: None,
-            )
+        observed_states: list[str] = []
+        first_msg = asyncio.Event()
+
+        async def _on_status(msg) -> None:
+            payload = json.loads(msg.data.decode())
+            observed_states.append(payload["state"])
+            first_msg.set()
+
+        sub = await mesh._nc.subscribe(
+            f"mesh.action.heli.{mesh.instance_id}.status",
+            cb=_on_status,
         )
-        try:
-            # Wait long enough for at least one heartbeat write
-            # (HEARTBEAT_INTERVAL_S = 1 s + jitter buffer).
-            await asyncio.sleep(1.6)
-            heli_entries = [
-                e for e in await mesh.kv.list(HELI_FLEET_WILDCARD) if e.value
-            ]
-            assert len(heli_entries) >= 1, (
-                f"expected >= 1 heli heartbeat record under {HELI_FLEET_WILDCARD}; "
-                f"got {len(heli_entries)}"
-            )
-            rec = FleetMemberState.model_validate_json(heli_entries[0].value)
-            assert rec.fleet_type == "heli"
-            assert rec.zone == "low-alt"
-            assert rec.state == "free"
-            assert rec.instance_id == mesh.instance_id
-            assert time.time() - rec.last_updated < 2.0
-        finally:
-            hb.cancel()
+
+        async with agent:
             try:
-                await hb
-            except asyncio.CancelledError:
-                pass
+                ack = await mesh.call(
+                    "low-alt.heli",
+                    _make_order(Coords(x=0.5, y=0.5)),
+                    timeout=2.0,
+                )
+                assert ack["accepted"] is True
+                await asyncio.wait_for(first_msg.wait(), timeout=6.0)
+            finally:
+                await sub.unsubscribe()
+
+        assert len(observed_states) >= 1
+        # All observed states must be valid ActionState members.
+        valid = {
+            "free", "dispatched", "en_route", "on_site",
+            "acting", "returning",
+        }
+        assert set(observed_states).issubset(valid), (
+            f"unexpected states: {observed_states}"
+        )
