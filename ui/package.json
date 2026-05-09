@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "nats.ws": "^1.30.3",
+    "@nats-io/nats-core": "^3.4.0",
     "@nats-io/jetstream": "^3.0.0",
     "@nats-io/kv": "^3.0.0"
   },
