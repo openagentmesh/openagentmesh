@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CatalogEntry, watchCatalog } from "./lib/catalog";
 import { FleetMember, watchFleet } from "./lib/fleet";
 import { RegistryTable } from "./components/RegistryTable";
+import { EventFeed } from "./components/EventFeed";
 
 export default function App() {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
@@ -32,11 +33,16 @@ export default function App() {
       <header className="mb-6">
         <h1 className="text-2xl font-semibold">OpenAgentMesh Admin</h1>
         <p className="text-sm text-gray-600">
-          Registry, flat list ({catalog.length} agents)
+          Registry ({catalog.length} agents) + live event feed
         </p>
       </header>
-      <div className="rounded border border-gray-200 bg-white shadow-sm overflow-x-auto">
-        <RegistryTable catalog={catalog} fleet={fleet} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="rounded border border-gray-200 bg-white shadow-sm overflow-x-auto">
+          <RegistryTable catalog={catalog} fleet={fleet} />
+        </div>
+        <div className="rounded border border-gray-200 bg-white shadow-sm h-[640px] flex flex-col">
+          <EventFeed />
+        </div>
       </div>
     </div>
   );
