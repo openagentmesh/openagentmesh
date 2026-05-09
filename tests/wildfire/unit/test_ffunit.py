@@ -105,3 +105,69 @@ def test_ffunit_stub_handler_returns_unaccepted_dispatch_ack():
     assert "DispatchAck(" in text
     assert "accepted=False" in text
     assert "phase 1 stub" in text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Live boot test against AgentMesh.local() (D-08, D-20, plan 01-10)
+# ---------------------------------------------------------------------------
+#
+# Same shape as test_heli's live boot test but for ground.ffunit.
+
+import asyncio  # noqa: E402
+import time  # noqa: E402
+
+from openagentmesh import AgentMesh  # noqa: E402
+from demos.wildfire.core.config import HQ  # noqa: E402
+from demos.wildfire.core.contracts import FleetMemberState  # noqa: E402
+from demos.wildfire.core.heartbeat import heartbeat_loop  # noqa: E402
+from demos.wildfire.core.keys import FLEET_PREFIX  # noqa: E402
+
+# NATS wildcard suffix is REQUIRED on every kv.list call; bare prefixes
+# return [] per src/openagentmesh/_context.py:375-405.
+FFUNIT_FLEET_WILDCARD = f"{FLEET_PREFIX}.ground.ffunit.>"
+
+
+async def test_ffunit_boots_registers_in_catalog_and_emits_heartbeat():
+    """Phase 1 ffunit scope (D-08): boot + register catalog entry + write
+    1 Hz heartbeat. No DispatchOrder caller is exercised this phase.
+    """
+    async with AgentMesh.local() as mesh:
+        ffunit.build_agent(mesh)
+        entries = await mesh.catalog()
+        names = {e.name for e in entries}
+        assert "ground.ffunit" in names, (
+            f"ground.ffunit should be in the catalog after build_agent + catalog(); "
+            f"saw {names}"
+        )
+
+        hb = asyncio.create_task(
+            heartbeat_loop(
+                mesh,
+                zone="ground",
+                fleet_type="ffunit",
+                get_state=lambda: "free",
+                get_coords=lambda: HQ,
+                get_assignment=lambda: None,
+            )
+        )
+        try:
+            await asyncio.sleep(1.6)
+            ffunit_entries = [
+                e for e in await mesh.kv.list(FFUNIT_FLEET_WILDCARD) if e.value
+            ]
+            assert len(ffunit_entries) >= 1, (
+                f"expected >= 1 ffunit heartbeat record under {FFUNIT_FLEET_WILDCARD}; "
+                f"got {len(ffunit_entries)}"
+            )
+            rec = FleetMemberState.model_validate_json(ffunit_entries[0].value)
+            assert rec.fleet_type == "ffunit"
+            assert rec.zone == "ground"
+            assert rec.state == "free"
+            assert rec.instance_id == mesh.instance_id
+            assert time.time() - rec.last_updated < 2.0
+        finally:
+            hb.cancel()
+            try:
+                await hb
+            except asyncio.CancelledError:
+                pass

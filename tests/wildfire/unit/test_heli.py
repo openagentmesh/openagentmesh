@@ -109,3 +109,78 @@ def test_heli_stub_handler_returns_unaccepted_dispatch_ack():
     assert "DispatchAck(" in text
     assert "accepted=False" in text
     assert "phase 1 stub" in text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Live boot test against AgentMesh.local() (D-08, D-20, plan 01-10)
+# ---------------------------------------------------------------------------
+#
+# Boots an embedded NATS, registers the heli agent, runs the heartbeat loop,
+# asserts the catalog entry is visible and a FleetMemberState record is
+# written under wildfire.fleet.low-alt.heli.{instance_id}. No mesh.call()
+# in Phase 1 (D-08).
+
+import asyncio  # noqa: E402
+import time  # noqa: E402
+
+from openagentmesh import AgentMesh  # noqa: E402
+from demos.wildfire.core.config import HQ  # noqa: E402
+from demos.wildfire.core.contracts import FleetMemberState  # noqa: E402
+from demos.wildfire.core.heartbeat import heartbeat_loop  # noqa: E402
+from demos.wildfire.core.keys import FLEET_PREFIX  # noqa: E402
+
+# NATS wildcard suffix is REQUIRED on every kv.list call; bare prefixes
+# return [] per src/openagentmesh/_context.py:375-405. Heli keys are
+# wildfire.fleet.low-alt.heli.{instance_id} (one segment after the
+# fleet+type prefix), but `>` is safer and consistent across fleets.
+HELI_FLEET_WILDCARD = f"{FLEET_PREFIX}.low-alt.heli.>"
+
+
+async def test_heli_boots_registers_in_catalog_and_emits_heartbeat():
+    """Phase 1 heli scope (D-08): boot + register catalog entry + write
+    1 Hz heartbeat. No DispatchOrder caller is exercised this phase.
+    """
+    async with AgentMesh.local() as mesh:
+        heli.build_agent(mesh)
+        # _subscribe_pending only runs at __aenter__ and on catalog()/call();
+        # call catalog() to bind the responder subscription + populate cache.
+        entries = await mesh.catalog()
+        names = {e.name for e in entries}
+        assert "low-alt.heli" in names, (
+            f"low-alt.heli should be in the catalog after build_agent + catalog(); "
+            f"saw {names}"
+        )
+
+        hb = asyncio.create_task(
+            heartbeat_loop(
+                mesh,
+                zone="low-alt",
+                fleet_type="heli",
+                get_state=lambda: "free",
+                get_coords=lambda: HQ,
+                get_assignment=lambda: None,
+            )
+        )
+        try:
+            # Wait long enough for at least one heartbeat write
+            # (HEARTBEAT_INTERVAL_S = 1 s + jitter buffer).
+            await asyncio.sleep(1.6)
+            heli_entries = [
+                e for e in await mesh.kv.list(HELI_FLEET_WILDCARD) if e.value
+            ]
+            assert len(heli_entries) >= 1, (
+                f"expected >= 1 heli heartbeat record under {HELI_FLEET_WILDCARD}; "
+                f"got {len(heli_entries)}"
+            )
+            rec = FleetMemberState.model_validate_json(heli_entries[0].value)
+            assert rec.fleet_type == "heli"
+            assert rec.zone == "low-alt"
+            assert rec.state == "free"
+            assert rec.instance_id == mesh.instance_id
+            assert time.time() - rec.last_updated < 2.0
+        finally:
+            hb.cancel()
+            try:
+                await hb
+            except asyncio.CancelledError:
+                pass
