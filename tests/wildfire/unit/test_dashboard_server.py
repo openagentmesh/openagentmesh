@@ -66,6 +66,25 @@ SERVER_SRC = Path(dashboard_server.__file__).read_text()
 # ---------------------------------------------------------------------------
 
 
+def _live_cell_entries(raw_entries):
+    """Filter raw KV entries to live PUTs and validate each as CellState.
+
+    ``mesh.kv.list_models`` chokes on DELETE tombstones (empty bytes do not
+    parse as JSON), so we project the raw byte entries here. The KV
+    snapshot may surface a tombstone with ``operation="PUT"`` and an empty
+    value when nats-py's history coalesces a delete; we treat empty values
+    as absent regardless of the reported operation.
+    """
+    out = []
+    for e in raw_entries:
+        if e.operation != "PUT":
+            continue
+        if not e.value:
+            continue  # tombstone (delete) reported as empty PUT.
+        out.append((e.key, CellState.model_validate_json(e.value), e.revision))
+    return out
+
+
 @pytest.mark.asyncio
 async def test_click_writes_cellstate() -> None:
     """A click with a non-null temperature writes a CellState to KV at the
@@ -73,19 +92,18 @@ async def test_click_writes_cellstate() -> None:
     async with AgentMesh.local() as mesh:
         await handle_click(mesh, x=1.5, y=-2.0, temperature=SPAWN_MAGNITUDE_LARGE)
 
-        entries = await mesh.kv.list_models(f"{CELL_PREFIX}.>", CellState)
-        live = [e for e in entries if e.operation == "PUT"]
+        live = _live_cell_entries(await mesh.kv.list(f"{CELL_PREFIX}.>"))
         assert len(live) == 1
-        entry = live[0]
-        assert entry.value.temperature == SPAWN_MAGNITUDE_LARGE
-        assert entry.value.last_modified_by == mesh.instance_id
+        key, value, _ = live[0]
+        assert value.temperature == SPAWN_MAGNITUDE_LARGE
+        assert value.last_modified_by == mesh.instance_id
 
         # Snapped coords should match cell_center(cell_indices(x, y)).
         x_idx, y_idx = cell_indices(1.5, -2.0)
         center = cell_center(x_idx, y_idx)
-        assert entry.value.coords.x == pytest.approx(center.x)
-        assert entry.value.coords.y == pytest.approx(center.y)
-        assert entry.key == cell_key(1.5, -2.0)
+        assert value.coords.x == pytest.approx(center.x)
+        assert value.coords.y == pytest.approx(center.y)
+        assert key == cell_key(1.5, -2.0)
 
 
 @pytest.mark.asyncio
@@ -107,10 +125,13 @@ async def test_click_with_null_temperature_deletes_cell() -> None:
 
         await handle_click(mesh, x=0.4, y=0.4, temperature=None)
 
-        # After the delete, list_models either omits the key or surfaces it
-        # with operation="DELETE". Either way, no live PUT entry remains.
-        entries = await mesh.kv.list_models(f"{CELL_PREFIX}.>", CellState)
-        live = [e for e in entries if e.operation == "PUT" and e.key == cell_key(0.4, 0.4)]
+        # After the delete, list either omits the key or surfaces it with
+        # operation="DELETE". Either way, no live PUT entry remains.
+        live = [
+            (k, v, r)
+            for (k, v, r) in _live_cell_entries(await mesh.kv.list(f"{CELL_PREFIX}.>"))
+            if k == cell_key(0.4, 0.4)
+        ]
         assert live == []
 
 
@@ -132,8 +153,11 @@ async def test_click_with_ambient_temperature_deletes_cell() -> None:
 
         await handle_click(mesh, x=-1.0, y=1.0, temperature=FIRE_SIM_AMBIENT_C)
 
-        entries = await mesh.kv.list_models(f"{CELL_PREFIX}.>", CellState)
-        live = [e for e in entries if e.operation == "PUT" and e.key == cell_key(-1.0, 1.0)]
+        live = [
+            (k, v, r)
+            for (k, v, r) in _live_cell_entries(await mesh.kv.list(f"{CELL_PREFIX}.>"))
+            if k == cell_key(-1.0, 1.0)
+        ]
         assert live == []
 
 
@@ -151,12 +175,12 @@ async def test_click_snaps_to_grid_exactly() -> None:
     async with AgentMesh.local() as mesh:
         await handle_click(mesh, x=raw_x, y=raw_y, temperature=SPAWN_MAGNITUDE_LARGE)
 
-        entries = await mesh.kv.list_models(f"{CELL_PREFIX}.>", CellState)
-        live = [e for e in entries if e.operation == "PUT"]
+        live = _live_cell_entries(await mesh.kv.list(f"{CELL_PREFIX}.>"))
         assert len(live) == 1
-        assert live[0].value.coords.x == pytest.approx(expected_center.x)
-        assert live[0].value.coords.y == pytest.approx(expected_center.y)
-        assert live[0].key == f"{CELL_PREFIX}.{expected_x_idx}.{expected_y_idx}"
+        key, value, _ = live[0]
+        assert value.coords.x == pytest.approx(expected_center.x)
+        assert value.coords.y == pytest.approx(expected_center.y)
+        assert key == f"{CELL_PREFIX}.{expected_x_idx}.{expected_y_idx}"
 
 
 @pytest.mark.asyncio
