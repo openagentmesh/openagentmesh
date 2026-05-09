@@ -122,3 +122,95 @@ def test_fleet_member_state_invalid_zone_rejected() -> None:
             state="free",
             last_updated=0.0,
         )
+
+
+# ---------------------------------------------------------------------------
+# MedevacStatus (Phase 2 addition; verbatim port of km/specs/wildfire/contracts.md)
+# ---------------------------------------------------------------------------
+
+
+def test_medevac_status_importable() -> None:
+    """MedevacStatus is exposed from demos.wildfire.core.contracts."""
+    mod = importlib.import_module("demos.wildfire.core.contracts")
+    assert hasattr(mod, "MedevacStatus"), "missing contract export: MedevacStatus"
+
+
+def test_medevac_status_constructs_with_documented_fields() -> None:
+    from demos.wildfire.core.contracts import Coords, MedevacStatus
+
+    status = MedevacStatus(
+        instance_id="m-0",
+        order_id="o-1",
+        state="dispatched",
+        coords=Coords(x=1.0, y=2.0),
+        capacity_used=2,
+        capacity_max=4,
+        timestamp=123.0,
+    )
+    assert status.instance_id == "m-0"
+    assert status.order_id == "o-1"
+    assert status.state == "dispatched"
+    assert status.coords == Coords(x=1.0, y=2.0)
+    assert status.capacity_used == 2
+    assert status.capacity_max == 4
+    assert status.timestamp == 123.0
+
+
+def test_medevac_status_capacity_max_default_four() -> None:
+    """capacity_max defaults to 4 (mirrors fleet config; spec contract)."""
+    from demos.wildfire.core.contracts import Coords, MedevacStatus
+
+    status = MedevacStatus(
+        instance_id="m-0",
+        order_id=None,
+        state="free",
+        coords=Coords(x=0.0, y=0.0),
+        capacity_used=0,
+        timestamp=0.0,
+    )
+    assert status.capacity_max == 4
+
+
+def test_medevac_status_order_id_accepts_none() -> None:
+    """When the medevac is free, order_id is None (no active dispatch)."""
+    from demos.wildfire.core.contracts import Coords, MedevacStatus
+
+    status = MedevacStatus(
+        instance_id="m-0",
+        order_id=None,
+        state="free",
+        coords=Coords(x=0.0, y=0.0),
+        capacity_used=0,
+        timestamp=0.0,
+    )
+    assert status.order_id is None
+
+
+def test_medevac_status_accepts_every_action_state() -> None:
+    """state field accepts every ActionState literal."""
+    from demos.wildfire.core.contracts import Coords, MedevacStatus
+
+    for valid in ("free", "dispatched", "en_route", "on_site", "acting", "returning"):
+        MedevacStatus(
+            instance_id="m-0",
+            order_id="o-1",
+            state=valid,  # type: ignore[arg-type]
+            coords=Coords(x=0.0, y=0.0),
+            capacity_used=0,
+            timestamp=0.0,
+        )
+
+
+def test_medevac_status_rejects_invalid_state() -> None:
+    """state field rejects literals outside ActionState."""
+    from demos.wildfire.core.contracts import Coords, MedevacStatus
+
+    with pytest.raises(ValidationError):
+        MedevacStatus(
+            instance_id="m-0",
+            order_id="o-1",
+            state="bogus",  # type: ignore[arg-type]
+            coords=Coords(x=0.0, y=0.0),
+            capacity_used=0,
+            timestamp=0.0,
+        )
