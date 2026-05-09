@@ -26,6 +26,14 @@ dependencies = [
 # land here.
 ui = []
 
+# Wildfire scenario UI dashboard backend (Phase 2 / D-25 / D-37 / D-38).
+# Lives at demos/wildfire/dashboard/ and runs uvicorn programmatically.
+# These deps are demo-scoped: the SDK itself does not import FastAPI.
+wildfire-dashboard = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
 [project.scripts]
 oam = "openagentmesh.cli:app"
 
@@ -40,6 +48,11 @@ dev = [
     "ruff>=0.15.9",
     "ty>=0.0.28",
     "zensical>=0.0.32",
+    # Phase 2 dashboard backend — pulled in for tests so `uv run pytest` exercises
+    # the FastAPI app without requiring a separate `--extra wildfire-dashboard`.
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",  # FastAPI TestClient backend
 ]
 demo = [
     "openai>=1.0.0",
