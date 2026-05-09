@@ -61,3 +61,9 @@ site/
 
 # CLI per-project mesh URL
 .oam-url
+
+# Frontend build artifacts (D-18)
+ui/node_modules/
+ui/dist/
+src/openagentmesh/_ui_assets/*
+!src/openagentmesh/_ui_assets/.gitkeep
