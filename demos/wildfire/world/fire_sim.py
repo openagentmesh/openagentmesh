@@ -209,7 +209,11 @@ def build_agent(mesh: AgentMesh, sim: FireSim) -> None:
                 "and writes only changed cells back via the same KV namespace."
             ),
         ),
-        sources=[mesh.kv_source(f"{CELL_PREFIX}.*", on_init="replay")],
+        # Cell keys are `wildfire.world.cell.<x_idx>.<y_idx>` (two trailing
+        # segments). NATS `*` matches exactly one segment, so the wildcard
+        # MUST be `>` (one or more) for the watcher to fire on real keys.
+        # Bug discovered by plan 01-10 live-integration tests.
+        sources=[mesh.kv_source(f"{CELL_PREFIX}.>", on_init="replay")],
     )
     async def fire_sim(entry: KVEntry[CellState]) -> None:
         # DELETE op: drop the cell from the in-process grid; nothing else to
