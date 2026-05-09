@@ -67,3 +67,8 @@ ui/node_modules/
 ui/dist/
 src/openagentmesh/_ui_assets/*
 !src/openagentmesh/_ui_assets/.gitkeep
+
+# Wildfire dashboard frontend (D-25, D-36)
+demos/wildfire/dashboard/node_modules/
+demos/wildfire/dashboard/dist/*
+!demos/wildfire/dashboard/dist/.gitkeep
