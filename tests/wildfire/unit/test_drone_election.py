@@ -219,3 +219,172 @@ def test_drone_module_has_no_bare_prefix_kv_list_calls():
             f"bare-prefix mesh.kv.list call detected: {snippet!r}. Add `.>` "
             f"or `.*` so the NATS wildcard matches all keys under the prefix."
         )
+
+
+# ---------------------------------------------------------------------------
+# Live-integration tests against AgentMesh.local() (D-20, plan 01-10)
+# ---------------------------------------------------------------------------
+#
+# Boots an embedded NATS, exercises the CAS-election helpers (_is_closest_free,
+# _claim, _complete) against synthetic peer + detection KV state. No
+# mesh.kv.list calls are made directly from this file -- peer scans go
+# through drone._list_peers, which uses the NATS wildcard suffix `.>` on
+# the low-alt.drone fleet prefix (already gated by
+# test_drone_module_peer_scan_uses_nats_wildcard_suffix above).
+
+import asyncio  # noqa: E402
+import time  # noqa: E402
+
+from openagentmesh import AgentMesh  # noqa: E402
+from demos.wildfire.core.contracts import (  # noqa: E402
+    DetectionRecord,
+    FleetMemberState,
+    SurveyResult,
+)
+from demos.wildfire.core.keys import detection_key, fleet_key  # noqa: E402
+
+
+async def test_is_closest_free_with_closer_peer_returns_false():
+    """Self at (0, 0). Peer at (0.5, 0.5) is closer to target (1, 1)."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            fleet_key("low-alt", "drone", "peer-close"),
+            FleetMemberState(
+                instance_id="peer-close",
+                zone="low-alt",
+                fleet_type="drone",
+                coords=Coords(x=0.5, y=0.5),
+                state="free",
+                current_assignment=None,
+                last_updated=time.time(),
+            ),
+        )
+        state = drone.DroneState(
+            current_coords=Coords(x=0.0, y=0.0),
+            fleet_state="free",
+            assignment_id=None,
+        )
+        target = Coords(x=1.0, y=1.0)
+        assert await drone._is_closest_free(mesh, state, target) is False
+
+
+async def test_is_closest_free_when_no_closer_peer_returns_true():
+    """Self at (0, 0). Peer at (4, 4) is farther than self from target (1, 1)."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            fleet_key("low-alt", "drone", "peer-far"),
+            FleetMemberState(
+                instance_id="peer-far",
+                zone="low-alt",
+                fleet_type="drone",
+                coords=Coords(x=4.0, y=4.0),
+                state="free",
+                current_assignment=None,
+                last_updated=time.time(),
+            ),
+        )
+        state = drone.DroneState(
+            current_coords=Coords(x=0.0, y=0.0),
+            fleet_state="free",
+            assignment_id=None,
+        )
+        target = Coords(x=1.0, y=1.0)
+        assert await drone._is_closest_free(mesh, state, target) is True
+
+
+async def test_is_closest_free_ignores_busy_peers():
+    """A busy peer at the same distance doesn't disqualify self."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            fleet_key("low-alt", "drone", "peer-busy"),
+            FleetMemberState(
+                instance_id="peer-busy",
+                zone="low-alt",
+                fleet_type="drone",
+                coords=Coords(x=0.5, y=0.5),  # closer to target than self
+                state="busy",  # but busy
+                current_assignment="d-other",
+                last_updated=time.time(),
+            ),
+        )
+        state = drone.DroneState(
+            current_coords=Coords(x=0.0, y=0.0),
+            fleet_state="free",
+            assignment_id=None,
+        )
+        assert await drone._is_closest_free(mesh, state, Coords(x=1.0, y=1.0)) is True
+
+
+async def test_claim_succeeds_on_pending_record_and_writes_assigned_state():
+    """`_claim` CAS-transitions a pending DetectionRecord to assigned:{instance_id}."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            detection_key("d-claim-1"),
+            DetectionRecord(
+                detection_id="d-claim-1",
+                state="pending",
+                coords=Coords(x=0, y=0),
+                severity=0.7,
+                detector_instance_id="uav-x",
+                created_at=time.time(),
+                last_updated=time.time(),
+            ),
+        )
+        won = await drone._claim(mesh, "d-claim-1")
+        assert won is True
+        rec = await mesh.kv.get_model(detection_key("d-claim-1"), DetectionRecord)
+        assert rec.state == f"assigned:{mesh.instance_id}"
+
+
+async def test_claim_bails_on_already_assigned_record():
+    """`_claim` returns False without modifying a record already assigned to another drone."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            detection_key("d-claim-2"),
+            DetectionRecord(
+                detection_id="d-claim-2",
+                state="assigned:other-drone",
+                coords=Coords(x=0, y=0),
+                severity=0.7,
+                detector_instance_id="uav-x",
+                created_at=time.time(),
+                last_updated=time.time(),
+            ),
+        )
+        won = await drone._claim(mesh, "d-claim-2")
+        assert won is False
+        rec = await mesh.kv.get_model(detection_key("d-claim-2"), DetectionRecord)
+        assert rec.state == "assigned:other-drone"  # unchanged
+
+
+async def test_complete_writes_surveyed_with_payload():
+    """`_complete` CAS-transitions an assigned record to `surveyed` and attaches the SurveyResult."""
+    async with AgentMesh.local() as mesh:
+        await mesh.kv.put_model(
+            detection_key("d-complete-1"),
+            DetectionRecord(
+                detection_id="d-complete-1",
+                state=f"assigned:{mesh.instance_id}",
+                coords=Coords(x=0, y=0),
+                severity=0.7,
+                detector_instance_id="uav-x",
+                created_at=time.time(),
+                last_updated=time.time(),
+            ),
+        )
+        survey = SurveyResult(
+            surveyor_instance_id=mesh.instance_id,
+            timestamp=time.time(),
+            fire_visible=True,
+            persons_detected=2,
+            structures_visible=1,
+            notes="test survey",
+        )
+        committed = await drone._complete(mesh, "d-complete-1", survey)
+        assert committed is True
+        rec = await mesh.kv.get_model(detection_key("d-complete-1"), DetectionRecord)
+        assert rec.state == "surveyed"
+        assert rec.survey is not None
+        assert rec.survey.persons_detected == 2
+        assert rec.survey.structures_visible == 1
+        assert rec.survey.notes == "test survey"
