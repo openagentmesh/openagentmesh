@@ -1,9 +1,10 @@
-"""Phase 1 hardcoded configuration constants for the wildfire demo.
+"""Hardcoded configuration constants for the wildfire demo (Phases 1-2).
 
-Single source of truth for HQ coords, fleet sizes, heartbeat cadence, and
-the fire-sim / UAV / drone tunables. Every fleet member, the orchestrator,
-and the spawn CLI imports from here so this file is the dial — there are
-no hardcoded magic numbers in the agent modules.
+Single source of truth for HQ coords, fleet sizes, heartbeat cadence, the
+fire-sim / UAV / drone tunables (Phase 1) plus the action-fleet ETA
+constants, dashboard spawn magnitudes, and dashboard port (Phase 2). Every
+fleet member, the orchestrator, and the spawn CLI imports from here so
+this file is the dial: no hardcoded magic numbers in agent modules.
 
 Sources:
 
@@ -16,6 +17,12 @@ Sources:
 - ``km/specs/wildfire/uav.md`` — UAV sensor footprint, threshold,
   confidence floor, dedup grid + window.
 - ``km/specs/wildfire/drone.md`` — drone speed and survey duration.
+- ``.planning/phases/02-cascade-closure/02-CONTEXT.md`` decisions D-39
+  (dashboard port 8081 with auto-fallback), D-43 (action-fleet ETA
+  formula), D-46 (shared ActionFleetAgent base class), D-49 (browser-side
+  magnitude cycling).
+- ``km/specs/wildfire/medevac.md`` — medevac speed positioning (slower
+  than heli, faster than ffunit).
 """
 
 from __future__ import annotations
@@ -106,3 +113,57 @@ DRONE_SPEED_KM_S: float = 0.4
 
 # Time spent on-site once arrived; simulated, no real sensor.
 DRONE_SURVEY_DURATION_S: float = 5.0
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Medevac fleet sizing (cascade closure)
+# ---------------------------------------------------------------------------
+
+# Number of medevac instances spawned by the orchestrator. Per
+# .planning/phases/02-cascade-closure/02-CONTEXT.md ("3 instances,
+# ground.medevac"). Tunable; orchestrator reads this value.
+MEDEVAC_COUNT: int = 3
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Per-fleet speed + action duration constants (D-43, D-46)
+# ---------------------------------------------------------------------------
+
+# Speed ordering invariant (per km/specs/wildfire/medevac.md
+# "ground vehicle, slower than heli, faster than ffunit"):
+#
+#     HELI_SPEED_KM_S > MEDEVAC_SPEED_KM_S > FFUNIT_SPEED_KM_S
+#
+# Consumed by the shared ActionFleetAgent base class (plan 02-02) for the
+# ETA formula: eta_seconds = distance(self.coords, target) / SPEED + ACTION
+# + return_distance / SPEED. Values are demo-pace tunables chosen to keep
+# the end-to-end cascade under ~60 s on a 10 km map.
+
+# Heli: water bomber, fastest fleet.
+HELI_SPEED_KM_S: float = 0.6
+HELI_ACTION_DURATION_S: float = 5.0  # water drop on-site
+
+# Medevac: ground vehicle, mid-pace; slower than heli, faster than ffunit.
+MEDEVAC_SPEED_KM_S: float = 0.3
+MEDEVAC_ACTION_DURATION_S: float = 6.0  # extraction on-site
+MEDEVAC_CAPACITY_MAX: int = 4  # mirrors MedevacStatus.capacity_max default
+
+# FFUnit: ground suppression unit, slowest.
+FFUNIT_SPEED_KM_S: float = 0.15
+FFUNIT_ACTION_DURATION_S: float = 8.0  # suppression on-site
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Dashboard click-spawn magnitudes (D-49)
+# ---------------------------------------------------------------------------
+
+# Three temperature tiers the dashboard cycles through on cell click. Values
+# stay inside the CellState [25, 800] expected band (see FIRE_SIM_AMBIENT_C
+# and FIRE_SIM_MAX_C above). Browser-side cycling only; server simply writes
+# whatever magnitude arrives on the spawn intent.
+SPAWN_MAGNITUDE_SMALL: float = 200.0
+SPAWN_MAGNITUDE_MEDIUM: float = 500.0
+SPAWN_MAGNITUDE_LARGE: float = 800.0
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Dashboard server port (D-39)
+# ---------------------------------------------------------------------------
+
+DASHBOARD_PORT: int = 8081  # auto-fallback to next free port if occupied (D-39)
