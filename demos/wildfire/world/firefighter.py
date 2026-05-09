@@ -209,15 +209,140 @@ def format_ack(ack: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# CLI entry point (Task 2 wires the REPL; Task 1 just declares main).
+# REPL loop (Task 2)
 # ---------------------------------------------------------------------------
+
+
+_PROMPT_BANNER = (
+    "firefighter operator: type 'help' for grammar; Ctrl-D to exit"
+)
+_PROMPT = "> "
+
+
+async def repl(
+    mesh: AgentMesh,
+    *,
+    operator_id: str,
+    in_stream=None,
+    out_stream=None,
+    err_stream=None,
+    call_timeout: float = 10.0,
+) -> None:
+    """Run the read-eval-print loop against an open ``AgentMesh``.
+
+    Each iteration:
+
+    1. Print ``> `` and read one line via ``asyncio.to_thread(readline)``
+       so the loop yields to the event loop while waiting on stdin.
+    2. Empty string back from ``readline`` signals EOF (stdin closed):
+       break and return.
+    3. ``help`` / ``?`` print ``GRAMMAR`` to stdout.
+    4. Otherwise, parse the line:
+       - ``ValueError`` -> print ``error: <msg>`` and ``GRAMMAR`` to
+         stderr; continue (loud failure per D-31).
+       - parsed ``DispatchOrder`` -> stamp ``order_id`` (uuid4 hex),
+         ``operator_id`` (caller-supplied), and ``issued_at`` (now); look
+         up the target via ``target_agent_for_fleet``; ``mesh.call`` it.
+       - ``MeshError`` from the call -> print to stderr; continue.
+
+    The streams default to the live process streams. Tests pass
+    ``StringIO`` instances to drive the loop deterministically.
+    """
+    if in_stream is None:
+        in_stream = sys.stdin
+    if out_stream is None:
+        out_stream = sys.stdout
+    if err_stream is None:
+        err_stream = sys.stderr
+
+    print(_PROMPT_BANNER, file=out_stream)
+
+    while True:
+        # Print the prompt without trailing newline; flush so it appears
+        # before readline blocks. StringIO ignores flush; real stdout needs it.
+        out_stream.write(_PROMPT)
+        try:
+            out_stream.flush()
+        except Exception:
+            pass
+
+        # Read one line. asyncio.to_thread keeps stdin off the event-loop
+        # thread; for StringIO this is functionally synchronous but the
+        # await still yields once.
+        line = await asyncio.to_thread(in_stream.readline)
+        if line == "":  # EOF (Ctrl-D on a tty, end-of-StringIO in tests)
+            break
+
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if stripped.lower() in {"help", "?"}:
+            print(GRAMMAR, file=out_stream)
+            continue
+
+        try:
+            order_template = parse_dispatch_line(line)
+        except ValueError as e:
+            print(f"error: {e}", file=err_stream)
+            print(GRAMMAR, file=err_stream)
+            continue
+
+        if order_template is None:
+            # Belt-and-braces: parse_dispatch_line already returned None
+            # for help / ? above. Defensive guard for empty lines that
+            # somehow slipped past the strip() check.
+            continue
+
+        # Recover the fleet keyword (first whitespace-separated token,
+        # lowered) so we can route to the matching action agent.
+        fleet = stripped.split()[0].lower()
+        try:
+            target = target_agent_for_fleet(fleet)
+        except ValueError as e:
+            print(f"error: {e}", file=err_stream)
+            continue
+
+        # Stamp caller-side fields. Order id is unique per dispatch so
+        # the receiving agent can dedupe / log.
+        order = order_template.model_copy(
+            update={
+                "order_id": uuid.uuid4().hex,
+                "operator_id": operator_id,
+                "issued_at": time.time(),
+            }
+        )
+
+        try:
+            ack = await mesh.call(target, order, timeout=call_timeout)
+        except MeshError as e:
+            print(f"error: dispatch failed: {e}", file=err_stream)
+            continue
+        except Exception as e:  # pragma: no cover -- defensive
+            print(f"error: dispatch failed: {e}", file=err_stream)
+            continue
+
+        print(format_ack(ack), file=out_stream)
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+async def _run(url: str, operator_id: str | None) -> None:
+    """Open ``AgentMesh(url)``, derive operator id if needed, run the REPL."""
+    async with AgentMesh(url) as mesh:
+        op_id = operator_id or f"op-{mesh.instance_id[:8]}"
+        await repl(mesh, operator_id=op_id)
 
 
 def main(argv: list[str]) -> int:
     """Entry point. Parses optional flags, opens AgentMesh, runs the REPL.
 
-    Task 2 fills this in. Task 1 leaves a stub so the module is importable
-    and ``main`` is callable without crashing.
+    Returns 0 on clean exit (EOF or KeyboardInterrupt), 1 on connection /
+    runtime failure. Bad lines do NOT exit the REPL; they are handled
+    inside the loop.
     """
     parser = argparse.ArgumentParser(prog="firefighter")
     parser.add_argument(
@@ -225,7 +350,17 @@ def main(argv: list[str]) -> int:
         default=None,
         help="operator identifier (default: derived from mesh.instance_id)",
     )
-    parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    url = os.environ.get("NATS_URL", "nats://127.0.0.1:4222")
+
+    try:
+        asyncio.run(_run(url, args.operator_id))
+    except KeyboardInterrupt:
+        return 0
+    except Exception as e:
+        print(f"firefighter exited with error: {e}", file=sys.stderr)
+        return 1
     return 0
 
 
