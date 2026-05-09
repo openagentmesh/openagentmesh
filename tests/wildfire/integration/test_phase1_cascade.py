@@ -97,6 +97,26 @@ def _ensure_ui_built() -> None:
     assert index.exists(), f"build did not produce {index}"
 
 
+def _ensure_dashboard_built() -> None:
+    """Build the dashboard SPA bundle if missing; idempotent.
+
+    The Phase 2 orchestrator (plan 02-09) unconditionally spawns
+    ``python -m demos.wildfire.dashboard``. If ``dist/index.html`` is
+    missing, the dashboard exits 2 with a "run pnpm run build" message
+    on stderr, which would spam this Phase 1 test's stdout via the
+    ``[dash]`` log multiplexer. Building once up front avoids that
+    noise; nothing in Phase 1's assertions touches the dashboard.
+    """
+    index = ROOT / "demos" / "wildfire" / "dashboard" / "dist" / "index.html"
+    if index.exists():
+        return
+    dash_dir = ROOT / "demos" / "wildfire" / "dashboard"
+    subprocess.run(["corepack", "enable"], check=False)
+    subprocess.run(["pnpm", "install"], cwd=dash_dir, check=True)
+    subprocess.run(["pnpm", "run", "build"], cwd=dash_dir, check=True)
+    assert index.exists(), f"build did not produce {index}"
+
+
 def _wipe_state() -> None:
     """Delete stale JetStream state from prior runs (best-effort)."""
     run_data = AGENTMESH_DIR / "run" / "wildfire"
@@ -141,6 +161,7 @@ def _wait_for_url(proc: subprocess.Popen, deadline_s: float = 30.0) -> str:
 async def test_phase1_cascade(tmp_path: Path) -> None:  # noqa: ARG001 -- pytest fixture
     """End-to-end Phase 1 cascade: boot, spawn fire, observe surveyed detection."""
     _ensure_ui_built()
+    _ensure_dashboard_built()
     _wipe_state()
 
     env = {**os.environ}
