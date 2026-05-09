@@ -344,6 +344,10 @@ class ActionFleetAgent:
                 # source of truth.
                 self._coords = msg.coords
                 self._state = msg.state
+                # Subclass hook BEFORE status publish: lets subclasses mutate
+                # state that should be reflected in the published status
+                # (e.g. medevac capacity_used) within the same writer tick.
+                self._on_transition(state=msg.state, order_id=msg.order_id)
                 await self._safe_kv_put(key, self._build_member_state(msg))
                 await self._safe_publish_status(
                     state=msg.state,
@@ -432,6 +436,22 @@ class ActionFleetAgent:
         raise NotImplementedError(
             f"{type(self).__name__} must implement _make_status()"
         )
+
+    def _on_transition(
+        self,
+        *,
+        state: ActionState,
+        order_id: str | None,
+    ) -> None:
+        """Subclass hook called by the writer immediately after each transition.
+
+        Default: no-op. Subclasses override to mutate per-fleet state that
+        the next ``_make_status()`` call should reflect (e.g. medevac
+        ``capacity_used`` increments on entering ``"acting"`` and resets on
+        re-entering ``"free"``). Synchronous; runs inside the writer task,
+        so no concurrency hazards.
+        """
+        return None
 
     # ------------------------------------------------------------------
     # @mesh.agent registration helper
