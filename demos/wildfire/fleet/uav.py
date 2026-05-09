@@ -113,11 +113,14 @@ def build_agent(mesh: AgentMesh) -> None:
                 "detection threshold; do NOT use to query historical detections."
             ),
         ),
-        # KV-watch source: kv_source("wildfire.world.cell.*") -- expanded
+        # KV-watch source: kv_source("wildfire.world.cell.>") -- expanded
         # literal kept in this comment alongside the f-string call so
         # cross-repo greps locate the subject pattern here too. The
         # canonical constant is demos.wildfire.core.keys.CELL_PREFIX.
-        sources=[mesh.kv_source(f"{CELL_PREFIX}.*", on_init="replay")],
+        # Cell keys carry two trailing segments (`.<x_idx>.<y_idx>`), so the
+        # wildcard MUST be `>` (one or more); `*` matches one segment only
+        # and would never fire on real cell writes (see plan 01-10).
+        sources=[mesh.kv_source(f"{CELL_PREFIX}.>", on_init="replay")],
     )
     async def uav(entry: KVEntry[CellState]) -> None:
         # DELETE: cell decayed back to ambient or was suppressed. Detections

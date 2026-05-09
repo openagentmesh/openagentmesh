@@ -144,3 +144,142 @@ def test_uav_module_uses_mesh_kv_create_for_detections():
 def test_uav_module_uses_heartbeat_loop_helper():
     text = _UAV_PATH.read_text()
     assert "heartbeat_loop" in text
+
+
+# ---------------------------------------------------------------------------
+# Live-integration tests against AgentMesh.local() (D-20, plan 01-10)
+# ---------------------------------------------------------------------------
+#
+# Boots the embedded NATS, registers the UAV agent, writes synthetic cell
+# states, asserts the resulting DetectionRecord state. NATS subject
+# wildcards are mandatory on every kv.list call; bare prefixes return [].
+
+import asyncio  # noqa: E402
+import time  # noqa: E402
+
+from openagentmesh import AgentMesh  # noqa: E402
+from demos.wildfire.core.contracts import CellState, Coords, DetectionRecord  # noqa: E402
+from demos.wildfire.core.keys import DETECTION_PREFIX, cell_key  # noqa: E402
+
+# NATS wildcard suffix — bare prefix returns [] per src/openagentmesh/_context.py:375-405.
+DETECTION_WILDCARD = f"{DETECTION_PREFIX}.>"
+
+
+async def test_uav_writes_pending_detection_on_hot_cell():
+    """A hot CellState (>UAV_TEMP_THRESHOLD_C, conf > UAV_CONFIDENCE_FLOOR)
+    inside the sensor footprint produces a pending DetectionRecord.
+    """
+    async with AgentMesh.local() as mesh:
+        uav.build_agent(mesh)
+        # Source binding is deferred until catalog()/call() per
+        # _subscribe_pending; trigger it explicitly so the kv_source fires.
+        await mesh.catalog()
+        await asyncio.sleep(0.5)
+
+        await mesh.kv.put_model(
+            cell_key(0.0, 0.0),
+            CellState(
+                coords=Coords(x=0.0, y=0.0),
+                temperature=600.0,
+                last_modified_at=time.time(),
+                last_modified_by="external",
+            ),
+        )
+
+        # Poll for arrival.
+        entries: list = []
+        for _ in range(30):
+            await asyncio.sleep(0.1)
+            entries = [e for e in await mesh.kv.list(DETECTION_WILDCARD) if e.value]
+            if entries:
+                break
+        assert len(entries) >= 1, (
+            f"expected >= 1 detection, got {len(entries)}"
+        )
+        rec = DetectionRecord.model_validate_json(entries[0].value)
+        assert rec.state == "pending"
+        assert rec.severity > 0.5
+        assert rec.detector_instance_id == mesh.instance_id
+
+
+async def test_uav_dedup_swallows_duplicate_hot_writes():
+    """Three rapid PUTs on the same cell within the dedup window
+    (100 m * 30 s) collide on the dedup hash; only one DetectionRecord
+    survives via the put-if-absent (mesh.kv.create) collision.
+    """
+    async with AgentMesh.local() as mesh:
+        uav.build_agent(mesh)
+        await mesh.catalog()
+        await asyncio.sleep(0.5)
+
+        for _ in range(3):
+            await mesh.kv.put_model(
+                cell_key(0.0, 0.0),
+                CellState(
+                    coords=Coords(x=0.0, y=0.0),
+                    temperature=600.0,
+                    last_modified_at=time.time(),
+                    last_modified_by="external",
+                ),
+            )
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.5)
+        entries = [e for e in await mesh.kv.list(DETECTION_WILDCARD) if e.value]
+        assert len(entries) == 1, (
+            f"dedup should have collapsed 3 hot writes to 1 detection, got {len(entries)}"
+        )
+
+
+async def test_uav_below_threshold_no_detection():
+    """A cell below ``UAV_TEMP_THRESHOLD_C`` (100 C) does NOT produce a
+    detection — the threshold gate short-circuits before kv.create.
+    """
+    async with AgentMesh.local() as mesh:
+        uav.build_agent(mesh)
+        await mesh.catalog()
+        await asyncio.sleep(0.5)
+
+        await mesh.kv.put_model(
+            cell_key(0.0, 0.0),
+            CellState(
+                coords=Coords(x=0.0, y=0.0),
+                temperature=80.0,
+                last_modified_at=time.time(),
+                last_modified_by="external",
+            ),
+        )
+        await asyncio.sleep(0.5)
+        entries = [e for e in await mesh.kv.list(DETECTION_WILDCARD) if e.value]
+        assert entries == []
+
+
+async def test_uav_outside_footprint_no_detection():
+    """A hot cell outside the sensor footprint (HQ at origin, 5 km radius)
+    does NOT produce a detection — the footprint gate short-circuits.
+
+    The CellState contract clips coords to ``[-5, +5]`` per axis, so a
+    truly out-of-footprint cell still has to be inside that box. We pin
+    the cell at the boundary corner (4.9, 4.9), distance ~6.93 km from
+    HQ — outside the 5 km footprint.
+    """
+    async with AgentMesh.local() as mesh:
+        uav.build_agent(mesh)
+        await mesh.catalog()
+        await asyncio.sleep(0.5)
+
+        await mesh.kv.put_model(
+            cell_key(4.9, 4.9),
+            CellState(
+                coords=Coords(x=4.9, y=4.9),
+                temperature=600.0,
+                last_modified_at=time.time(),
+                last_modified_by="external",
+            ),
+        )
+        await asyncio.sleep(0.5)
+        entries = [e for e in await mesh.kv.list(DETECTION_WILDCARD) if e.value]
+        assert entries == [], (
+            "cell at (4.9, 4.9) is ~6.93 km from HQ (origin); "
+            "outside the 5 km footprint, must NOT produce a detection"
+        )
