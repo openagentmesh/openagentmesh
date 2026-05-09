@@ -163,13 +163,28 @@ class Orchestrator:
         argv: list[str],
         env: dict[str, str],
     ) -> subprocess.Popen[bytes]:
-        """Spawn a child process with piped stdout/stderr and start_new_session."""
+        """Spawn a child process with piped stdout/stderr.
+
+        Children inherit the orchestrator's session/process group. Without
+        ``start_new_session=True``, every fleet child, the admin UI server,
+        the dashboard backend, and nats-server stay in the orchestrator's
+        process group. That makes a single ``killpg(orch_pgid, SIGTERM)``
+        from a parent (terminal Ctrl+C, integration test teardown,
+        ``systemd-run --scope ...``, etc.) tear the whole tree down without
+        relying on the orchestrator's asyncio loop being responsive: each
+        child handles its own SIGTERM independently. The orchestrator's
+        ``_shutdown()`` remains the correct path when the orchestrator
+        decides to exit on its own (e.g. NATS death), but it is no longer
+        the only path.
+
+        T-02-09-03 mitigation: orphan dashboard/medevac/etc. processes are
+        impossible because killpg reaches every leaf.
+        """
         proc = subprocess.Popen(  # noqa: S603 -- argv is constructed from constants
             argv,
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            start_new_session=True,
         )
         self._log_tasks.append(asyncio.create_task(self._drain(tag, proc.stdout)))
         self._log_tasks.append(asyncio.create_task(self._drain(tag, proc.stderr)))
@@ -196,12 +211,14 @@ class Orchestrator:
             store_dir=store_dir,
         )
 
-        # 3. Spawn nats-server.
+        # 3. Spawn nats-server. Stays in the orchestrator's process group so
+        # a parent ``killpg(orch_pgid, SIGTERM)`` reaps the entire tree
+        # (see ``_spawn``); the orchestrator's own ``_shutdown`` still
+        # SIGTERM-then-SIGKILL nats-server when it exits voluntarily.
         self._nats_proc = subprocess.Popen(  # noqa: S603 -- binary is a resolved Path
             [str(binary), "-c", str(self._config_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            start_new_session=True,
         )
         self._log_tasks.append(
             asyncio.create_task(self._drain("nats", self._nats_proc.stdout))
