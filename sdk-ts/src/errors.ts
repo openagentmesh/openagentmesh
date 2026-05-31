@@ -118,11 +118,14 @@ export function fromEnvelope(env: ErrorEnvelope): MeshError {
 
   switch (code) {
     case MeshTimeout.code:
-      return new MeshTimeout(message, {
-        ...common,
-        subject: asStr(env.details?.["subject"]),
-        timeout: asNum(env.details?.["timeout"]),
-      });
+      // The wire envelope for a timeout error carries no structured duration:
+      // the Python SDK keeps subject/timeout as attributes only and serializes
+      // details={} (the value rides inside `message`). We deliberately do NOT
+      // read a unit-ambiguous details.timeout here (Python's float seconds vs
+      // this client's milliseconds). Client-raised MeshTimeout sets .timeout in
+      // milliseconds directly; reconstructed-from-wire timeouts leave it unset.
+      // See ADR-0057 (timeout error envelope has no structured duration field).
+      return new MeshTimeout(message, common);
     case ChunkSequenceError.code:
       return new ChunkSequenceError(message, {
         agent: env.agent,

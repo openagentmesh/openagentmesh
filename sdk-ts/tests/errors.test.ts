@@ -23,11 +23,16 @@ describe("error taxonomy", () => {
     expect(e.message).toBe("m");
   });
 
-  it("reconstructs MeshTimeout subject/timeout from details", () => {
-    const e = fromEnvelope({ code: "timeout", message: "t", details: { subject: "mesh.agent.x", timeout: 5 } });
+  it("reconstructs a timeout error without reading a unit-ambiguous duration", () => {
+    // The wire envelope carries no structured timeout (Python serializes
+    // details={}); the value lives only in `message`. We must not interpret a
+    // details.timeout, whose unit the two SDKs disagree on. See ADR-0057.
+    const e = fromEnvelope({ code: "timeout", message: "No message on mesh.agent.x within 30.0s", details: { timeout: 30 } });
     expect(e).toBeInstanceOf(MeshTimeout);
-    expect((e as MeshTimeout).subject).toBe("mesh.agent.x");
-    expect((e as MeshTimeout).timeout).toBe(5);
+    expect(e.code).toBe("timeout");
+    expect(e.message).toContain("within 30.0s");
+    expect((e as MeshTimeout).timeout).toBeUndefined();
+    expect((e as MeshTimeout).subject).toBeUndefined();
   });
 
   it("reconstructs ChunkSequenceError expected/got", () => {
