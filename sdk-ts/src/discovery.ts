@@ -6,6 +6,9 @@ export const CATALOG_BUCKET = "mesh-catalog";
 export const CATALOG_KEY = "catalog";
 export const REGISTRY_BUCKET = "mesh-registry";
 
+// The catalog/registry wire is produced by the OAM SDK (Python today) and is
+// trusted to conform to the contract schema. Primitives are coerced defensively;
+// nested JSON Schemas are passed through as opaque objects.
 function coerceEntry(raw: Record<string, unknown>): CatalogEntry {
   return {
     name: String(raw["name"] ?? ""),

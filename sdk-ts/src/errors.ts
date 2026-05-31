@@ -108,6 +108,9 @@ const CODE_TO_CLASS: Record<string, BaseErrorCtor> = {
  * Reconstruct a typed error from a wire envelope. Unknown codes fall back to a
  * base `MeshError` with the code preserved (forward compatibility).
  */
+const asNum = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
+const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
 export function fromEnvelope(env: ErrorEnvelope): MeshError {
   const code = env.code ?? MeshError.code;
   const message = env.message ?? "mesh error";
@@ -117,18 +120,18 @@ export function fromEnvelope(env: ErrorEnvelope): MeshError {
     case MeshTimeout.code:
       return new MeshTimeout(message, {
         ...common,
-        subject: env.details?.["subject"] as string | undefined,
-        timeout: env.details?.["timeout"] as number | undefined,
+        subject: asStr(env.details?.["subject"]),
+        timeout: asNum(env.details?.["timeout"]),
       });
     case ChunkSequenceError.code:
       return new ChunkSequenceError(message, {
         agent: env.agent,
         requestId: env.request_id,
-        expectedSeq: env.details?.["expected_seq"] as number | undefined,
-        gotSeq: env.details?.["got_seq"] as number | undefined,
+        expectedSeq: asNum(env.details?.["expected_seq"]),
+        gotSeq: asNum(env.details?.["got_seq"]),
       });
     case KVKeyExists.code:
-      return new KVKeyExists(message, { key: env.details?.["key"] as string | undefined });
+      return new KVKeyExists(message, { key: asStr(env.details?.["key"]) });
     default: {
       const Cls = CODE_TO_CLASS[code] ?? MeshError;
       return new Cls(message, { ...common, code });

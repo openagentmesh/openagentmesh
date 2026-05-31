@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Msg, NatsConnection } from "@nats-io/nats-core";
-import { AgentMesh, HandlerError, MeshError, MeshTimeout } from "../src/index.js";
+import { AgentMesh, HandlerError, InvalidInput, MeshTimeout } from "../src/index.js";
 import { delay } from "./helpers/delay.js";
 import { startNatsServer, type NatsServer } from "./helpers/server.js";
 import { ensureBuckets, errorResult, rawConnect, Sim } from "./helpers/sim.js";
@@ -80,6 +80,6 @@ describe("send", () => {
   it("rejects when onReply and replyTo are both provided", async () => {
     await expect(
       mesh.send("worker.task", {}, { onReply: () => {}, replyTo: "x" }),
-    ).rejects.toBeInstanceOf(Error);
+    ).rejects.toBeInstanceOf(InvalidInput);
   });
 });

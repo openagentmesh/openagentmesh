@@ -1,4 +1,5 @@
 // Public data shapes for the OAM TypeScript client.
+import type { MeshError } from "./errors.js";
 
 export type Json = Record<string, unknown>;
 
@@ -70,7 +71,7 @@ export interface StreamOptions {
 
 export interface SendOptions {
   onReply?: (msg: Json) => void;
-  onError?: (err: Error) => void;
+  onError?: (err: MeshError) => void;
   replyTo?: string;
   timeout?: number;
 }

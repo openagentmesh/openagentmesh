@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Msg, NatsConnection } from "@nats-io/nats-core";
-import { AgentMesh } from "../src/index.js";
+import { AgentMesh, InvalidInput } from "../src/index.js";
 import { startNatsServer, type NatsServer } from "./helpers/server.js";
 import { ensureBuckets, rawConnect, Sim } from "./helpers/sim.js";
 
@@ -71,7 +71,7 @@ describe("publish", () => {
   });
 
   it("rejects subjects containing wildcards", async () => {
-    await expect(mesh.publish("bad.*.subject", {})).rejects.toBeInstanceOf(Error);
-    await expect(mesh.publish("bad.>", {})).rejects.toBeInstanceOf(Error);
+    await expect(mesh.publish("bad.*.subject", {})).rejects.toBeInstanceOf(InvalidInput);
+    await expect(mesh.publish("bad.>", {})).rejects.toBeInstanceOf(InvalidInput);
   });
 });

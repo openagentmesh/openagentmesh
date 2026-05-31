@@ -14,7 +14,7 @@ function toBytes(value: unknown): Uint8Array {
 function isWrongLastSequence(err: unknown): boolean {
   const e = err as { code?: number | string; api_error?: { err_code?: number }; message?: string };
   if (e?.api_error?.err_code === 10071) return true;
-  if (e?.code === 10071) return true;
+  if (e?.code === 10071 || e?.code === "10071") return true;
   return /wrong last sequence|already exists/i.test(e?.message ?? "");
 }
 
@@ -129,8 +129,11 @@ export class KVStore {
     const maxRetries = opts.maxRetries ?? 10;
     for (let i = 0; i < maxRetries; i++) {
       const e = await this.kv.get(key);
-      const current = e && e.operation === "PUT" ? e.string() : "";
-      const revision = e ? e.revision : 0;
+      // Value is empty for a missing/deleted key; CAS revision is the entry's
+      // current last sequence (the DELETE/PURGE revision for a tombstoned key,
+      // which is what overwrites it), or 0 for a never-existed key.
+      const current = e !== null && e.operation === "PUT" ? e.string() : "";
+      const revision = e !== null ? e.revision : 0;
       const next = await fn(current);
       try {
         await this.kv.put(key, toBytes(next), { previousSeq: revision });

@@ -11,6 +11,7 @@ import {
   ChunkSequenceError,
   type ErrorEnvelope,
   fromEnvelope,
+  InvalidInput,
   InvocationMismatch,
   MeshError,
   MeshTimeout,
@@ -175,6 +176,9 @@ export class AgentMesh {
         );
         if (res.done) break;
         const m = res.value;
+        // Error chunks are exempt from sequence validation (they carry
+        // X-Mesh-Status:error + X-Mesh-Stream-End:true and terminate the stream),
+        // matching the Python SDK which omits X-Mesh-Stream-Seq on error chunks.
         if (readHeader(m.headers, H.status) === STATUS_ERROR) {
           throw fromEnvelope(decodeJSON<ErrorEnvelope>(m.data));
         }
@@ -197,7 +201,7 @@ export class AgentMesh {
     const timeout = opts.timeout ?? 60_000;
     this.preflight(name, "send");
     if (opts.onReply && opts.replyTo) {
-      throw new Error("send(): `onReply` and `replyTo` are mutually exclusive");
+      throw new InvalidInput("send(): `onReply` and `replyTo` are mutually exclusive");
     }
     const requestId = newRequestId();
     const subject = computeSubject(name);
@@ -206,7 +210,9 @@ export class AgentMesh {
     if (opts.onReply) {
       const replySubj = resultsSubject(requestId);
       const sub = this.nc.subscribe(replySubj);
-      void this.drainReplies(sub, opts, timeout);
+      void this.drainReplies(sub, opts, timeout).catch(() => {
+        /* drain is fire-and-forget; failures are surfaced via onError */
+      });
       const headers = buildHeaders({ [H.requestId]: requestId }, this.instanceId);
       this.nc.publish(subject, data, { headers, reply: replySubj });
       return;
@@ -221,29 +227,45 @@ export class AgentMesh {
   }
 
   private async drainReplies(sub: Subscription, opts: SendOptions, timeout: number): Promise<void> {
+    // Consumer callbacks run inside this background task; isolate their throws
+    // so a buggy onReply/onError cannot become an unhandled rejection.
+    const safeReply = (msg: Json): void => {
+      try {
+        opts.onReply?.(msg);
+      } catch {
+        /* swallow consumer callback error */
+      }
+    };
+    const safeError = (err: MeshError): void => {
+      try {
+        opts.onError?.(err);
+      } catch {
+        /* swallow consumer callback error */
+      }
+    };
     try {
       const it = sub[Symbol.asyncIterator]();
       const deadline = Date.now() + timeout;
       while (true) {
         const remaining = deadline - Date.now();
         if (remaining <= 0) {
-          opts.onError?.(new MeshTimeout(`send reply timed out after ${timeout}ms`, { timeout }));
+          safeError(new MeshTimeout(`send reply timed out after ${timeout}ms`, { timeout }));
           break;
         }
         let res: IteratorResult<Msg>;
         try {
           res = await withDeadline(it.next(), remaining, () => new MeshTimeout(`send reply timed out after ${timeout}ms`, { timeout }));
         } catch (err) {
-          opts.onError?.(err as Error);
+          safeError(err instanceof MeshError ? err : new MeshError(String(err)));
           break;
         }
         if (res.done) break;
         const m = res.value;
         if (readHeader(m.headers, H.status) === STATUS_ERROR) {
-          opts.onError?.(fromEnvelope(decodeJSON<ErrorEnvelope>(m.data)));
+          safeError(fromEnvelope(decodeJSON<ErrorEnvelope>(m.data)));
           break;
         }
-        opts.onReply?.(decodeJSON(m.data));
+        safeReply(decodeJSON(m.data));
         const hasSeq = readHeader(m.headers, H.streamSeq) !== undefined;
         const ended = readHeader(m.headers, H.streamEnd) === "true";
         if (!hasSeq || ended) break;
@@ -256,7 +278,7 @@ export class AgentMesh {
   // ── publish ───────────────────────────────────────────────────────────────
   async publish(subject: string, payload: unknown, opts: PublishOptions = {}): Promise<void> {
     if (!isValidSubject(subject)) {
-      throw new Error(`invalid publish subject '${subject}' (wildcards are not allowed)`);
+      throw new InvalidInput(`invalid publish subject '${subject}' (wildcards are not allowed)`);
     }
     let data: Uint8Array;
     let contentType: string;
@@ -310,12 +332,12 @@ export class AgentMesh {
 
   private resolveSubscribeSubject(opts: SubscribeOptions): string {
     if (opts.subject && opts.agent) {
-      throw new Error("subscribe(): `agent` and `subject` are mutually exclusive");
+      throw new InvalidInput("subscribe(): `agent` and `subject` are mutually exclusive");
     }
     if (opts.subject) return opts.subject;
     if (opts.agent) return computeEventSubject(opts.agent);
     if (opts.channel) return channelSubject(opts.channel);
-    throw new Error("subscribe(): one of `agent`, `channel`, or `subject` is required");
+    throw new InvalidInput("subscribe(): one of `agent`, `channel`, or `subject` is required");
   }
 
   // ── discovery ──────────────────────────────────────────────────────────────

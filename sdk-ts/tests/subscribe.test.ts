@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { NatsConnection } from "@nats-io/nats-core";
-import { AgentMesh, MeshTimeout } from "../src/index.js";
+import { AgentMesh, InvalidInput, MeshTimeout } from "../src/index.js";
 import { delay } from "./helpers/delay.js";
 import { startNatsServer, type NatsServer } from "./helpers/server.js";
 import { ensureBuckets, rawConnect, Sim } from "./helpers/sim.js";
@@ -77,6 +77,6 @@ describe("subscribe", () => {
       for await (const _e of mesh.subscribe({ agent: "a", subject: "s" })) {
         /* none */
       }
-    }).rejects.toBeInstanceOf(Error);
+    }).rejects.toBeInstanceOf(InvalidInput);
   });
 });

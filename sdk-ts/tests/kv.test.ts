@@ -52,6 +52,13 @@ describe("kv (mesh-context)", () => {
     expect(await mesh.kv.get("counter")).toBe("2");
   });
 
+  it("update resurrects a deleted key via CAS revision 0", async () => {
+    await mesh.kv.put("resurrect.me", "v1");
+    await mesh.kv.delete("resurrect.me");
+    await mesh.kv.update("resurrect.me", (cur) => (cur === "" ? "reborn" : `${cur}!`));
+    expect(await mesh.kv.get("resurrect.me")).toBe("reborn");
+  });
+
   it("watch yields decoded values on each PUT", async () => {
     const iter = mesh.kv.watch("watched.key")[Symbol.asyncIterator]();
     const first = iter.next();
