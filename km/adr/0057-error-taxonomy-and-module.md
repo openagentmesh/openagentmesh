@@ -77,6 +77,8 @@ Codes are stable wire identifiers. Classes are local Python conveniences. By def
 
 Adding a new code requires either an existing subclass or a new one in `_errors.py`; raw `MeshError(code="new_thing", ...)` is disallowed in `src/`.
 
+**Wire note — the `timeout` envelope carries no structured duration.** `MeshTimeout` keeps `subject` and `timeout` as instance attributes only; `to_dict()` serializes `self.details`, which stays `{}` for a timeout error, so the deadline travels only inside `message` (`"No message on {subject} within {timeout}s"`). There is deliberately no numeric `details.timeout` / `details.subject` on the wire. This matters across SDKs: Python timeouts are float **seconds**, the TypeScript client's are **milliseconds** (ADR-0061). Because the value is never serialized, that unit divergence cannot cross the boundary, and the registry/catalog likewise store no duration (only the ISO-8601 `registered_at` timestamp). Readers must not synthesize a `details.timeout`: a bare number there has no agreed unit (Python's `from_envelope` would read seconds, the TS client milliseconds), so deserializing it would manufacture a 1000x mismatch for a field nobody emits. The TS `fromEnvelope` therefore leaves a reconstructed-from-wire `MeshTimeout.timeout` unset. If a future feature must transmit a deadline/TTL structurally, pin its unit here first (recommend seconds) and update every SDK reader in lockstep.
+
 ### 4. Dispatch in `_mesh.py`
 
 The single outer `try/except` is replaced with a two-stage structure that separates input validation from handler execution.
