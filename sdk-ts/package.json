@@ -1,0 +1,32 @@
+{
+  "name": "@openagentmesh/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client SDK for OpenAgentMesh — the fabric for multi-agent systems.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@nats-io/nats-core": "^3.4.0",
+    "@nats-io/jetstream": "^3.0.0",
+    "@nats-io/kv": "^3.0.0"
+  },
+  "devDependencies": {
+    "@nats-io/transport-node": "^3.0.0",
+    "@types/node": "^20.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

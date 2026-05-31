@@ -68,4 +68,4 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0058](0058-public-mesh-publish.md) | Public `mesh.publish(subject, payload)` for arbitrary-subject emission | documented | feature/mesh-publish |
 | [ADR-0059](0059-mesh-instance-id.md) | `mesh.instance_id` stable per-process identifier + auto-stamped header | documented | feature/instance-id |
 | [ADR-0060](0060-kv-ergonomics-extensions.md) | KV ergonomics: `list`, `try_cas`, `create`, model helpers (amends ADR-0025) | documented | feature/kv-ergonomics |
-| [ADR-0061](0061-typescript-client-sdk.md) | TypeScript client SDK (`@openagentmesh/sdk`, consume-only, isomorphic) | spec | feature/typescript-sdk |
+| [ADR-0061](0061-typescript-client-sdk.md) | TypeScript client SDK (`@openagentmesh/sdk`, consume-only, isomorphic) | documented | feature/typescript-sdk |
