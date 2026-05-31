@@ -8,6 +8,15 @@ const ENC = new TextEncoder();
 const DEC = new TextDecoder();
 const enc = (v: unknown) => ENC.encode(JSON.stringify(v));
 const dec = (d: Uint8Array) => (d.length ? JSON.parse(DEC.decode(d)) : {});
+/** Decode best-effort: JSON when possible, else the raw bytes (for text/binary payloads). */
+const tryDec = (d: Uint8Array): unknown => {
+  if (!d.length) return {};
+  try {
+    return JSON.parse(DEC.decode(d));
+  } catch {
+    return d;
+  }
+};
 
 export function rawConnect(url: string): Promise<NatsConnection> {
   return connect({ servers: url });
@@ -118,7 +127,44 @@ export class Sim {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
     void (async () => {
-      for await (const m of sub) onMsg(dec(m.data), m);
+      for await (const m of sub) onMsg(tryDec(m.data), m);
+    })();
+    return this;
+  }
+
+  /** Capture messages on an arbitrary subject (for publish() asserts). */
+  captureSubject(subject: string, onMsg: (payload: any, m: Msg) => void): this {
+    const sub = this.nc.subscribe(subject);
+    this.subs.push(sub);
+    void (async () => {
+      for await (const m of sub) onMsg(tryDec(m.data), m);
+    })();
+    return this;
+  }
+
+  /** Flush the underlying connection so a freshly-created subscription's interest reaches the server. */
+  async ready(): Promise<void> {
+    await this.nc.flush();
+  }
+
+  /** Stream chunks but with a gap in the sequence numbers to force a ChunkSequenceError. */
+  streamerBadSeq(name: string, chunks: unknown[]): this {
+    const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
+    this.subs.push(sub);
+    void (async () => {
+      for await (const m of sub) {
+        if (!isStreamRequest(m)) continue;
+        const id = reqId(m);
+        chunks.forEach((c, i) => {
+          const seq = i === 0 ? 0 : i + 1; // 0, 2, 3, ... → gap after the first chunk
+          const h = headers();
+          h.set("X-Mesh-Request-Id", id);
+          h.set("X-Mesh-Stream-Seq", String(seq));
+          h.set("X-Mesh-Stream-End", "false");
+          this.nc.publish(streamSubject(id), enc(c), { headers: h });
+        });
+        await this.nc.flush();
+      }
     })();
     return this;
   }
