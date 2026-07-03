@@ -816,11 +816,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 if skip_initial and not init_done:
                     continue
 
-                op = (
-                    "DELETE"
-                    if str(getattr(entry, "operation", "PUT")).upper().endswith("DELETE")
-                    else "PUT"
-                )
+                raw_op = str(getattr(entry, "operation", "PUT")).upper()
+                op = "DELETE" if raw_op in ("DEL", "PURGE", "DELETE") else "PUT"
+                if op == "DELETE" and info.source_param_kind in ("model", "mesh_message"):
+                    continue
                 try:
                     payload = self._build_source_input(
                         info,

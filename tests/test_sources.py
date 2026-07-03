@@ -207,6 +207,63 @@ class TestKVSource:
             assert len(received) == 1
             assert received[0].detection_id == "d1"
 
+    async def test_kv_source_model_handler_skips_delete(self):
+        """DELETE entries (empty bytes) must not be validated as the model.
+
+        Sparse-KV deletes (e.g. wildfire 'cell off' click) deliver entry.value=b''.
+        Model-kind handlers can't construct a model from empty bytes, so the SDK
+        skips them rather than raising json_invalid on every drain.
+        """
+        async with AgentMesh.local() as mesh:
+            received: list[DetectionRecord] = []
+
+            @mesh.agent(
+                AgentSpec(name="del-model-watcher", description="model + delete"),
+                sources=[mesh.kv_source("test.delete.*", on_init="skip")],
+            )
+            async def watcher(detection: DetectionRecord) -> None:
+                received.append(detection)
+
+            await mesh._subscribe_pending()
+            await asyncio.sleep(0.1)
+
+            await mesh.kv.put_model(
+                "test.delete.d1",
+                DetectionRecord(detection_id="d1", state="pending"),
+            )
+            await asyncio.sleep(0.2)
+            assert len(received) == 1
+
+            await mesh.kv.delete("test.delete.d1")
+            await asyncio.sleep(0.2)
+            # Handler must NOT have been re-invoked (no validation error,
+            # no extra entry).
+            assert len(received) == 1
+
+    async def test_kv_source_kv_entry_handler_sees_delete(self):
+        """KVEntry-kind handlers still receive DELETE ops (raw value passthrough)."""
+        async with AgentMesh.local() as mesh:
+            received: list[KVEntry[bytes]] = []
+
+            @mesh.agent(
+                AgentSpec(name="del-entry-watcher", description="entry + delete"),
+                sources=[mesh.kv_source("test.delete2.*", on_init="skip")],
+            )
+            async def watcher(entry: KVEntry[bytes]) -> None:
+                received.append(entry)
+
+            await mesh._subscribe_pending()
+            await asyncio.sleep(0.1)
+
+            await mesh.kv.put("test.delete2.x", "v1")
+            await asyncio.sleep(0.2)
+            await mesh.kv.delete("test.delete2.x")
+            await asyncio.sleep(0.2)
+
+            ops = [e.operation for e in received]
+            assert "PUT" in ops
+            assert "DELETE" in ops
+
 
 # --- Catalog visibility ---
 
