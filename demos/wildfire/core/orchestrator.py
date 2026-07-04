@@ -46,6 +46,7 @@ from .config import (
     HELI_COUNT,
     MEDEVAC_COUNT,
     UAV_COUNT,
+    WILDFIRE_SEED_DEFAULT,
 )
 from .nats_config import write_nats_config
 
@@ -121,6 +122,8 @@ class Orchestrator:
         ui_port: int = 8088,
         dashboard_port: int = DASHBOARD_PORT,
         run_dir: Path = AGENTMESH_DIR / "run" / "wildfire",
+        seed: int = WILDFIRE_SEED_DEFAULT,
+        fresh: bool = True,
     ) -> None:
         self.nats_port = nats_port
         self.ws_port = ws_port
@@ -128,6 +131,8 @@ class Orchestrator:
         self.ui_port = ui_port
         self.dashboard_port = dashboard_port
         self.run_dir = run_dir
+        self.seed = seed
+        self.fresh = fresh
         self.nats_url = f"nats://127.0.0.1:{nats_port}"
 
         self._nats_proc: subprocess.Popen[bytes] | None = None
@@ -218,8 +223,15 @@ class Orchestrator:
             self._print("[orchestrator] downloading nats-server ...")
             binary = await download_nats_server()
 
-        # 2. Write HOCON config.
+        # 2. Write HOCON config. Clean-slate by default (DEMO_SCRIPT.md):
+        # leftover fires, registrations, and heartbeats from a previous run
+        # would replay into every kv_source and pollute the recording.
         store_dir = self.run_dir / f"jetstream-{self.nats_port}"
+        if self.fresh and store_dir.exists():
+            import shutil
+
+            shutil.rmtree(store_dir, ignore_errors=True)
+            self._print("[orchestrator] previous run state wiped (use --keep-state to retain)")
         self._config_path = write_nats_config(
             port=self.nats_port,
             ws_port=self.ws_port,
@@ -258,6 +270,7 @@ class Orchestrator:
         # 5. Build child env.
         child_env = dict(os.environ)
         child_env["NATS_URL"] = self.nats_url
+        child_env["WILDFIRE_SEED"] = str(self.seed)
 
         # 6. Spawn fleet children.
         for logical_name, (module, count) in CHILD_SPECS.items():

@@ -19,10 +19,18 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 export function groupCatalog(catalog: CatalogEntry[]): AgentGroup[] {
+  // Single-segment agent names (fire-sim, tasker, briefer) are Services.
+  // A prefixed name whose channel IS a service agent (briefer.survey-feed)
+  // groups with its parent under Services instead of spawning a one-row
+  // channel group.
+  const serviceNames = new Set(
+    catalog.filter((e) => !e.name.includes(".")).map((e) => e.name),
+  );
   const byKey = new Map<string, CatalogEntry[]>();
   for (const entry of catalog) {
     const dot = entry.name.indexOf(".");
-    const key = dot > 0 ? entry.name.slice(0, dot) : "services";
+    const prefix = dot > 0 ? entry.name.slice(0, dot) : null;
+    const key = prefix === null || serviceNames.has(prefix) ? "services" : prefix;
     const list = byKey.get(key) ?? [];
     list.push(entry);
     byKey.set(key, list);

@@ -10,20 +10,46 @@ const DEFAULT_PATTERN = "mesh.>";
  * pattern before opening the new one. Buffer capped at MAX_BUFFER events to
  * bound rendering cost (T-02-08-03).
  */
+// Message-rate telemetry: per-second buckets over the last 30s drive the
+// sparkline; the badge shows the mean of the last 5 full seconds.
+const RATE_WINDOW_S = 30;
+
 export function EventFeed() {
   const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
   const [activePattern, setActivePattern] = useState<string>(DEFAULT_PATTERN);
   const [events, setEvents] = useState<DecodedEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [buckets, setBuckets] = useState<number[]>(() => new Array(RATE_WINDOW_S).fill(0));
 
   const stopRef = useRef<(() => void) | null>(null);
+  const countsRef = useRef<Map<number, number>>(new Map());
+
+  // Roll the rate window once a second, even when no messages arrive.
+  useEffect(() => {
+    const roll = setInterval(() => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const counts = countsRef.current;
+      for (const k of counts.keys()) {
+        if (k < nowSec - RATE_WINDOW_S) counts.delete(k);
+      }
+      const next: number[] = [];
+      for (let s = nowSec - RATE_WINDOW_S + 1; s <= nowSec; s++) {
+        next.push(counts.get(s) ?? 0);
+      }
+      setBuckets(next);
+    }, 1000);
+    return () => clearInterval(roll);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
     setEvents([]);
+    countsRef.current = new Map();
     subscribeSubjects(activePattern, (e) => {
       if (cancelled) return;
+      const sec = Math.floor(e.receivedAt / 1000);
+      countsRef.current.set(sec, (countsRef.current.get(sec) ?? 0) + 1);
       setEvents((prev) => {
         const next = [e, ...prev];
         if (next.length > MAX_BUFFER) next.length = MAX_BUFFER;
@@ -92,6 +118,7 @@ export function EventFeed() {
             Subscribe
           </button>
         </form>
+        <RateBadge buckets={buckets} />
         <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-500">
           {events.length}/{MAX_BUFFER}
         </span>
@@ -127,5 +154,38 @@ export function EventFeed() {
         </ul>
       )}
     </section>
+  );
+}
+
+// Live message-rate telemetry: mean of the last 5 seconds as the number,
+// the last 30 seconds as a sparkline. SVG, no chart dependency.
+function RateBadge({ buckets }: { buckets: number[] }) {
+  const last5 = buckets.slice(-5);
+  const rate = last5.reduce((a, b) => a + b, 0) / Math.max(1, last5.length);
+  const max = Math.max(1, ...buckets);
+  const W = 60;
+  const H = 14;
+  const step = W / buckets.length;
+  const points = buckets
+    .map((v, i) => `${(i * step).toFixed(1)},${(H - (v / max) * (H - 2)).toFixed(1)}`)
+    .join(" ");
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 whitespace-nowrap"
+      title="messages per second (30s window)"
+    >
+      <svg width={W} height={H} className="opacity-70">
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#ff8a3d"
+          strokeWidth="1"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="font-mono text-[10px] tabular-nums text-ink-300">
+        {rate >= 10 ? rate.toFixed(0) : rate.toFixed(1)}/s
+      </span>
+    </span>
   );
 }

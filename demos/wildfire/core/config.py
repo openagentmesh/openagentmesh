@@ -197,7 +197,20 @@ BRIEFER_CLUSTER_WINDOW_S: float = 60.0
 # ---------------------------------------------------------------------------
 
 STATS_TICK_INTERVAL_S: float = 10.0
-NARRATOR_INTERVAL_S: float = 300.0
+
+# Demo pacing (DEMO_SCRIPT.md): 60s so the first narrative lands inside the
+# 90-second recording. The spec's production cadence is 5 minutes; this
+# constant is the dial.
+NARRATOR_INTERVAL_S: float = 60.0
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Reproducible runs (DEMO_SCRIPT.md)
+# ---------------------------------------------------------------------------
+
+# Default world seed: drives the scenario UI's procedural terrain (and any
+# future scenario randomness). `python -m demos.wildfire --seed N` overrides;
+# the orchestrator exports WILDFIRE_SEED to every child.
+WILDFIRE_SEED_DEFAULT: int = 42
 
 # ---------------------------------------------------------------------------
 # Phase 4 — Chaos recovery

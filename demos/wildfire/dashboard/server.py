@@ -45,6 +45,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -459,6 +460,8 @@ def make_app(mesh: AgentMesh) -> FastAPI:
             "status": "ok",
             "mesh_instance_id": mesh.instance_id,
             "connections": len(connections),
+            # Terrain seed for the browser (reproducible recording).
+            "seed": int(os.environ.get("WILDFIRE_SEED", "42")),
         }
 
     @app.websocket("/ws")

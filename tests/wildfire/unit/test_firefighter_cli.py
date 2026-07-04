@@ -30,7 +30,6 @@ Test layout
 """
 from __future__ import annotations
 
-import asyncio
 import io
 from pathlib import Path
 
@@ -43,7 +42,13 @@ firefighter = pytest.importorskip(
     reason="demos.wildfire.world.firefighter not yet on disk (this plan creates it).",
 )
 
-from demos.wildfire.core.contracts import DispatchAck, DispatchOrder  # noqa: E402
+from demos.wildfire.core.contracts import (  # noqa: E402
+    Coords,
+    DispatchAck,
+    DispatchOrder,
+    TaskCommand,
+    TaskTranslateRequest,
+)
 
 _FIREFIGHTER_PATH = Path(firefighter.__file__)
 
@@ -216,10 +221,14 @@ def test_firefighter_module_does_not_use_aspirational_kwargs(needle: str):
     assert needle not in code_text, f"{needle!r} is not a real SDK kwarg (A-09)"
 
 
-def test_firefighter_module_has_no_tasker_reference():
-    """Phase 3 deferral: no Tasker call in Phase 2."""
-    text = _FIREFIGHTER_PATH.read_text().lower()
-    assert "tasker" not in text, "tasker integration is deferred to Phase 3"
+def test_firefighter_module_wires_the_nl_tasker_path():
+    """Phase 3 (D-32): the --nl default routes non-grammar lines through
+    mesh.call("tasker", ...) and audits raw intent on mesh.fire.*.intent."""
+    text = _FIREFIGHTER_PATH.read_text()
+    assert 'mesh.call(\n            "tasker"' in text or '"tasker"' in text
+    assert "TaskTranslateRequest" in text
+    assert "FirefighterIntent" in text
+    assert ".intent" in text
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +319,7 @@ async def test_repl_handles_bad_input_without_exit():
             in_stream=in_stream,
             out_stream=out_stream,
             err_stream=err_stream,
+            nl=False,  # typed-grammar mode: non-grammar lines are errors
         )
         err = err_stream.getvalue()
         out = out_stream.getvalue()
@@ -337,6 +347,70 @@ async def test_repl_help_prints_grammar():
         # The grammar must contain at least one fleet keyword to be useful.
         assert "heli" in out
         assert "accepted=True" in out
+
+
+async def test_repl_nl_line_translates_and_dispatches_with_auto_accept():
+    """D-32 NL path: sentence -> stub tasker -> TaskCommand -> heli dispatch."""
+    mesh = await _make_mesh_with_stubs()
+
+    @mesh.agent(AgentSpec(name="tasker", description="stub NL translator"))
+    async def tasker_stub(req: TaskTranslateRequest) -> TaskCommand:
+        assert "water bomber" in req.text
+        return TaskCommand(
+            target_fleet="heli",
+            coords=Coords(x=1.0, y=-2.0),
+            incident_id=None,
+            priority="high",
+            persons_estimated=0,
+            rationale="operator asked for the heli",
+        )
+
+    async with mesh.local():
+        in_stream = io.StringIO("send the water bomber to the fire\n")
+        out_stream = io.StringIO()
+        err_stream = io.StringIO()
+        await firefighter.repl(
+            mesh,
+            operator_id="op-test",
+            in_stream=in_stream,
+            out_stream=out_stream,
+            err_stream=err_stream,
+            auto_accept=True,
+        )
+        out = out_stream.getvalue()
+        assert "tasker:" in out
+        assert "rationale: operator asked for the heli" in out
+        assert "instance_id=h-stub" in out, "translated command must reach the heli stub"
+
+
+async def test_repl_nl_confirmation_no_cancels_dispatch():
+    mesh = await _make_mesh_with_stubs()
+
+    @mesh.agent(AgentSpec(name="tasker", description="stub NL translator"))
+    async def tasker_stub(req: TaskTranslateRequest) -> TaskCommand:
+        return TaskCommand(
+            target_fleet="ffunit",
+            coords=Coords(x=0.0, y=0.0),
+            incident_id=None,
+            priority="low",
+            persons_estimated=0,
+            rationale="r",
+        )
+
+    async with mesh.local():
+        in_stream = io.StringIO("do the thing\nn\n")
+        out_stream = io.StringIO()
+        err_stream = io.StringIO()
+        await firefighter.repl(
+            mesh,
+            operator_id="op-test",
+            in_stream=in_stream,
+            out_stream=out_stream,
+            err_stream=err_stream,
+        )
+        out = out_stream.getvalue()
+        assert "cancelled" in out
+        assert "accepted=" not in out, "no dispatch after a declined confirmation"
 
 
 async def test_repl_empty_or_eof_exits_cleanly():

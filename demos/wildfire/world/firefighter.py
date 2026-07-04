@@ -10,11 +10,13 @@ registered agent" + decision D-30). It instantiates ``AgentMesh()``,
 opens the connection, runs the REPL, and exits. No catalog presence,
 no @mesh.agent decoration, no AgentSpec.
 
-Phase 3 deferrals (D-32): no briefing-pane subscription on the briefing
-fan-out subject, and no NL-translation hop through the Phase-3 translator
-agent. Phase 3 will retrofit a ``--nl`` flag (default true) that adds the
-NL translation step; ``--typed`` falls back to the path this module ships
-today.
+Phase 3 (D-32) retrofit: NL mode is the default. Any line that does not
+parse as the typed grammar is audited on ``mesh.fire.{operator_id}.intent``
+(``FirefighterIntent``) and translated via ``mesh.call("tasker", ...)`` into
+a ``TaskCommand``; the operator confirms (or ``--auto-accept`` skips the
+prompt) and the command dispatches to the matching fleet. ``--typed``
+restores the grammar-only behaviour. The briefing-pane subscription stays
+deferred (the scenario UI owns that surface).
 
 Typed-form grammar (D-31)::
 
@@ -67,8 +69,13 @@ import sys
 import time
 import uuid
 
-from demos.wildfire.core.contracts import Coords, DispatchOrder
-
+from demos.wildfire.core.contracts import (
+    Coords,
+    DispatchOrder,
+    FirefighterIntent,
+    TaskCommand,
+    TaskTranslateRequest,
+)
 from openagentmesh import AgentMesh
 from openagentmesh._errors import MeshError
 
@@ -86,6 +93,8 @@ GRAMMAR = (
     "  heli 1.5 -2.3 high\n"
     "  ffunit 0 0 low\n"
     "  medevac 2.7 1.2 med 3\n"
+    "in --nl mode (default) any other sentence goes to the tasker, e.g.:\n"
+    "  send the water bomber to the big fire, high priority\n"
     "type 'help' or '?' to reprint this grammar, Ctrl-D to exit"
 )
 
@@ -193,6 +202,28 @@ def parse_dispatch_line(line: str) -> DispatchOrder | None:
     )
 
 
+def dispatch_order_from_command(cmd: TaskCommand, *, operator_id: str) -> DispatchOrder:
+    """Project a tasker ``TaskCommand`` onto a ready-to-send ``DispatchOrder``."""
+    return DispatchOrder(
+        order_id=uuid.uuid4().hex,
+        target_coords=cmd.coords,
+        incident_id=cmd.incident_id,
+        priority=cmd.priority,
+        operator_id=operator_id,
+        issued_at=time.time(),
+        persons_estimated=cmd.persons_estimated,
+    )
+
+
+def format_command(cmd: TaskCommand) -> str:
+    """One-line human rendering of a tasker translation."""
+    return (
+        f"tasker: {cmd.target_fleet} @ ({cmd.coords.x:.2f}, {cmd.coords.y:.2f}) "
+        f"priority={cmd.priority} persons={cmd.persons_estimated}\n"
+        f"  rationale: {cmd.rationale}"
+    )
+
+
 def format_ack(ack: dict) -> str:
     """Format a ``DispatchAck`` dict (the wire shape returned by ``mesh.call``)
     as a single human-readable line.
@@ -227,6 +258,8 @@ async def repl(
     out_stream=None,
     err_stream=None,
     call_timeout: float = 10.0,
+    nl: bool = True,
+    auto_accept: bool = False,
 ) -> None:
     """Run the read-eval-print loop against an open ``AgentMesh``.
 
@@ -284,6 +317,20 @@ async def repl(
         try:
             order_template = parse_dispatch_line(line)
         except ValueError as e:
+            if nl:
+                # D-32 NL mode: anything that is not the typed grammar goes
+                # through the tasker. Audit first, then translate.
+                await _handle_nl_line(
+                    mesh,
+                    text=stripped,
+                    operator_id=operator_id,
+                    in_stream=in_stream,
+                    out_stream=out_stream,
+                    err_stream=err_stream,
+                    call_timeout=call_timeout,
+                    auto_accept=auto_accept,
+                )
+                continue
             print(f"error: {e}", file=err_stream)
             print(GRAMMAR, file=err_stream)
             continue
@@ -325,16 +372,81 @@ async def repl(
         print(format_ack(ack), file=out_stream)
 
 
+async def _handle_nl_line(
+    mesh: AgentMesh,
+    *,
+    text: str,
+    operator_id: str,
+    in_stream,
+    out_stream,
+    err_stream,
+    call_timeout: float,
+    auto_accept: bool,
+) -> None:
+    """NL path: audit intent, translate via tasker, confirm, dispatch.
+
+    Failure shape per the tasker spec: an ``llm_unavailable`` MeshError
+    prints and re-prompts; it never kills the REPL.
+    """
+    # Audit trail (mesh.fire.{operator_id}.intent, contracts.md).
+    try:
+        await mesh.publish(
+            f"mesh.fire.{operator_id}.intent",
+            FirefighterIntent(operator_id=operator_id, text=text, issued_at=time.time()),
+        )
+    except Exception as e:
+        print(f"warn: intent audit publish failed: {e}", file=err_stream)
+
+    print("tasker is translating…", file=out_stream)
+    try:
+        raw = await mesh.call(
+            "tasker",
+            TaskTranslateRequest(operator_id=operator_id, text=text),
+            timeout=call_timeout,
+        )
+        cmd = TaskCommand.model_validate(raw)
+    except MeshError as e:
+        print(f"error: {e}", file=err_stream)
+        return
+    except Exception as e:
+        print(f"error: translation failed: {e}", file=err_stream)
+        return
+
+    print(format_command(cmd), file=out_stream)
+
+    if not auto_accept:
+        out_stream.write("dispatch? [y/N] ")
+        try:
+            out_stream.flush()
+        except Exception:
+            pass
+        answer = (await asyncio.to_thread(in_stream.readline)).strip().lower()
+        if answer not in {"y", "yes"}:
+            print("cancelled", file=out_stream)
+            return
+
+    order = dispatch_order_from_command(cmd, operator_id=operator_id)
+    target = target_agent_for_fleet(cmd.target_fleet)
+    try:
+        ack = await mesh.call(target, order, timeout=call_timeout)
+    except MeshError as e:
+        print(f"error: dispatch failed: {e}", file=err_stream)
+        return
+    print(format_ack(ack), file=out_stream)
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 
 
-async def _run(url: str, operator_id: str | None) -> None:
+async def _run(
+    url: str, operator_id: str | None, *, nl: bool, auto_accept: bool
+) -> None:
     """Open ``AgentMesh(url)``, derive operator id if needed, run the REPL."""
     async with AgentMesh(url) as mesh:
         op_id = operator_id or f"op-{mesh.instance_id[:8]}"
-        await repl(mesh, operator_id=op_id)
+        await repl(mesh, operator_id=op_id, nl=nl, auto_accept=auto_accept)
 
 
 def main(argv: list[str]) -> int:
@@ -350,12 +462,29 @@ def main(argv: list[str]) -> int:
         default=None,
         help="operator identifier (default: derived from mesh.instance_id)",
     )
+    parser.add_argument(
+        "--typed",
+        action="store_true",
+        help="typed-grammar only: non-grammar lines are errors (disables the NL tasker path)",
+    )
+    parser.add_argument(
+        "--auto-accept",
+        action="store_true",
+        help="dispatch tasker translations without the y/N confirmation",
+    )
     args = parser.parse_args(argv)
 
     url = os.environ.get("NATS_URL", "nats://127.0.0.1:4222")
 
     try:
-        asyncio.run(_run(url, args.operator_id))
+        asyncio.run(
+            _run(
+                url,
+                args.operator_id,
+                nl=not args.typed,
+                auto_accept=args.auto_accept,
+            )
+        )
     except KeyboardInterrupt:
         return 0
     except Exception as e:

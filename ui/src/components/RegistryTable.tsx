@@ -45,7 +45,8 @@ function instancesFor(name: string, fleet: Record<string, FleetMember>): Livenes
 
 function LivenessDot({ l }: { l: Liveness }) {
   if (!l.known) return <span className="dot bg-ink-600" title="no heartbeat surface" />;
-  if (l.live > 0) return <span className="dot bg-live" />;
+  if (l.live === l.total) return <span className="dot bg-live" />;
+  if (l.live > 0) return <span className="dot animate-pulse-dot bg-stale" title="degraded" />;
   return <span className="dot animate-pulse-dot bg-dead" />;
 }
 
@@ -142,7 +143,11 @@ export function RegistryTable({ catalog, fleet, selected, onSelect }: Props) {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <span className="inline-flex items-center gap-1.5 font-mono text-xs tabular-nums text-ink-200">
+                      <span
+                        className={`inline-flex items-center gap-1.5 font-mono text-xs tabular-nums ${
+                          l.known && l.live < l.total ? "text-dead" : "text-ink-200"
+                        }`}
+                      >
                         <LivenessDot l={l} />
                         {l.known ? `${l.live}/${l.total}` : "—"}
                       </span>

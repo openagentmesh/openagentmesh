@@ -34,8 +34,11 @@ Per ``km/specs/wildfire/briefer.md`` with these v1 decisions:
   comes from config ``LLM_MODEL_BRIEFER``; never hardcoded here.
 - **Resolution, best-effort v1.** An incident whose cached detections are all
   ``surveyed`` with nothing unbriefed for 2 consecutive check passes is
-  CAS-marked resolved. No fire-sim temperature check, no stale-assignment
-  watchdog (spec open questions; documented limitations).
+  CAS-marked resolved. No fire-sim temperature check (documented limitation).
+- **Chaos watchdog (Phase 4).** Each tick opens with
+  :func:`reclaim_stale_assignments`: detections stuck on a drone whose
+  heartbeat went stale are CAS-flipped back to ``pending`` so a sibling
+  re-claims and the cascade survives a chaos kill.
 - **No heartbeat.** ``FleetMemberState.fleet_type`` is a closed Literal of
   the five fleet types; the briefer is an LLM peer, not a fleet member.
 """

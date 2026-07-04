@@ -97,15 +97,31 @@
     fitCanvas();
     window.addEventListener("resize", fitCanvas);
     window.addEventListener("keydown", handleKeydown);
-    if (canvas) {
-      renderer = new Renderer(canvas, () => ({
-        cells: get(cellsStore),
-        fleet: get(fleetStore),
-        detections: get(detectionsStore),
-        selectedId: selected?.instance_id ?? null,
-      }));
-      renderer.start();
-    }
+    // Terrain seed comes from the server (WILDFIRE_SEED) so the recording
+    // is reproducible; fall back to 42 if /health is unreachable.
+    (async () => {
+      let seed = 42;
+      try {
+        const res = await fetch("/health");
+        const body = (await res.json()) as { seed?: number };
+        if (typeof body.seed === "number") seed = body.seed;
+      } catch {
+        // keep default
+      }
+      if (canvas) {
+        renderer = new Renderer(
+          canvas,
+          () => ({
+            cells: get(cellsStore),
+            fleet: get(fleetStore),
+            detections: get(detectionsStore),
+            selectedId: selected?.instance_id ?? null,
+          }),
+          seed,
+        );
+        renderer.start();
+      }
+    })();
     closeWs = openMeshWebSocket();
     clockTimer = setInterval(() => (clock = new Date()), 1000);
   });

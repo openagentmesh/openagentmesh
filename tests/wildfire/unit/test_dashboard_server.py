@@ -299,7 +299,8 @@ def test_grep_invariants_match_plan_body() -> None:
     assert SERVER_SRC.count("def make_app") == 1
     assert SERVER_SRC.count("WebSocket") >= 1
     assert SERVER_SRC.count("mesh.kv_source(") == 3
-    assert SERVER_SRC.count("mesh.subject_source(") == 1
+    # 1 action feed + 3 swarm-feed sources (briefing / narrative / stats).
+    assert SERVER_SRC.count("mesh.subject_source(") == 4
     assert SERVER_SRC.count("mesh.kv.put_model(") >= 1
     assert SERVER_SRC.count("mesh.kv.delete(") >= 1
     # The two patterns that demand `.>` (per the segment-count rule).
