@@ -31,6 +31,7 @@ import os
 import signal
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import IO
 from urllib.parse import urlparse
@@ -129,6 +130,14 @@ class Orchestrator:
         self._config_path: Path | None = None
         self._stop = asyncio.Event()
         self._log_tasks: list[asyncio.Task[None]] = []
+        # Every child pipe gets a permanently-blocked readline thread. The
+        # default asyncio executor caps at min(32, cpus+4) workers, which is
+        # fewer than the ~34 streams this tree produces; starved drains leave
+        # a full pipe and a child deadlocked on write (the dashboard was the
+        # first casualty). Dedicated pool sized past any realistic tree.
+        self._drain_executor = ThreadPoolExecutor(
+            max_workers=64, thread_name_prefix="pipe-drain"
+        )
 
     # ----------------------------------------------------------------- helpers
 
@@ -148,7 +157,7 @@ class Orchestrator:
             return
         loop = asyncio.get_event_loop()
         while True:
-            line = await loop.run_in_executor(None, stream.readline)
+            line = await loop.run_in_executor(self._drain_executor, stream.readline)
             if not line:
                 return
             try:
@@ -378,6 +387,8 @@ class Orchestrator:
             with contextlib.suppress(BaseException):
                 await task
         self._log_tasks.clear()
+
+        self._drain_executor.shutdown(wait=False, cancel_futures=True)
 
         # Drop temp HOCON config (T-01-03-01).
         if self._config_path is not None:
