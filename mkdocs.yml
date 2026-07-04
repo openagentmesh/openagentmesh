@@ -102,6 +102,7 @@ nav:
       - Automatic Load Balancing: cookbook/load-balancing.md
       - Reactive Pipeline: cookbook/reactive-pipeline.md
       - Parallel RAG Indexing: cookbook/parallel-rag-indexing.md
+      - Wildfire Incident Response: cookbook/wildfire-incident.md
   - API Reference:
       - AgentMesh: api/agentmesh.md
       - AgentContract: api/contract.md
