@@ -51,6 +51,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from demos.wildfire.core.chaos import chaos_kill_listener
 from demos.wildfire.core.config import HEARTBEAT_INTERVAL_S, HQ
 from demos.wildfire.core.contracts import (
     ActionState,
@@ -126,27 +127,31 @@ class ActionFleetAgent:
         self._writer_queue: asyncio.Queue[_Transition | None] = asyncio.Queue()
         self._sim_task: asyncio.Task | None = None
         self._writer_task: asyncio.Task | None = None
+        self._chaos_task: asyncio.Task | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle: start / stop
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Spawn the single-writer task. Idempotent."""
+        """Spawn the single-writer + chaos-listener tasks. Idempotent."""
         if self._writer_task is None or self._writer_task.done():
             self._writer_task = asyncio.create_task(self._writer_loop())
+        if self._chaos_task is None or self._chaos_task.done():
+            self._chaos_task = asyncio.create_task(chaos_kill_listener(self.mesh))
 
     async def stop(self) -> None:
-        """Cancel writer + simulation tasks and wait for them to drain."""
-        for task in (self._sim_task, self._writer_task):
+        """Cancel writer + simulation + chaos tasks and wait for them to drain."""
+        for task in (self._sim_task, self._writer_task, self._chaos_task):
             if task is not None and not task.done():
                 task.cancel()
-        for task in (self._sim_task, self._writer_task):
+        for task in (self._sim_task, self._writer_task, self._chaos_task):
             if task is not None:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
         self._sim_task = None
         self._writer_task = None
+        self._chaos_task = None
 
     async def __aenter__(self) -> ActionFleetAgent:
         await self.start()

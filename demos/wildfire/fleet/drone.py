@@ -53,6 +53,7 @@ import os
 import time
 from dataclasses import dataclass, field
 
+from demos.wildfire.core.chaos import chaos_kill_listener
 from demos.wildfire.core.config import (
     DRONE_SPEED_KM_S,
     DRONE_SURVEY_DURATION_S,
@@ -372,6 +373,7 @@ async def _main() -> None:
 
     async with mesh:
         interp = asyncio.create_task(_interpolator(state))
+        chaos = asyncio.create_task(chaos_kill_listener(mesh))
         hb = asyncio.create_task(
             heartbeat_loop(
                 mesh,
@@ -389,7 +391,8 @@ async def _main() -> None:
         finally:
             interp.cancel()
             hb.cancel()
-            for task in (interp, hb):
+            chaos.cancel()
+            for task in (interp, hb, chaos):
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
 

@@ -57,6 +57,7 @@ from pydantic import ValidationError
 from demos.wildfire.core.config import FIRE_SIM_AMBIENT_C
 from demos.wildfire.core.contracts import (
     CellState,
+    ChaosKill,
     Coords,
     DetectionRecord,
     FleetMemberState,
@@ -142,6 +143,19 @@ async def handle_click(
         last_modified_by=mesh.instance_id,
     )
     await mesh.kv.put_model(key, state)
+
+
+async def handle_chaos_kill(mesh: AgentMesh, *, instance_id: str) -> None:
+    """Publish a ``ChaosKill`` at the targeted instance (Phase 4).
+
+    The scenario UI's fleet popover sends ``{"type": "chaos_kill",
+    "instance_id": ...}``; the targeted process's chaos listener hard-exits
+    on receipt. Broken out of the WebSocket loop for direct unit testing.
+    """
+    await mesh.publish(
+        f"mesh.chaos.kill.{instance_id}",
+        ChaosKill(target_instance_id=instance_id),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +472,15 @@ def make_app(mesh: AgentMesh) -> FastAPI:
                             pass
                     except Exception as e:
                         _log.warning("click handler raised: %s", e)
+                elif msg_type == "chaos_kill":
+                    instance_id = msg.get("instance_id")
+                    if not isinstance(instance_id, str) or not instance_id:
+                        _log.warning("chaos_kill frame missing instance_id: %r", msg)
+                        continue
+                    try:
+                        await handle_chaos_kill(mesh, instance_id=instance_id)
+                    except Exception as e:
+                        _log.warning("chaos_kill handler raised: %s", e)
                 else:
                     _log.warning("unknown ws frame type: %r", msg_type)
         except WebSocketDisconnect:

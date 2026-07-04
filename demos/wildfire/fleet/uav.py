@@ -37,6 +37,7 @@ import math
 import os
 import time
 
+from demos.wildfire.core.chaos import chaos_kill_listener
 from demos.wildfire.core.config import (
     HQ,
     UAV_CONFIDENCE_FLOOR,
@@ -184,6 +185,7 @@ async def _main() -> None:
     build_agent(mesh)
 
     async with mesh:
+        chaos = asyncio.create_task(chaos_kill_listener(mesh))
         hb = asyncio.create_task(
             heartbeat_loop(
                 mesh,
@@ -200,8 +202,10 @@ async def _main() -> None:
             pass
         finally:
             hb.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await hb
+            chaos.cancel()
+            for task in (hb, chaos):
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
 
 
 if __name__ == "__main__":

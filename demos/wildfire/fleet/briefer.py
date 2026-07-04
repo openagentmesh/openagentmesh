@@ -62,9 +62,11 @@ from demos.wildfire.core.config import (
     BRIEFER_EVENT_THRESHOLD,
     BRIEFER_TICK_INTERVAL_S,
     LLM_MODEL_BRIEFER,
+    STALE_ASSIGNMENT_AFTER_S,
 )
 from demos.wildfire.core.contracts import (
     DetectionRecord,
+    FleetMemberState,
     IncidentBriefing,
     IncidentState,
     RecommendedAction,
@@ -74,6 +76,7 @@ from demos.wildfire.core.keys import (
     DETECTION_PREFIX,
     INCIDENT_PREFIX,
     detection_key,
+    fleet_key,
     incident_key,
 )
 from demos.wildfire.core.llm import LLMUnavailable, structured_llm_call
@@ -489,9 +492,59 @@ async def _briefing_inputs(
     return detections
 
 
-async def _tick_once(mesh: AgentMesh, state: BrieferState, now: float | None = None) -> None:
-    """One pass over the durable incident store: resolve, gate, brief."""
+async def reclaim_stale_assignments(mesh: AgentMesh, now: float | None = None) -> list[str]:
+    """Chaos recovery watchdog: dead drone's detections go back to pending.
+
+    A detection in ``assigned:{drone_instance_id}`` whose drone heartbeat is
+    at least ``STALE_ASSIGNMENT_AFTER_S`` stale (or missing) is CAS-flipped
+    back to ``pending``. The PUT re-fires every sibling drone's kv_source,
+    so a new election claims the abandoned detection within seconds; the
+    cascade never stalls on a chaos kill. Returns the reclaimed ids.
+    """
     now = time.time() if now is None else now
+    reclaimed: list[str] = []
+    raw = await mesh.kv.list(f"{DETECTION_PREFIX}.*")
+    for entry in raw:
+        try:
+            rec = DetectionRecord.model_validate_json(entry.value)
+        except ValidationError:
+            continue
+        state_str = str(rec.state)
+        if not state_str.startswith("assigned:"):
+            continue
+        surveyor = state_str.split(":", 1)[1]
+
+        alive = False
+        try:
+            member = await mesh.kv.get_model(
+                fleet_key("low-alt", "drone", surveyor), FleetMemberState
+            )
+            alive = now - member.last_updated < STALE_ASSIGNMENT_AFTER_S
+        except (KeyNotFoundError, ValidationError):
+            alive = False  # no heartbeat record at all: treat as dead
+        if alive:
+            continue
+
+        try:
+            ctx = mesh.kv.try_cas_model(detection_key(rec.detection_id), DetectionRecord)
+            async with ctx as gate:
+                if str(gate.value.state) == state_str:  # still stuck on the dead drone
+                    gate.value.state = "pending"
+                    gate.value.last_updated = now
+        except KeyNotFoundError:
+            continue
+        if gate.committed and gate.attempted_write:
+            reclaimed.append(rec.detection_id)
+            _log.warning(
+                "reclaimed detection %s from dead drone %s", rec.detection_id, surveyor
+            )
+    return reclaimed
+
+
+async def _tick_once(mesh: AgentMesh, state: BrieferState, now: float | None = None) -> None:
+    """One pass over the durable incident store: reclaim, resolve, gate, brief."""
+    now = time.time() if now is None else now
+    await reclaim_stale_assignments(mesh, now)
     raw = await mesh.kv.list(f"{INCIDENT_PREFIX}.*")
     for raw_entry in raw:
         try:

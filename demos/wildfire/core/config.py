@@ -198,3 +198,13 @@ BRIEFER_CLUSTER_WINDOW_S: float = 60.0
 
 STATS_TICK_INTERVAL_S: float = 10.0
 NARRATOR_INTERVAL_S: float = 300.0
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Chaos recovery
+# ---------------------------------------------------------------------------
+
+# A detection stuck in "assigned:{drone}" is reclaimed to "pending" once the
+# drone's heartbeat is at least this stale (twice the reader-side liveness
+# cutoff: a healthy but busy drone keeps heartbeating, a chaos-killed one
+# stops entirely). The briefer's tick watchdog owns the reclaim.
+STALE_ASSIGNMENT_AFTER_S: float = 2 * LIVENESS_STALENESS_S
