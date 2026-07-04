@@ -66,6 +66,10 @@ def find_free_port(host: str, requested: int, *, max_walk: int = 100) -> int:
     for offset in range(max_walk + 1):
         port = requested + offset
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # SO_REUSEADDR matches uvicorn's own bind semantics; without it a
+            # TIME_WAIT socket from the previous run reads as busy and every
+            # restart silently walks to the next port.
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 s.bind((host, port))
             except OSError:
