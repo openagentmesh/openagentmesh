@@ -85,6 +85,9 @@ MSG_FLEET_UPDATE = "fleet_update"
 MSG_DETECTION = "detection"
 MSG_ACTION_STATUS = "action_status"
 MSG_SNAPSHOT_COMPLETE = "snapshot_complete"
+MSG_BRIEFING = "briefing"
+MSG_NARRATIVE = "narrative"
+MSG_STATS = "stats"
 
 Broadcast = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -359,6 +362,46 @@ def register_mesh_consumers(mesh: AgentMesh, broadcast: Broadcast) -> None:
         await broadcast(
             {
                 "type": MSG_ACTION_STATUS,
+                "subject": msg.subject,
+                "payload": payload,
+            }
+        )
+
+    @mesh.agent(
+        AgentSpec(
+            name="dashboard.swarm-feed",
+            description=(
+                "Dashboard observability: forward mesh.briefing.> "
+                "(IncidentBriefing), mesh.swarm.narrative (Narrative), and "
+                "mesh.swarm.stats (SwarmStats) to connected WebSocket "
+                "clients as briefing / narrative / stats envelopes."
+            ),
+        ),
+        sources=[
+            mesh.subject_source("mesh.briefing.>"),
+            mesh.subject_source("mesh.swarm.narrative"),
+            mesh.subject_source("mesh.swarm.stats"),
+        ],
+    )
+    async def on_swarm(msg: MeshMessage[bytes]) -> None:
+        # One handler, three subjects (SDK binds one payload shape per
+        # handler): route on the subject, decode generically.
+        try:
+            payload = json.loads(msg.payload) if msg.payload else None
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            _log.warning(
+                "malformed JSON on %s: %s; payload=%r", msg.subject, e, msg.payload
+            )
+            return
+        if msg.subject.startswith("mesh.briefing."):
+            msg_type = MSG_BRIEFING
+        elif msg.subject == "mesh.swarm.narrative":
+            msg_type = MSG_NARRATIVE
+        else:
+            msg_type = MSG_STATS
+        await broadcast(
+            {
+                "type": msg_type,
                 "subject": msg.subject,
                 "payload": payload,
             }
