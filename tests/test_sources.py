@@ -264,6 +264,38 @@ class TestKVSource:
             assert "PUT" in ops
             assert "DELETE" in ops
 
+    async def test_kv_source_kv_entry_model_handler_gets_none_on_delete(self):
+        """KVEntry[Model] handlers get value=None on DELETE, not a b'' validation.
+
+        Regression: the DEL marker carries empty bytes; validating them as the
+        model raised json_invalid on every sparse-KV delete (wildfire cell decay).
+        """
+        async with AgentMesh.local() as mesh:
+            received: list[KVEntry[DetectionRecord]] = []
+
+            @mesh.agent(
+                AgentSpec(name="del-model-entry-watcher", description="model entry + delete"),
+                sources=[mesh.kv_source("test.delete3.*", on_init="skip")],
+            )
+            async def watcher(entry: KVEntry[DetectionRecord]) -> None:
+                received.append(entry)
+
+            await mesh._subscribe_pending()
+            await asyncio.sleep(0.1)
+
+            await mesh.kv.put_model(
+                "test.delete3.d1",
+                DetectionRecord(detection_id="d1", state="pending"),
+            )
+            await asyncio.sleep(0.2)
+            await mesh.kv.delete("test.delete3.d1")
+            await asyncio.sleep(0.2)
+
+            assert [e.operation for e in received] == ["PUT", "DELETE"]
+            assert received[0].value is not None
+            assert received[0].value.detection_id == "d1"
+            assert received[1].value is None
+
 
 # --- Catalog visibility ---
 
