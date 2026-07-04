@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink-950 text-ink-100 antialiased;
+    font-size: 13px;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-600 rounded;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* Section micro-label: uppercase, letterspaced, muted. */
+  .microlabel {
+    @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400;
+  }
+  /* Status dot base: colored via bg-* utility at the call site. */
+  .dot {
+    @apply inline-block h-[7px] w-[7px] rounded-full align-middle;
+  }
+  .panel {
+    @apply rounded-md border border-ink-700 bg-ink-900;
+  }
+}

@@ -2,19 +2,17 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { DecodedEvent, subscribeSubjects } from "../lib/events";
 
 const MAX_BUFFER = 200;
-const DEFAULT_PATTERN = "mesh.action.>";
+const DEFAULT_PATTERN = "mesh.>";
 
 /**
  * Live event feed for any NATS subject pattern reachable from the browser.
- * Default pattern `mesh.action.>` shows heli/ffunit/medevac status pubsub
- * (Phase 2). Operator can edit the pattern at runtime; submitting unsubscribes
- * the old pattern before opening the new one (no leak). Buffer capped at
- * MAX_BUFFER=200 events to bound rendering cost (T-02-08-03).
+ * Operator edits the pattern at runtime; submitting unsubscribes the old
+ * pattern before opening the new one. Buffer capped at MAX_BUFFER events to
+ * bound rendering cost (T-02-08-03).
  */
 export function EventFeed() {
   const [pattern, setPattern] = useState<string>(DEFAULT_PATTERN);
-  const [activePattern, setActivePattern] =
-    useState<string>(DEFAULT_PATTERN);
+  const [activePattern, setActivePattern] = useState<string>(DEFAULT_PATTERN);
   const [events, setEvents] = useState<DecodedEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,48 +62,70 @@ export function EventFeed() {
     }
   }
 
+  // Subject color accents: severity-adjacent subjects pick up the ember ramp;
+  // everything else stays neutral so the ramp keeps its meaning.
+  function subjectTone(subject: string): string {
+    if (subject.startsWith("mesh.briefing.")) return "text-ember-400";
+    if (subject.startsWith("mesh.survey.")) return "text-ember-300";
+    if (subject.startsWith("mesh.chaos.")) return "text-dead";
+    if (subject.startsWith("mesh.swarm.")) return "text-ink-300";
+    return "text-ink-200";
+  }
+
   return (
-    <section className="flex flex-col h-full min-h-0">
-      <header className="flex items-center gap-2 p-2 border-b border-gray-200">
-        <h2 className="text-sm font-semibold mr-2">Event feed</h2>
-        <form onSubmit={applyPattern} className="flex gap-2 flex-1">
+    <section className="flex h-full min-h-0 flex-col">
+      <header className="flex items-center gap-2 border-b border-ink-700 px-3 py-2">
+        <h2 className="microlabel mr-1 whitespace-nowrap">Event feed</h2>
+        <form onSubmit={applyPattern} className="flex flex-1 gap-1.5">
           <input
             aria-label="subject-pattern"
-            className="flex-1 border rounded px-2 py-1 text-sm font-mono"
+            className="min-w-0 flex-1 rounded border border-ink-700 bg-ink-950 px-2 py-1 font-mono text-xs text-ink-100 focus:border-ember-500 focus:outline-none"
             value={pattern}
             onChange={(ev) => setPattern(ev.target.value)}
-            placeholder="mesh.action.>"
+            placeholder="mesh.>"
+            spellCheck={false}
           />
           <button
             type="submit"
-            className="rounded bg-blue-600 text-white px-3 py-1 text-sm"
+            className="rounded border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs text-ink-100 transition-colors hover:border-ember-500 hover:text-ember-300"
           >
             Subscribe
           </button>
         </form>
-        <span className="text-xs text-gray-500">
+        <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-500">
           {events.length}/{MAX_BUFFER}
         </span>
       </header>
       {error && (
-        <div className="p-2 text-sm text-red-700 bg-red-50">{error}</div>
+        <div className="border-b border-dead/30 bg-dead/10 px-3 py-2 text-xs text-dead">
+          {error}
+        </div>
       )}
-      <ul className="overflow-auto flex-1 font-mono text-xs">
-        {events.map((ev, i) => (
-          <li
-            key={`${ev.receivedAt}-${i}`}
-            className="border-b border-gray-100 px-2 py-1"
-          >
-            <div className="flex justify-between text-gray-500">
-              <span>{ev.subject}</span>
-              <span>{new Date(ev.receivedAt).toLocaleTimeString()}</span>
-            </div>
-            <pre className="whitespace-pre-wrap break-all text-gray-800">
-              {renderPayload(ev.payload, ev.raw)}
-            </pre>
-          </li>
-        ))}
-      </ul>
+      {events.length === 0 && !error ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+          <p className="text-sm text-ink-300">Listening on <span className="font-mono text-ink-200">{activePattern}</span></p>
+          <p className="text-[11px] text-ink-500">No messages yet. Spawn a fire in the scenario UI to light this up.</p>
+        </div>
+      ) : (
+        <ul className="min-h-0 flex-1 overflow-auto font-mono text-xs">
+          {events.map((ev, i) => (
+            <li
+              key={`${ev.receivedAt}-${i}`}
+              className={`border-b border-ink-800 px-3 py-1.5 ${i === 0 ? "animate-feed-in" : ""}`}
+            >
+              <div className="flex justify-between gap-2">
+                <span className={`truncate ${subjectTone(ev.subject)}`}>{ev.subject}</span>
+                <span className="whitespace-nowrap tabular-nums text-ink-500">
+                  {new Date(ev.receivedAt).toLocaleTimeString("en-GB")}
+                </span>
+              </div>
+              <pre className="mt-0.5 max-h-16 overflow-hidden whitespace-pre-wrap break-all text-[11px] leading-snug text-ink-400">
+                {renderPayload(ev.payload, ev.raw)}
+              </pre>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

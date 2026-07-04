@@ -1,49 +1,70 @@
 import { useEffect, useState } from "react";
 import { CatalogEntry, watchCatalog } from "./lib/catalog";
 import { FleetMember, watchFleet } from "./lib/fleet";
+import { AgentRegistryDoc, watchRegistry } from "./lib/registry";
 import { RegistryTable } from "./components/RegistryTable";
 import { EventFeed } from "./components/EventFeed";
+import { AgentDetail } from "./components/AgentDetail";
 
 export default function App() {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [fleet, setFleet] = useState<Record<string, FleetMember>>({});
+  const [registry, setRegistry] = useState<Record<string, AgentRegistryDoc>>({});
+  const [selected, setSelected] = useState<string | null>(null);
+  const [connected, setConnected] = useState<boolean>(false);
   // Force a re-render every second so liveness staleness updates without a KV
   // event (otherwise an agent could go stale without the row reflecting it).
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    let stopCatalog: (() => void) | null = null;
-    let stopFleet: (() => void) | null = null;
-    watchCatalog(setCatalog).then((s) => {
-      stopCatalog = s;
-    });
-    watchFleet(setFleet).then((s) => {
-      stopFleet = s;
-    });
+    const stops: Array<() => void> = [];
+    watchCatalog((c) => {
+      setConnected(true);
+      setCatalog(c);
+    }).then((s) => stops.push(s));
+    watchFleet(setFleet).then((s) => stops.push(s));
+    watchRegistry(setRegistry).then((s) => stops.push(s));
     const interval = setInterval(() => setTick((t) => t + 1), 1_000);
     return () => {
-      if (stopCatalog) stopCatalog();
-      if (stopFleet) stopFleet();
+      stops.forEach((s) => s());
       clearInterval(interval);
     };
   }, []);
 
+  const selectedDoc = selected ? registry[selected] : undefined;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold">OpenAgentMesh Admin</h1>
-        <p className="text-sm text-gray-600">
-          Registry ({catalog.length} agents) + live event feed
-        </p>
+    <div className="flex h-screen flex-col">
+      <header className="flex items-center gap-3 border-b border-ink-700 bg-ink-900 px-4 py-2">
+        <h1 className="text-sm font-semibold tracking-tight text-ink-50">
+          OpenAgentMesh
+          <span className="ml-1.5 font-normal text-ink-400">Admin</span>
+        </h1>
+        <span className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-ink-300">
+          {catalog.length} agents
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[11px] text-ink-400">
+          <span className={`dot ${connected ? "bg-live" : "animate-pulse-dot bg-stale"}`} />
+          {connected ? "connected" : "connecting"}
+        </span>
       </header>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded border border-gray-200 bg-white shadow-sm overflow-x-auto">
-          <RegistryTable catalog={catalog} fleet={fleet} />
+
+      <main className="grid min-h-0 flex-1 gap-3 p-3" style={{ gridTemplateColumns: selectedDoc ? "5fr 4fr 4fr" : "1fr 1fr" }}>
+        <div className="panel min-h-0 overflow-y-auto">
+          <RegistryTable
+            catalog={catalog}
+            fleet={fleet}
+            selected={selected}
+            onSelect={(name) => setSelected((cur) => (cur === name ? null : name))}
+          />
         </div>
-        <div className="rounded border border-gray-200 bg-white shadow-sm h-[640px] flex flex-col">
+        {selectedDoc && (
+          <AgentDetail doc={selectedDoc} onClose={() => setSelected(null)} />
+        )}
+        <div className="panel min-h-0">
           <EventFeed />
         </div>
-      </div>
+      </main>
     </div>
   );
 }
