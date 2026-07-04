@@ -167,3 +167,34 @@ SPAWN_MAGNITUDE_LARGE: float = 800.0
 # ---------------------------------------------------------------------------
 
 DASHBOARD_PORT: int = 8081  # auto-fallback to next free port if occupied (D-39)
+
+# ---------------------------------------------------------------------------
+# Phase 3 — LLM peers (km/specs/wildfire/{briefer,tasker}.md)
+# ---------------------------------------------------------------------------
+
+# Current Claude models only (hard constraint: never a stale model id).
+# Briefer + tasker want richer reasoning (Sonnet tier); narrator is cheap
+# narrative (Haiku tier).
+LLM_MODEL_BRIEFER: str = "claude-sonnet-4-6"
+LLM_MODEL_TASKER: str = "claude-sonnet-4-6"
+LLM_MODEL_NARRATOR: str = "claude-haiku-4-5-20251001"
+
+# Briefer instance count (queue group `briefers`, CAS-gated tick).
+BRIEFER_COUNT: int = 2
+
+# Briefing cadence: emit when now - last_briefing >= this, or the incident's
+# unbriefed event count crosses BRIEFER_EVENT_THRESHOLD.
+BRIEFER_TICK_INTERVAL_S: float = 30.0
+BRIEFER_EVENT_THRESHOLD: int = 5
+
+# Detection-to-incident clustering: merge when a new detection lands within
+# this distance AND time window of an existing incident's detections.
+BRIEFER_CLUSTER_RADIUS_KM: float = 0.5
+BRIEFER_CLUSTER_WINDOW_S: float = 60.0
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Reporting peers (km/specs/wildfire/{stats-ticker,narrator}.md)
+# ---------------------------------------------------------------------------
+
+STATS_TICK_INTERVAL_S: float = 10.0
+NARRATOR_INTERVAL_S: float = 300.0

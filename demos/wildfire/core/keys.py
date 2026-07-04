@@ -33,6 +33,7 @@ WILDFIRE_PREFIX = "wildfire"
 CELL_PREFIX = "wildfire.world.cell"
 DETECTION_PREFIX = "wildfire.detection"
 FLEET_PREFIX = "wildfire.fleet"
+INCIDENT_PREFIX = "wildfire.incident"
 
 # ---------------------------------------------------------------------------
 # Grid geometry
@@ -116,3 +117,11 @@ def detection_key(detection_id: str) -> str:
     Format: ``wildfire.detection.{detection_id}`` (per A-08).
     """
     return f"{DETECTION_PREFIX}.{detection_id}"
+
+
+def incident_key(incident_id: str) -> str:
+    """Return the KV key for a briefer-owned incident record.
+
+    Format: ``wildfire.incident.{incident_id}`` (per contracts.md).
+    """
+    return f"{INCIDENT_PREFIX}.{incident_id}"
