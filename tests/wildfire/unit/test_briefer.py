@@ -306,6 +306,8 @@ def test_briefer_module_never_hardcodes_a_model_id():
 
 def test_briefer_module_routes_llm_calls_through_shared_helper():
     assert "structured_llm_call" in _BRIEFER_SRC
+    assert "AsyncOpenAI" not in _BRIEFER_SRC
+    assert "import openai" not in _BRIEFER_SRC
     assert "AsyncAnthropic" not in _BRIEFER_SRC
     assert "import anthropic" not in _BRIEFER_SRC
 

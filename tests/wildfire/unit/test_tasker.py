@@ -195,7 +195,9 @@ def test_module_takes_model_id_from_config():
     "needle",
     [
         "bucket=",  # no bucket kwarg exists (A-09, single-bucket pivot)
-        "AsyncAnthropic",  # all LLM calls go through structured_llm_call
+        "AsyncOpenAI",  # all LLM calls go through structured_llm_call
+        "import openai",
+        "AsyncAnthropic",  # no direct-Anthropic leftovers either
         "import anthropic",
         "put_model(",  # request/reply only: no KV writes
         "kv.put(",
@@ -286,7 +288,7 @@ async def test_llm_unavailable_raises_mesh_error_with_recoverable_code(monkeypat
     monkeypatch.setattr(
         tasker,
         "structured_llm_call",
-        _stub_llm(None, captured, exc=LLMUnavailable("ANTHROPIC_API_KEY not set")),
+        _stub_llm(None, captured, exc=LLMUnavailable("OPENROUTER_API_KEY not set")),
     )
 
     with pytest.raises(MeshError) as excinfo:

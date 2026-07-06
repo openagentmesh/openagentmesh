@@ -196,23 +196,34 @@ def build_tasker(mesh: AgentMesh) -> None:
     The recipe simulates the LLM with keyword routing so it runs offline. The full demo makes exactly one structured call per request, with the output schema pinned via forced tool use and Pydantic as the final gate: a hallucinated `target_fleet="hovercraft"` fails validation instead of reaching a fleet.
 
     ```python
-    from anthropic import AsyncAnthropic
+    import os
 
-    client = AsyncAnthropic()
+    from openai import AsyncOpenAI
 
-    resp = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": grounding_json}],
-        tools=[{
-            "name": "emit_taskcommand",
-            "description": "Emit the TaskCommand result.",
-            "input_schema": TaskCommand.model_json_schema(),
-        }],
-        tool_choice={"type": "tool", "name": "emit_taskcommand"},
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.environ["OPENROUTER_API_KEY"],
     )
-    command = TaskCommand.model_validate(resp.content[0].input)
+
+    resp = await client.chat.completions.create(
+        model="anthropic/claude-sonnet-4.6",
+        max_tokens=1024,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": grounding_json},
+        ],
+        tools=[{
+            "type": "function",
+            "function": {
+                "name": "emit_taskcommand",
+                "description": "Emit the TaskCommand result.",
+                "parameters": TaskCommand.model_json_schema(),
+            },
+        }],
+        tool_choice={"type": "function", "function": {"name": "emit_taskcommand"}},
+    )
+    call = resp.choices[0].message.tool_calls[0]
+    command = TaskCommand.model_validate_json(call.function.arguments)
     ```
 
 ## The Cascade
@@ -316,4 +327,4 @@ The seed pins the terrain, and each boot wipes the previous run's JetStream stat
 - **Scenario UI** (`http://127.0.0.1:8081`): tactical map with live fire spread, fleet sprites and trails, incident briefings, mission log, and narrator pane. Double-click terrain to ignite a fire; click a unit to kill its process and watch the swarm self-heal.
 - **Admin UI** (`http://127.0.0.1:8088`): the mesh's own view: agent registry with liveness, live event feed, and a contract sandbox where you can call the tasker in natural language from the browser and watch the typed `TaskCommand` come back.
 
-Export `ANTHROPIC_API_KEY` first if you want real briefings and translations; without it every LLM surface degrades to an honest typed error. The full source is in `demos/wildfire/` (agents in `fleet/`, world simulation in `world/`, contracts and keys in `core/`).
+Export `OPENROUTER_API_KEY` first if you want real briefings and translations (the demo reaches Claude through OpenRouter); without it every LLM surface degrades to an honest typed error. The full source is in `demos/wildfire/` (agents in `fleet/`, world simulation in `world/`, contracts and keys in `core/`).

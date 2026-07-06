@@ -63,7 +63,7 @@ CHILD_SPECS: dict[str, tuple[str, int]] = {
     "ffunit": ("demos.wildfire.fleet.ffunit", FFUNIT_COUNT),
     "medevac": ("demos.wildfire.fleet.medevac", MEDEVAC_COUNT),  # Phase 2 (SCN-07)
     # Phase 3/4 peers. LLM-backed agents degrade gracefully without
-    # ANTHROPIC_API_KEY (briefer: fallback summary; tasker: typed error).
+    # OPENROUTER_API_KEY (briefer: fallback summary; tasker: typed error).
     "briefer": ("demos.wildfire.fleet.briefer", BRIEFER_COUNT),
     "tasker": ("demos.wildfire.fleet.tasker", 1),
     "stats-ticker": ("demos.wildfire.fleet.stats_ticker", 1),

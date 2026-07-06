@@ -172,12 +172,13 @@ DASHBOARD_PORT: int = 8081  # auto-fallback to next free port if occupied (D-39)
 # Phase 3 — LLM peers (km/specs/wildfire/{briefer,tasker}.md)
 # ---------------------------------------------------------------------------
 
-# Current Claude models only (hard constraint: never a stale model id).
-# Briefer + tasker want richer reasoning (Sonnet tier); narrator is cheap
-# narrative (Haiku tier).
-LLM_MODEL_BRIEFER: str = "claude-sonnet-4-6"
-LLM_MODEL_TASKER: str = "claude-sonnet-4-6"
-LLM_MODEL_NARRATOR: str = "claude-haiku-4-5-20251001"
+# OpenRouter slugs for current Claude models (hard constraint: never a stale
+# model id). All LLM access goes through OpenRouter (core/llm.py); briefer +
+# tasker want richer reasoning (Sonnet tier), narrator is cheap narrative
+# (Haiku tier).
+LLM_MODEL_BRIEFER: str = "anthropic/claude-sonnet-4.6"
+LLM_MODEL_TASKER: str = "anthropic/claude-sonnet-4.6"
+LLM_MODEL_NARRATOR: str = "anthropic/claude-haiku-4.5"
 
 # Briefer instance count (queue group `briefers`, CAS-gated tick).
 BRIEFER_COUNT: int = 2

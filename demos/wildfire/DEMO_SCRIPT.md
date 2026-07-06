@@ -7,7 +7,8 @@ so there is no dead air and no beat outruns the viewer.
 
 ## Prerequisites
 
-- `ANTHROPIC_API_KEY` exported in the shell that boots the demo. Without it
+- `OPENROUTER_API_KEY` exported in the shell that boots the demo (all LLM
+  calls go through OpenRouter). Without it
   every LLM surface degrades honestly (briefings read "Briefing unavailable,
   see KV record", the sandbox shows a styled `llm_unavailable` error), but
   the recording needs the real prose.
