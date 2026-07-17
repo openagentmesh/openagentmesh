@@ -86,6 +86,36 @@ def resolve_creds(explicit: str | None, *, cwd: Path | None = None) -> str | Non
     return None
 
 
+def read_user_jwt_claims(creds_path: Path) -> dict:
+    """Decode the (unverified) claims of the user JWT inside a ``.creds`` file.
+
+    Used for identity display only (`oam auth whoami`); verification is the
+    server's job.
+    """
+    import base64
+    import json
+
+    jwt = None
+    in_jwt = False
+    lines = []
+    for line in creds_path.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("-----BEGIN NATS USER JWT-----"):
+            in_jwt = True
+            continue
+        if in_jwt and stripped.startswith("---"):
+            jwt = "".join(lines)
+            break
+        if in_jwt:
+            lines.append(stripped)
+    if jwt is None:
+        raise ValueError(f"No NATS user JWT found in {creds_path}")
+
+    payload = jwt.split(".")[1]
+    payload += "=" * (-len(payload) % 4)
+    return json.loads(base64.urlsafe_b64decode(payload))
+
+
 _AUTH_ERROR_MARKERS = (
     "authorization violation",
     "authentication",

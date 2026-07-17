@@ -236,9 +236,14 @@ def down() -> None:
 
 
 @mesh_app.command("connect")
-def connect(url: str = typer.Argument(..., help="NATS URL, e.g. nats://host:4222")) -> None:
+def connect(
+    url: str = typer.Argument(..., help="NATS URL, e.g. nats://host:4222"),
+    creds: str | None = typer.Option(
+        None, "--creds", help="Credentials file (.creds) to use for this mesh (ADR-0038)."
+    ),
+) -> None:
     """Point subsequent `oam` commands at a mesh by writing `.oam-url`."""
-    write_url_file(url)
+    write_url_file(url, creds=creds)
     typer.echo(f"Wrote {OAM_URL_FILE}")
 
 

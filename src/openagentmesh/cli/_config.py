@@ -40,9 +40,15 @@ def resolve_url(flag: str | None, *, cwd: Path | None = None) -> str:
     return DEFAULT_URL
 
 
-def write_url_file(url: str, *, cwd: Path | None = None) -> Path:
-    """Write `url` to `.oam-url` in the given directory (defaults to cwd)."""
+def write_url_file(url: str, *, creds: str | None = None, cwd: Path | None = None) -> Path:
+    """Write `.oam-url` in the given directory (defaults to cwd).
+
+    Bare URL without credentials (legacy form); TOML once `creds` is present.
+    """
     target_dir = cwd if cwd is not None else Path.cwd()
     target = target_dir / OAM_URL_FILE
-    target.write_text(f"{url}\n")
+    if creds is None:
+        target.write_text(f"{url}\n")
+    else:
+        target.write_text(f'url = "{url}"\ncreds = "{creds}"\n')
     return target

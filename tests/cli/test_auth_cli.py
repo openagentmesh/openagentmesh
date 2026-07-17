@@ -67,7 +67,7 @@ def test_whoami_reports_user_from_creds(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "worker" in result.stdout
     # the user's public NKey (sub claim of the user JWT)
-    assert "UC35GWCXFKABZZPLYGX6DWM2SIEHROLCAQF7VD44H7F4MMOOWKXE5IPJ" in result.stdout
+    assert "UBGIT7A6OYCH2BTC6SQRA3QUXBGFNVFCDZ6IYLTNM7ANHVHEW75PQZUF" in result.stdout
 
 
 def test_whoami_with_explicit_creds_flag(tmp_path, monkeypatch):
