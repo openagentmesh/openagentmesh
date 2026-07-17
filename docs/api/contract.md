@@ -126,3 +126,12 @@ Serialize to the registry JSON format (A2A-compatible with `x-agentmesh` namespa
 ```python
 json_str = contract.to_registry_json()
 ```
+
+### `.to_agent_card(url=None)`
+
+Project to an A2A Agent Card: the registry document with the `x-agentmesh` block stripped and `url` injected when provided. Agents have no HTTP URL inside the mesh, so the field is omitted unless a federation gateway supplies one.
+
+```python
+card = contract.to_agent_card(url="https://agents.example.com/summarizer")
+# {"name": ..., "capabilities": ..., "skills": [...], "url": "https://..."}
+```
