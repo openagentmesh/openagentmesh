@@ -5,14 +5,15 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 1 — Interop (in progress; core items done and merged, npm publish blocked on Luca).
+Stage 2 — Launch (in progress; unblocked items being worked, demo recording and all
+publishing blocked on Luca). Stage 1 remains open only on npm publish (Needs Luca).
 Stage 0 remains open only on its Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 
 ## Stage checklist
 
 - [ ] Stage 0 — Consolidate (blocked on Needs-Luca items below; everything else done)
 - [ ] Stage 1 — Interop (core done: MCP bridge, to_agent_card, docs; npm publish blocked)
-- [ ] Stage 2 — Launch
+- [ ] Stage 2 — Launch (drafts + README fold done; demo/URL/publishing need Luca)
 - [ ] Stage 3 — Production trust
 - [ ] Stage 4 — Frontier
 
@@ -66,6 +67,33 @@ did not fall out trivially).
 All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified this run:
 253 pytest passed, 53 vitest passed, ruff/ty zero.
 
+## Stage 2 item status (verified 2026-07-17, run 3)
+
+1. **Wildfire demo recording** — BLOCKED twice over: feature/wildfire-demo still not on
+   origin (re-verified this run: `git branch -a` has no wildfire branch), and recording
+   needs OPENROUTER_API_KEY. README carries a placeholder comment where the embed goes.
+   → Needs Luca (items 1 and 6 below).
+2. **Docs URL split** — INVENTORIED, decision recorded as a question (Needs Luca item 7).
+   Facts verified this run: README has 3 links to openagentmesh.github.io; mkdocs.yml
+   `site_url: https://openagentmesh.dev/`; no CNAME file anywhere in the repo;
+   .github/workflows/docs.yml deploys to GitHub Pages. Note: the wrong site_url is an
+   ACTIVE bug, not cosmetics — the deployed github.io site emits canonical URLs and a
+   sitemap pointing at openagentmesh.dev. Could not verify from the cloud whether
+   openagentmesh.dev resolves (sandbox proxy 403s both URLs) — unverified.
+3. **Launch content** — DRAFTED, committed on roadmap/stage-2 under km/notes/launch/:
+   2026-07-17-launch-post-draft.md (blog post, "The Wire, Not the Workflow") and
+   2026-07-17-show-hn-draft.md (title options + body + prepared first comment).
+   Both marked draft; publishing is Luca's explicit go (item 8). README top fold
+   tightened on the same branch: positioning hook (MCP/A2A gap), hero agent sample,
+   `claude mcp add mesh -- oam mcp serve` one-liner, demo placeholder.
+4. **Admin UI MVP (ADR-0056)** — SHAPED, DEFER PROPOSED (item 9). Estimate 4–6
+   sessions, over the stage's ~2-session bar: new ui/ toolchain (Vite+React+TS+
+   Tailwind+rjsf+nats.ws), embedded-NATS websocket listener, `oam ui` static server,
+   three screens incl. browser-side streaming replies, CI wheel-packaging changes.
+   Extra argument for deferring to Stage 3: the registry screen's liveness dot depends
+   on ADR-0016 (a Stage 3 item) — building the UI after Stage 3's liveness work avoids
+   shipping the heartbeat stand-in hack.
+
 ## Needs Luca
 
 5. **npm credential for @openagentmesh/sdk.** Add an NPM_TOKEN secret (or configure a
@@ -87,8 +115,55 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 4. **OK to delete stale remote branches?** feature/error-taxonomy and
    feature/tool-conversion predate their content landing on main (verified their
    tests/modules are on main). Deleting remote branches is destructive, so left alone.
+6. **OPENROUTER_API_KEY for the demo recording** (Stage 2 item 1). Also blocked on the
+   wildfire branch push (item 1 above). Both are yours; the executor cannot record the
+   demo in the cloud regardless (no key, no branch, and screen recording is better done
+   on your machine anyway — DEMO_SCRIPT.md will be on the wildfire branch).
+7. **Docs URL decision** (Stage 2 item 2): standardize on
+   https://openagentmesh.github.io/openagentmesh/ or wire openagentmesh.dev?
+   Facts: no CNAME in the repo, docs deploy to GitHub Pages, mkdocs.yml claims
+   openagentmesh.dev, README uses github.io. The mismatch makes the live site emit
+   canonical/sitemap URLs to a domain that may not be wired (SEO harm today).
+   Options: (a) "github.io" — executor fixes mkdocs.yml site_url next run, done;
+   (b) "wire openagentmesh.dev" — you add the CNAME/DNS (domain + Pages settings are
+   yours), executor then flips README links. Answer here with (a) or (b).
+   Recommendation: (a) now, (b) later if you buy/wire the domain — (a) is one line
+   and reversible.
+8. **Review the launch drafts** (Stage 2 exit criterion): km/notes/launch/
+   2026-07-17-launch-post-draft.md and 2026-07-17-show-hn-draft.md (on roadmap/stage-2;
+   on main after merge). Posting anywhere is your explicit go — the executor will never
+   post them. Edit in place or leave notes here.
+9. **ADR-0056 admin UI: OK to defer to Stage 3?** Shaping estimate 4–6 sessions
+   (details in Stage 2 item status above). The stage prompt says propose deferral if
+   over ~2 sessions — this is the proposal. Silence = defer; say "build it in Stage 2"
+   to override.
 
 ## Run log
+
+### 2026-07-17 ~12:05–12:25 UTC — run 3 (Fable 5, cloud)
+
+Verified: origin/main tip f38b490 = run 2's final commit, no edits from Luca (all
+Needs-Luca items still unanswered); CI green on the stage-1 merge b2a5849 (run #12)
+and on f38b490 (run #13) — closes the verification run 2 left open; wildfire branch
+still absent from origin; no lock-protocol concern (origin quiet ~5.5 h before this
+run started).
+
+Advanced (Stage 2, on roadmap/stage-2, CI run #14 green — both jobs genuinely
+executed: ruff/ty/pytest + tsc/vitest — merged to main --no-ff as 2d81978):
+- Launch post draft ("The Wire, Not the Workflow") and Show HN draft (title options,
+  body, prepared first comment) in km/notes/launch/, both marked unpublished.
+- README top fold: positioning hook, hero agent sample, MCP bridge one-liner, demo
+  video placeholder comment.
+- Docs URL split inventoried (item status above); flagged that the wrong site_url is
+  an active canonical/SEO bug. Could not check DNS from the sandbox (proxy 403).
+- ADR-0056 shaped: 4–6 session estimate, defer-to-Stage-3 proposed (Needs Luca 9).
+
+Left open: everything gated — demo recording (wildfire branch + OPENROUTER_API_KEY),
+docs URL decision, draft reviews, npm publish, Stage 0 items 1/2/7. Next run: check
+Needs-Luca answers and act on any (URL fix is one line; npm tag; v0.3.0 /release);
+otherwise Stage 2 has no more unblocked work — consider starting Stage 3's shaping
+pass (read-only ADR assessment + prioritized plan for Luca's sign-off), which needs
+no answers to begin.
 
 ### 2026-07-17 ~06:05–07:15 UTC — run 2 (Fable 5, cloud)
 

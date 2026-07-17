@@ -70,3 +70,26 @@ update that file too and say so here.
   Fine for real deployments (serve_mcp enters the mesh context), but multi-connection
   tests need a warmup call. DX question for later: should @mesh.agent on a connected
   mesh subscribe eagerly?
+
+## 2026-07-17 — Stage 2, run 3 (cloud executor)
+
+- **The docs URL split is an active bug, not future polish.** mkdocs.yml's
+  `site_url: openagentmesh.dev` means the deployed github.io site emits canonical
+  URLs and a sitemap pointing at a domain with no CNAME in the repo. Whatever Luca
+  decides, the one-line site_url fix should not wait for the launch stage's other
+  items. (Sandbox proxy 403s outbound web requests, so DNS state of
+  openagentmesh.dev could not be checked from the cloud.)
+- **Launch messaging hook that emerged from Stages 0–1:** the MCP bridge one-liner
+  (`claude mcp add mesh -- oam mcp serve`) is the sharpest demoable claim — it turns
+  "abstract fabric" into "your whole mesh is a toolbox for Claude in two commands."
+  Both drafts and the README fold lead with it alongside the MCP/A2A gap framing
+  from the competitors note ("the wire, not the workflow").
+- **CI is fast enough to gate docs-only merges** (~45 s wall with the cached NATS
+  binary and uv cache), so the "merge only when branch tests pass" rule costs
+  nothing even for km/-only changes. No path filters in ci.yml — a green run means
+  ruff/ty/pytest/tsc/vitest all actually executed; verified at job-step level once,
+  future runs can trust conclusion=success.
+- **ADR-0056 (admin UI) has a hidden Stage 3 dependency:** the registry screen's
+  liveness indicator wants ADR-0016 disconnect advisories; building the UI before
+  the liveness work means shipping a heartbeat stand-in and reworking it. Deferral
+  proposed to Luca; if approved, Stage 3's plan should slot the UI after 0016/0040.
