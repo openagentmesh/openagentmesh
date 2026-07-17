@@ -8,6 +8,12 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 Stage 3 — Production trust (shaping pass done run 4; prioritized plan in
 km/notes/2026-07-17-stage3-plan.md awaiting sign-off, item 10; executing the
 plan's default order — ADR-0038 auth first — meanwhile).
+ADR-0038 progress on roadmap/stage-3 (run 5): SDK slice done (creds=/TLS/
+OAM_CREDS/.oam-url TOML/ConnectionDenied, 13 tests against a real JWT-auth'd
+nats-server) plus `oam mesh connect --creds` and `oam auth whoami` (8 tests).
+Remaining before merge: `oam auth init` / `user add` role templates /
+`user revoke` (nsc wrapping) and the docs slice (auth concepts page +
+secured-mesh cookbook recipe — a stage exit criterion).
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -148,7 +154,60 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    over ~2 sessions — this is the proposal. Silence = defer; say "build it in Stage 2"
    to override.
 
+## Stage 3 item status (updated 2026-07-17, run 5)
+
+1. **ADR-0038 auth** — IN PROGRESS on roadmap/stage-3 (not yet merged to main).
+   - Slice A (SDK) DONE: `AgentMesh(creds=, tls_cert=, tls_key=, tls_ca=)`;
+     resolution creds= > OAM_CREDS > .oam-url TOML > open; `ConnectionDenied`
+     (code `connection_denied`) on connect-time rejection; runtime permission
+     violations logged at WARNING; `AgentMesh.local()` ignores ambient creds.
+     Verified: 13 tests in tests/test_auth.py run a real nats-server in
+     operator/JWT mode with static nsc-generated fixtures (tests/auth_fixtures/).
+   - CLI increment DONE: `oam mesh connect --creds` (persists TOML .oam-url),
+     `oam auth whoami` (decodes user JWT: user/nkey/account). 8 tests in
+     tests/cli/test_auth_cli.py.
+   - Verified this run on the branch: 274 pytest passed (was 253), ruff and ty
+     clean. CI on the branch push not yet observed (left for next run).
+   - Remaining: `oam auth init` / `user add` (worker/invoker/observer role
+     templates) / `user revoke` wrapping nsc; docs (auth concepts page +
+     secured multi-node mesh cookbook recipe with executable twin). ADR index
+     status: test (SDK part implemented; whole-ADR completion needs the CLI
+     + docs slices).
+   - Design findings recorded in the ADR's new "Implementation notes" section:
+     JWT/operator mode REQUIRES a system account for JetStream (resolves the
+     ADR's open question — `oam auth init` must create SYS); `nkeys` is now a
+     core dependency (nats-py needs it for .creds).
+2. **ADR-0016+0040 liveness pair** — not started.
+3. **ADR-0048 observability** — not started.
+4. **ADR-0055 lifecycle gates** — not started.
+5. **ADR-0056 admin UI** — awaiting deferral confirmation (Needs Luca 9).
+
 ## Run log
+
+### 2026-07-17 ~19:15–19:50 UTC — run 5 (Fable 5, cloud)
+
+**Run 4 reconciliation:** run 4 (~18:10 UTC) committed the stage-3 plan and
+claimed ADR-0038 in the index (cb9ddf1) but was cut off before creating the
+roadmap/stage-3 branch or logging its own run entry — this entry closes that
+gap. No Needs-Luca answers found (state file untouched since cb9ddf1, all
+commits are the executor's own; origin quiet ~65 min at run start).
+
+Verified: baseline 253 pytest passed on main tip cb9ddf1 before any work;
+nats-server rebuilt via Go module proxy (learnings workaround still good);
+nsc installed the same way.
+
+Advanced (Stage 3 / ADR-0038, on roadmap/stage-3, pushed through 14b1e89):
+- Red-green per the pipeline: red tests committed first for both increments.
+- SDK auth slice + connect --creds/whoami CLI (details in Stage 3 item
+  status above). 274 pytest, ruff/ty clean, verified locally on the branch.
+- ADR-0038 implementation notes added (system-account requirement, nkeys
+  dep, denial semantics); index status spec -> test; CHANGELOG updated.
+
+Left open: CI result on the branch (pushed at end of run — verify next run);
+oam auth init/user add/revoke (nsc wrapping) and the docs slice, then merge
+to main; all prior Needs-Luca items still unanswered. Next run: check CI +
+Needs-Luca answers, then continue ADR-0038 slice B (role templates are the
+meat; ADR §5 has the subject lists) and slice C docs.
 
 ### 2026-07-17 ~12:05–12:25 UTC — run 3 (Fable 5, cloud)
 

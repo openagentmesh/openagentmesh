@@ -71,6 +71,32 @@ update that file too and say so here.
   tests need a warmup call. DX question for later: should @mesh.agent on a connected
   mesh subscribe eagerly?
 
+## 2026-07-17 — Stage 3, run 5 (cloud executor)
+
+- **A JWT/operator-mode nats-server refuses to start JetStream without a
+  system account** (`system account not setup` at boot). Since OAM requires
+  JetStream, ADR-0038's "does `oam auth init` create a system account?" open
+  question is not a choice — it must. Recorded in the ADR.
+- **nats-py needs the `nkeys` package for `.creds` auth** (lazy import at
+  connect). Added as a core dependency; without it the failure is a raw
+  `ModuleNotFoundError` mid-connect.
+- **Static nsc-generated credentials + a MEMORY resolver with
+  `resolver_preload` make JWT auth fully testable offline**: no nsc at test
+  time, no resolver directory, JWTs never expire by default. nsc itself
+  installs in the sandbox via `go install github.com/nats-io/nsc/v2@latest`
+  (same Go-proxy trick as nats-server).
+- **Runtime NATS permission violations are asynchronous**: the server sends
+  them on the error callback and does not fail the offending publish, so a
+  denied `mesh.call()` manifests as a timeout plus an async warning. True
+  call-site `connection_denied` errors need request-correlation machinery —
+  same machinery as the ADR-0016/0040 liveness work; noted in the ADR to
+  revisit there.
+- **Run 4 was cut off before it could log its run entry or create its
+  branch** — the state file claimed "executing on roadmap/stage-3" but the
+  branch didn't exist. Protocol tweak honored this run: commit the run-log
+  entry and push the branch EARLY (branch created and pushed before the
+  first code commit), so a cut-off leaves breadcrumbs instead of claims.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's
