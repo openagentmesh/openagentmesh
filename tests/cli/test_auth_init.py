@@ -16,7 +16,7 @@ import pytest
 from pydantic import BaseModel
 from typer.testing import CliRunner
 
-from openagentmesh import AgentMesh, AgentSpec, ConnectionDenied, MeshError
+from openagentmesh import AgentMesh, AgentSpec, ConnectionDenied
 from openagentmesh._local import _free_port, find_nats_server
 from openagentmesh.cli import app
 from openagentmesh.cli.auth import find_nsc
@@ -29,8 +29,18 @@ pytestmark = pytest.mark.skipif(find_nsc() is None, reason="nsc binary not avail
 def _boot_server(conf: Path, port: int, store_dir: Path) -> subprocess.Popen:
     binary = find_nats_server()
     assert binary is not None
+    # per-boot copy with its own JetStream store so parallel servers don't collide
+    import re
+
+    content = re.sub(
+        r'jetstream \{ store_dir: "[^"]*" \}',
+        f'jetstream {{ store_dir: "{store_dir}/js" }}',
+        conf.read_text(),
+    )
+    boot_conf = store_dir / "server.conf"
+    boot_conf.write_text(content)
     proc = subprocess.Popen(
-        [str(binary), "-c", str(conf), "-p", str(port), "--store_dir", str(store_dir)],
+        [str(binary), "-c", str(boot_conf), "-p", str(port)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         start_new_session=True,
@@ -54,8 +64,11 @@ def _boot_server(conf: Path, port: int, store_dir: Path) -> subprocess.Popen:
 def authdir(tmp_path_factory):
     """`oam auth init` plus one user of each role, in an isolated directory."""
     base = tmp_path_factory.mktemp("auth-init")
-    kwargs = {"catch_exceptions": False}
-    r = runner.invoke(app, ["auth", "init", "--name", "testmesh", "--dir", str(base / ".oam")], **kwargs)
+    r = runner.invoke(
+        app,
+        ["auth", "init", "--name", "testmesh", "--dir", str(base / ".oam")],
+        catch_exceptions=False,
+    )
     assert r.exit_code == 0, r.output
     for name, role in [("pipeline", "worker"), ("caller", "invoker"), ("viewer", "observer")]:
         r = runner.invoke(
@@ -66,7 +79,7 @@ def authdir(tmp_path_factory):
                 "--dir", str(base / ".oam"),
                 "--out", str(base / f"{name}.creds"),
             ],
-            **kwargs,
+            catch_exceptions=False,
         )
         assert r.exit_code == 0, r.output
         assert (base / f"{name}.creds").is_file()
@@ -141,9 +154,9 @@ async def test_observer_reads_catalog_but_cannot_invoke(secured_url):
         async with observer:
             names = [e.name for e in await observer.catalog()]
             assert "echo-o" in names
-            # publish on mesh.agent.> is denied -> the call never reaches the
-            # agent and times out (runtime violations are async; see ADR-0038)
-            with pytest.raises(MeshError):
+            # publish on mesh.agent.> is denied; the async violation report
+            # turns the resulting timeout into ConnectionDenied (ADR-0038)
+            with pytest.raises(ConnectionDenied):
                 await observer.call("echo-o", {"message": "nope"}, timeout=1.0)
 
 
