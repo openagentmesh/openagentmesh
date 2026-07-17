@@ -6,6 +6,7 @@ import typer
 
 from .agent import agent_app
 from .demo import demo
+from .mcp import mcp_app
 from .mesh import mesh_app
 
 app = typer.Typer(
@@ -17,6 +18,7 @@ app = typer.Typer(
 
 app.add_typer(mesh_app, name="mesh")
 app.add_typer(agent_app, name="agent")
+app.add_typer(mcp_app, name="mcp")
 app.command("demo")(demo)
 
 
