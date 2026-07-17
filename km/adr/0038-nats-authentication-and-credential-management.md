@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-18
-- **Status:** spec
+- **Status:** documented
 - **Related:** ADR-0033 (CLI surface, auth deferred), ADR-0035 (control plane), ADR-0037 (OAM scope), ADR-0022 (`AgentMesh.local()`)
 - **Source:** conversation (shaping session on authn/z)
 
@@ -66,9 +66,21 @@ Output is a standard NATS `.creds` file usable by any NATS client, not just OAM.
 
 | Role | Intent | NATS publish allow | NATS subscribe allow |
 |------|--------|--------------------|----------------------|
-| `worker` | hosts agents, emits events, serves invocations | `mesh.health.>`, `mesh.agent.*.*`, `mesh.agent.*.*.events`, `mesh.errors.>`, `_INBOX.>`, `$JS.API.>`, `$KV.mesh-registry.>` (own-key only, enforced by policy template) | `mesh.agent.>`, `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>` |
-| `invoker` | calls agents, reads the catalog | `mesh.agent.>`, `_INBOX.>` | `_INBOX.>`, `mesh.results.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>` |
-| `observer` | read-only: catalog, health, events | (none beyond `_INBOX.>`) | `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.health.>`, `mesh.agent.>.events` |
+| `worker` | hosts agents, emits events, serves invocations, full SDK surface | `mesh.>`, `_INBOX.>`, `$JS.API.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `$KV.mesh-context.>`, `$O.mesh-artifacts.>` | `mesh.>`, `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `$KV.mesh-context.>`, `$O.mesh-artifacts.>` |
+| `invoker` | calls agents, reads the catalog | `mesh.agent.>`, `_INBOX.>`, `$JS.API.>` | `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.agent.*.*.events` |
+| `observer` | read-only: catalog, health, events | `_INBOX.>`, `$JS.API.>` | `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.agent.*.*.events`, `mesh.errors.>`, `mesh.health.>` |
+
+> **Amended 2026-07-17 (implementation):** the original table was derived from
+> the subject taxonomy, not from what the SDK actually publishes, and a
+> credential built from it could not even complete registration. Corrections
+> found by running real role-credentialed meshes against a JWT-auth'd server:
+> catalog updates are CAS writes by every registering process, so workers need
+> publish on `$KV.mesh-catalog.>`; `mesh.kv` / `mesh.workspace` need the
+> `mesh-context` KV and `mesh-artifacts` Object Store subjects; and *reading*
+> KV (catalog included) goes through `$JS.API.>` requests, so even observers
+> need publish there (`$KV.*` publish stays denied, which is what blocks
+> writes). JS API access is coarse in v1 — an observer could create unrelated
+> streams; refining to the read-only `$JS.API` subset is a follow-up.
 
 Roles are coarse-by-design. A process that hosts multiple agents takes `worker`, gaining publish rights on `mesh.agent.*.*`. The tighter "this process may only serve `finance.risk.scorer`" property belongs to the OAM scope layer (ADR-0037), not to NATS-level permissions, because enforcing it at NATS forces one process per agent.
 
@@ -226,6 +238,31 @@ tls {
 **Downstream-API credential vault integrated into the SDK (OneCLI-style).** Rejected for this ADR. Agent-to-external-API secrets are a different problem from mesh authn/z. ADR-0023 already excludes BYOK for downstream keys. Handler bodies choose whatever secret-management approach they like; OAM does not prescribe one.
 
 **Application-layer governance frameworks (Microsoft Agent Governance Toolkit, similar).** Rejected as the auth foundation; viable as a peer integration. Frameworks like [AGT](https://github.com/microsoft/agent-governance-toolkit) provide in-process policy enforcement (intercept tool calls, evaluate against rules, allow/deny before execution) plus their own identity stack (Ed25519 + ML-DSA-65 credentials, trust scoring, SPIFFE/SVID). They occupy the same layer as ADR-0037 OAM scope (caller-side, cooperative, in-process), not the wire-level identity layer this ADR addresses. Adopting AGT as OAM's identity foundation would contradict the Non-goals above (no OAM-native identity abstraction, no issuer service, no OAM-format tokens) and re-route credentials through a Microsoft-controlled stack still in Public Preview with declared breaking changes ahead. The ecosystem-fit framing applies: AGT-governed agents and OAM agents are complementary populations. The right shape is a documented integration alongside the future MCP and A2A bridges, either as a cookbook recipe (handler body calls AGT's `PolicyEvaluator` before doing work, pure developer territory per ADR-0008) or as an optional adapter package outside core. Note also a naming collision: AGT ships an `agentmesh-platform` Python package, so any integration documentation must disambiguate `from openagentmesh import AgentMesh` from AGT's `AgentMesh` symbols.
+
+## Implementation notes (2026-07-17, SDK slice)
+
+- **The system-account open question answered itself:** a nats-server in
+  operator (JWT) mode refuses to start JetStream at all without a
+  `system_account` (`Can't start JetStream: ... system account not setup`).
+  Since OAM requires JetStream, `oam auth init` MUST create a SYS account and
+  wire it into the emitted server config — it is not an operator choice.
+- **`nkeys` became a core dependency.** nats-py imports the `nkeys` package
+  lazily when `user_credentials` is set; without it, presenting a `.creds`
+  file dies with `ModuleNotFoundError`. Bundled by default so auth works out
+  of the box.
+- **Denial semantics as implemented:** connect-time rejections raise
+  `ConnectionDenied`. Runtime permission violations arrive asynchronously on
+  the NATS error callback (the server does not fail the offending publish
+  synchronously), so they are logged at WARNING with the `connection_denied`
+  framing; the blocked call itself surfaces as a timeout. Mapping those
+  violations back to the originating call site is deferred — revisit with the
+  ADR-0016/0040 liveness work, which builds the machinery for correlating
+  async failure signals to in-flight requests.
+- **`AgentMesh.local()` ignores ambient credentials** (`OAM_CREDS`, `.oam-url`):
+  §2's "local dev stays open" would otherwise break in any shell that has
+  credentials configured for a remote mesh.
+- Static test credentials live in `tests/auth_fixtures/` (nsc-generated,
+  memory resolver + preload, no nsc needed at test time).
 
 ## Open Questions
 

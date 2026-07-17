@@ -1,7 +1,11 @@
-"""Mesh URL resolution for the CLI (ADR-0033).
+"""Mesh URL resolution for the CLI (ADR-0033, extended by ADR-0038).
 
 Precedence: --url flag > OAM_URL env > .oam-url file (walked up from cwd)
 > default nats://localhost:4222.
+
+`.oam-url` accepts two forms: a legacy bare URL line, or a small TOML with
+`url` and optional `creds` fields (ADR-0038). Parsing lives in
+`openagentmesh._auth` and is shared with the SDK's credential resolution.
 """
 
 from __future__ import annotations
@@ -9,29 +13,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from openagentmesh._auth import OAM_URL_FILE, find_target_file, parse_target_file
+
 DEFAULT_URL = "nats://localhost:4222"
-OAM_URL_FILE = ".oam-url"
 ENV_VAR = "OAM_URL"
 
-
-def _find_url_file(start: Path) -> Path | None:
-    current = start.resolve()
-    while True:
-        candidate = current / OAM_URL_FILE
-        if candidate.is_file():
-            return candidate
-        if current.parent == current:
-            return None
-        current = current.parent
-
-
-def _read_url_file(path: Path) -> str | None:
-    content = path.read_text()
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return None
+__all__ = ["DEFAULT_URL", "ENV_VAR", "OAM_URL_FILE", "resolve_url", "write_url_file"]
 
 
 def resolve_url(flag: str | None, *, cwd: Path | None = None) -> str:
@@ -44,18 +31,24 @@ def resolve_url(flag: str | None, *, cwd: Path | None = None) -> str:
         return env_value
 
     start = cwd if cwd is not None else Path.cwd()
-    file_path = _find_url_file(start)
+    file_path = find_target_file(start)
     if file_path is not None:
-        value = _read_url_file(file_path)
-        if value:
-            return value
+        target = parse_target_file(file_path)
+        if target.url:
+            return target.url
 
     return DEFAULT_URL
 
 
-def write_url_file(url: str, *, cwd: Path | None = None) -> Path:
-    """Write `url` to `.oam-url` in the given directory (defaults to cwd)."""
+def write_url_file(url: str, *, creds: str | None = None, cwd: Path | None = None) -> Path:
+    """Write `.oam-url` in the given directory (defaults to cwd).
+
+    Bare URL without credentials (legacy form); TOML once `creds` is present.
+    """
     target_dir = cwd if cwd is not None else Path.cwd()
     target = target_dir / OAM_URL_FILE
-    target.write_text(f"{url}\n")
+    if creds is None:
+        target.write_text(f"{url}\n")
+    else:
+        target.write_text(f'url = "{url}"\ncreds = "{creds}"\n')
     return target

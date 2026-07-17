@@ -45,7 +45,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0035](0035-control-plane-for-agent-channel-scoping.md) | Control plane for agent and channel scoping | discussion | |
 | [ADR-0036](0036-orchestration-declarative-workflows-and-checkpointing.md) | Orchestration: declarative workflows and checkpointing | discussion | |
 | [ADR-0037](0037-oam-scope-per-agent-visibility-and-reachability.md) | OAM scope: per-agent visibility and reachability | spec | |
-| [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | spec | roadmap/stage-3 |
+| [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | documented | roadmap/stage-3 |
 | [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
 | [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | discussion | |
 | [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | superseded by ADR-0045 | feature/cli-demos |

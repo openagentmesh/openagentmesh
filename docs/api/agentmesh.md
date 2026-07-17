@@ -14,13 +14,19 @@ mesh = AgentMesh("nats://localhost:4222")
 mesh = AgentMesh()
 ```
 
-### `AgentMesh(url: str = "nats://localhost:4222")`
+### `AgentMesh(url, *, creds=None, tls_cert=None, tls_key=None, tls_ca=None)`
 
 Connect to a running NATS server. Defaults to `nats://localhost:4222` when no URL is provided.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `url` | `str` | `"nats://localhost:4222"` | NATS connection URL |
+| `creds` | `str \| None` | `None` | Path to a NATS `.creds` file. When omitted, resolves from `OAM_CREDS`, then the `creds` field of `.oam-url`; otherwise connects open. See [Securing the Mesh](../concepts/security.md). |
+| `tls_cert` | `str \| None` | `None` | Client certificate for mTLS |
+| `tls_key` | `str \| None` | `None` | Client key for mTLS |
+| `tls_ca` | `str \| None` | `None` | CA bundle used to verify the server |
+
+Connecting without valid credentials to a server that requires them raises `ConnectionDenied` (code `connection_denied`).
 
 ### `AgentMesh.local()`
 

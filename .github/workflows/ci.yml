@@ -20,7 +20,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.agentmesh/bin
-          key: nats-server-${{ runner.os }}-2.10.24
+          key: nats-tools-${{ runner.os }}-2.10.24-nsc
+      - name: Install nats-server
+        run: |
+          if [ ! -x ~/.agentmesh/bin/nats-server ]; then
+            mkdir -p ~/.agentmesh/bin
+            curl -fsSL https://github.com/nats-io/nats-server/releases/download/v2.10.24/nats-server-v2.10.24-linux-amd64.tar.gz \
+              | tar xz --strip-components=1 -C ~/.agentmesh/bin nats-server-v2.10.24-linux-amd64/nats-server
+          fi
+      - name: Install nsc
+        run: |
+          if [ ! -x ~/.agentmesh/bin/nsc ]; then
+            mkdir -p ~/.agentmesh/bin
+            curl -fsSL https://github.com/nats-io/nsc/releases/download/v2.11.0/nsc-linux-amd64.zip -o /tmp/nsc.zip
+            unzip -o /tmp/nsc.zip -d ~/.agentmesh/bin nsc
+          fi
       - run: uv run ruff check .
       - run: uv run ty check
       - run: uv run pytest

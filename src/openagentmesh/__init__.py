@@ -3,6 +3,7 @@
 from ._context import KVEntry
 from ._errors import (
     ChunkSequenceError,
+    ConnectionDenied,
     ConnectionFailed,
     HandlerError,
     InvalidInput,
@@ -26,6 +27,7 @@ __all__ = [
     "AgentSpec",
     "CatalogEntry",
     "ChunkSequenceError",
+    "ConnectionDenied",
     "ConnectionFailed",
     "HandlerError",
     "InvalidInput",

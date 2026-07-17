@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
+from pathlib import Path
 from typing import Any, Literal
 
 import nats
@@ -18,9 +20,11 @@ from nats.js import JetStreamContext
 from nats.js.kv import KeyValue
 from pydantic import BaseModel
 
+from ._auth import build_tls_context, is_auth_error, resolve_creds
 from ._context import KVStore
 from ._discovery import DiscoveryMixin
 from ._errors import (
+    ConnectionDenied,
     ConnectionFailed,
     HandlerError,
     InvalidInput,
@@ -74,8 +78,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             ...
     """
 
-    def __init__(self, url: str = "nats://localhost:4222"):
+    def __init__(
+        self,
+        url: str = "nats://localhost:4222",
+        *,
+        creds: str | None = None,
+        tls_cert: str | None = None,
+        tls_key: str | None = None,
+        tls_ca: str | None = None,
+    ):
         self._url = url
+        self._creds = creds
+        self._tls_cert = tls_cert
+        self._tls_key = tls_key
+        self._tls_ca = tls_ca
         self.instance_id: str = uuid.uuid4().hex
         self._nc: NatsClient | None = None
         self._js: JetStreamContext | None = None
@@ -99,6 +115,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._watcher_tasks: dict[str, asyncio.Task] = {}
         self._source_subscriptions: list[Any] = []
         self._source_tasks: list[asyncio.Task] = []
+        # Subjects the server denied us on (ADR-0038): violations arrive
+        # asynchronously, so call sites consult this to turn a bare timeout
+        # into a ConnectionDenied.
+        self._denied_subjects: set[str] = set()
 
     @property
     def url(self) -> str:
@@ -158,6 +178,22 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     async def _connect(self) -> None:
         if self._nc is not None:
             return
+
+        # A local mesh stays open (ADR-0038 §2): no ambient OAM_CREDS/.oam-url pickup.
+        creds = self._creds if self._embedded is not None else resolve_creds(self._creds)
+        if creds is not None and not Path(creds).is_file():
+            raise ConnectionFailed(
+                message=f"Credentials file not found: {creds}",
+            )
+        options: dict[str, Any] = {}
+        if creds is not None:
+            options["user_credentials"] = creds
+        tls_context = build_tls_context(
+            tls_cert=self._tls_cert, tls_key=self._tls_key, tls_ca=self._tls_ca
+        )
+        if tls_context is not None:
+            options["tls"] = tls_context
+
         try:
             self._nc = await nats.connect(
                 self._url,
@@ -165,15 +201,34 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 max_reconnect_attempts=5,
                 reconnect_time_wait=1,
                 error_cb=self._nats_error_cb,
+                **options,
             )
         except Exception as e:
+            if is_auth_error(e):
+                raise ConnectionDenied(
+                    message=(
+                        f"Mesh at {self._url} rejected the connection: {e}. "
+                        + (
+                            f"Credentials used: {creds}"
+                            if creds
+                            else "No credentials were presented; the server requires auth "
+                            "(creds=, OAM_CREDS, or a creds field in .oam-url)"
+                        )
+                    ),
+                ) from e
             raise ConnectionFailed(
                 message=f"Could not connect to mesh at {self._url}. Is it running? Try: oam mesh up",
             ) from e
         self._js = self._nc.jetstream()
 
     async def _nats_error_cb(self, e: Exception) -> None:
-        _log.debug("nats: %s", e)
+        if is_auth_error(e):
+            _log.warning("nats connection_denied: %s", e)
+            match = re.search(r'violation for (?:publish|subscription) to "([^"]+)"', str(e))
+            if match:
+                self._denied_subjects.add(match.group(1).lower())
+        else:
+            _log.debug("nats: %s", e)
 
     async def _ensure_buckets(self) -> None:
         assert self._js is not None
