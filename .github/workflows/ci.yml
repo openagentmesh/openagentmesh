@@ -1,0 +1,55 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: Cache embedded NATS binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.agentmesh/bin
+          key: nats-server-${{ runner.os }}-2.10.24
+      - run: uv run ruff check .
+      - run: uv run ty check
+      - run: uv run pytest
+  sdk-ts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk-ts
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: sdk-ts/pnpm-lock.yaml
+      - name: Cache embedded NATS binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.agentmesh/bin
+          key: nats-server-${{ runner.os }}-2.10.24
+      - name: Install nats-server
+        run: |
+          if [ ! -x ~/.agentmesh/bin/nats-server ]; then
+            mkdir -p ~/.agentmesh/bin
+            curl -fsSL https://github.com/nats-io/nats-server/releases/download/v2.10.24/nats-server-v2.10.24-linux-amd64.tar.gz \
+              | tar xz --strip-components=1 -C ~/.agentmesh/bin nats-server-v2.10.24-linux-amd64/nats-server
+          fi
+      - run: pnpm install --frozen-lockfile
+      - run: npx tsc --noEmit
+      - run: pnpm vitest run
