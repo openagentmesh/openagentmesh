@@ -183,6 +183,22 @@ class AgentContract(BaseModel):
 
         return json.dumps(doc)
 
+    def to_agent_card(self, url: str | None = None) -> dict[str, Any]:
+        """A2A Agent Card projection (ADR-0012).
+
+        Thin by design: the registry document minus the ``x-agentmesh``
+        extension block, with ``url`` injected when the caller (typically a
+        federation gateway) provides one. Agents have no HTTP URL inside the
+        mesh, so none is stored.
+        """
+        import json
+
+        card: dict[str, Any] = json.loads(self.to_registry_json())
+        card.pop("x-agentmesh", None)
+        if url is not None:
+            card["url"] = url
+        return card
+
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 _STRICT_STRIP = frozenset({
