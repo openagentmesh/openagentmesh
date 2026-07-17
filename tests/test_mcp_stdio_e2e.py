@@ -17,6 +17,7 @@ pytest.importorskip("mcp")
 
 from mcp import ClientSession, StdioServerParameters  # noqa: E402
 from mcp.client.stdio import stdio_client  # noqa: E402
+from mcp.types import TextContent  # noqa: E402
 
 
 class EchoInput(BaseModel):
@@ -40,13 +41,17 @@ async def test_stdio_client_lists_and_calls_mesh_agent():
             command=sys.executable,
             args=["-m", "openagentmesh.cli", "mcp", "serve", "--url", host.url],
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        async with (
+            stdio_client(params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
 
-                tools = (await session.list_tools()).tools
-                assert "echo" in [t.name for t in tools]
+            tools = (await session.list_tools()).tools
+            assert "echo" in [t.name for t in tools]
 
-                result = await session.call_tool("echo", {"message": "hello"})
-                assert result.isError is False
-                assert json.loads(result.content[0].text) == {"reply": "Echo: hello"}
+            result = await session.call_tool("echo", {"message": "hello"})
+            assert result.isError is False
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            assert json.loads(content.text) == {"reply": "Echo: hello"}

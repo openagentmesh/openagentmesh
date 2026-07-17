@@ -2,7 +2,18 @@
 
 OpenAgentMesh does not replace MCP. It complements it.
 
-MCP is the standard for connecting LLMs to tools. OAM supports it directly. Any agent contract can be projected into the tool format your LLM expects:
+MCP is the standard for connecting LLMs to tools. OAM supports it in two ways.
+
+**Serve the mesh to MCP clients.** Any MCP client (Claude Code, Claude Desktop, Cursor) can list and call mesh agents as tools through the built-in bridge:
+
+```bash
+pip install 'openagentmesh[mcp]'
+claude mcp add mesh -- oam mcp serve
+```
+
+Agents opt in per ADR-0003 (`@mesh.agent(spec, mcp=True)`, with a `default_mcp` mesh policy). See the [MCP Bridge recipe](../cookbook/mcp-bridge.md).
+
+**Project contracts into tool definitions.** Any agent contract converts to the tool format your LLM expects:
 
 ```python
 from openagentmesh import AgentMesh
@@ -10,12 +21,9 @@ from openagentmesh import AgentMesh
 mesh = AgentMesh("nats://localhost:4222")
 contract = await mesh.contract("summarizer")
 
-# Build tool definitions from the contract's schemas
-tool = {
-    "name": contract.name,
-    "description": contract.description,
-    "input_schema": contract.input_schema,
-}
+tool = contract.to_tool_schema()        # provider-neutral
+tool = contract.to_anthropic_tool()     # Anthropic Messages API
+tool = contract.to_openai_tool()        # OpenAI Chat Completions
 ```
 
 So where does OAM add value? In three areas where MCP alone runs into friction at enterprise scale.
