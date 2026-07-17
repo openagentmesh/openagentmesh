@@ -91,6 +91,23 @@ update that file too and say so here.
   call-site `connection_denied` errors need request-correlation machinery —
   same machinery as the ADR-0016/0040 liveness work; noted in the ADR to
   revisit there.
+- **Design-derived permission lists don't survive contact with the wire.**
+  ADR-0038's role table was written from the subject taxonomy; a credential
+  built from it couldn't even complete registration (catalog CAS writes need
+  `$KV.mesh-catalog.>` publish; KV *reads* need `$JS.API.>` publish even for
+  observers). Lesson for 0016/0048: derive any subject list from a running
+  mesh with a real credential, not from the docs. The e2e test that boots a
+  server from the emitted config is what caught every gap.
+- **The auth work surfaced a latent taxonomy leak:** `mesh.call()` timeouts
+  raised raw `nats.errors.TimeoutError`, never `MeshTimeout`. Denied
+  publishes also read as timeouts because NATS reports violations async on
+  the error callback; the SDK now records denied subjects and converts the
+  timeout at the call site into `ConnectionDenied`.
+- **CI test-ordering trap:** tests/cli/* collect before tests/test_*.py, so
+  anything using `find_nats_server()` directly runs before a `local()` test
+  has lazily downloaded the binary. CI now installs nats-server (and nsc)
+  explicitly in the python job; local sandbox runs already do this via the
+  Go-proxy workaround.
 - **Run 4 was cut off before it could log its run entry or create its
   branch** — the state file claimed "executing on roadmap/stage-3" but the
   branch didn't exist. Protocol tweak honored this run: commit the run-log

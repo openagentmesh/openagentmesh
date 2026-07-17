@@ -8,12 +8,10 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 Stage 3 — Production trust (shaping pass done run 4; prioritized plan in
 km/notes/2026-07-17-stage3-plan.md awaiting sign-off, item 10; executing the
 plan's default order — ADR-0038 auth first — meanwhile).
-ADR-0038 progress on roadmap/stage-3 (run 5): SDK slice done (creds=/TLS/
-OAM_CREDS/.oam-url TOML/ConnectionDenied, 13 tests against a real JWT-auth'd
-nats-server) plus `oam mesh connect --creds` and `oam auth whoami` (8 tests).
-Remaining before merge: `oam auth init` / `user add` role templates /
-`user revoke` (nsc wrapping) and the docs slice (auth concepts page +
-secured-mesh cookbook recipe — a stage exit criterion).
+ADR-0038 auth: COMPLETE end of run 5 — SDK, full `oam auth` CLI, and docs
+all merged to main (9502f52, --no-ff) with CI green on the branch tip
+(run on fca33cc, conclusion success). Next up per the plan: the
+ADR-0016+0040 liveness pair.
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -156,27 +154,29 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Stage 3 item status (updated 2026-07-17, run 5)
 
-1. **ADR-0038 auth** — IN PROGRESS on roadmap/stage-3 (not yet merged to main).
-   - Slice A (SDK) DONE: `AgentMesh(creds=, tls_cert=, tls_key=, tls_ca=)`;
-     resolution creds= > OAM_CREDS > .oam-url TOML > open; `ConnectionDenied`
-     (code `connection_denied`) on connect-time rejection; runtime permission
-     violations logged at WARNING; `AgentMesh.local()` ignores ambient creds.
-     Verified: 13 tests in tests/test_auth.py run a real nats-server in
-     operator/JWT mode with static nsc-generated fixtures (tests/auth_fixtures/).
-   - CLI increment DONE: `oam mesh connect --creds` (persists TOML .oam-url),
-     `oam auth whoami` (decodes user JWT: user/nkey/account). 8 tests in
-     tests/cli/test_auth_cli.py.
-   - Verified this run on the branch: 274 pytest passed (was 253), ruff and ty
-     clean. CI on the branch push not yet observed (left for next run).
-   - Remaining: `oam auth init` / `user add` (worker/invoker/observer role
-     templates) / `user revoke` wrapping nsc; docs (auth concepts page +
-     secured multi-node mesh cookbook recipe with executable twin). ADR index
-     status: test (SDK part implemented; whole-ADR completion needs the CLI
-     + docs slices).
-   - Design findings recorded in the ADR's new "Implementation notes" section:
-     JWT/operator mode REQUIRES a system account for JetStream (resolves the
-     ADR's open question — `oam auth init` must create SYS); `nkeys` is now a
-     core dependency (nats-py needs it for .creds).
+1. **ADR-0038 auth** — DONE (run 5). Merged to main 9502f52 (--no-ff);
+   ADR + index at `documented`. Verified: 281 pytest on the merged tree
+   locally; ruff/ty clean; CI success on branch tip fca33cc (main-merge CI
+   run not yet observed — check next run).
+   - SDK: `AgentMesh(creds=, tls_cert=, tls_key=, tls_ca=)`; resolution
+     creds= > OAM_CREDS > .oam-url TOML > open; `ConnectionDenied` on
+     connect-time rejection AND on calls blocked by permissions (async
+     violation reports correlated back to the call site); local() ignores
+     ambient creds. Bonus fix: call() timeouts now raise MeshTimeout
+     instead of leaking nats.errors.TimeoutError.
+   - CLI: `oam auth init` (nsc-wrapped operator+SYS+account tree, emits
+     runnable server.conf, mem resolver), `user add --role
+     worker|invoker|observer`, `user revoke`, `whoami`; `oam mesh connect
+     --creds`. E2E tests boot a server from the emitted config and drive
+     real role-credentialed meshes (28 auth tests total).
+   - Docs: concepts/security.md, cookbook/secured-mesh.md + executable
+     twin, oam auth CLI reference, AgentMesh constructor params.
+   - ADR amendments recorded in the ADR itself: role table corrected
+     against real wire usage (original blocked registration); JWT mode
+     requires a system account for JetStream; nkeys now a core dep.
+   - Stage exit criterion "cookbook recipe showing a secured multi-node
+     mesh" is met. Remaining stage exit criterion: the chaos-style
+     kill-mid-request test (belongs to the 0016+0040 liveness pair).
 2. **ADR-0016+0040 liveness pair** — not started.
 3. **ADR-0048 observability** — not started.
 4. **ADR-0055 lifecycle gates** — not started.
@@ -203,11 +203,21 @@ Advanced (Stage 3 / ADR-0038, on roadmap/stage-3, pushed through 14b1e89):
 - ADR-0038 implementation notes added (system-account requirement, nkeys
   dep, denial semantics); index status spec -> test; CHANGELOG updated.
 
-Left open: CI result on the branch (pushed at end of run — verify next run);
-oam auth init/user add/revoke (nsc wrapping) and the docs slice, then merge
-to main; all prior Needs-Luca items still unanswered. Next run: check CI +
-Needs-Luca answers, then continue ADR-0038 slice B (role templates are the
-meat; ADR §5 has the subject lists) and slice C docs.
+Continued (same run, later): completed ADR-0038 entirely — `oam auth
+init`/`user add`/`user revoke` wrapping nsc (role subject lists corrected
+against real wire usage; ADR amended), a fix making denied/timed-out calls
+raise ConnectionDenied/MeshTimeout instead of leaking raw NATS errors,
+docs slice (concepts/security.md, cookbook/secured-mesh.md + twin, CLI
+reference), CI now installs nsc + nats-server explicitly (one red CI run
+from test-ordering: auth tests ran before the lazy binary download —
+fixed). Merged --no-ff to main as 9502f52 after CI success on fca33cc;
+281 pytest on merged tree verified locally.
+
+Left open: CI on the main merge commit (verify next run); all prior
+Needs-Luca items still unanswered. Next run: verify CI on 9502f52, check
+Needs-Luca answers, then start the ADR-0016+0040 liveness pair (amend 0016
+with a code sample + shape 0040 discussion->spec first; ends with the
+chaos-style kill-mid-request test, the stage's remaining exit criterion).
 
 ### 2026-07-17 ~12:05–12:25 UTC — run 3 (Fable 5, cloud)
 
