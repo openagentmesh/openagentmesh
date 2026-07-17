@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, suppress
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from typing import Any
 
 import nats
@@ -82,8 +82,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._registry_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
         self._artifacts_os: Any | None = None
-        self.kv: KVStore | None = None
-        self.workspace: Workspace | None = None
+        self._kv: KVStore | None = None
+        self._workspace: Workspace | None = None
 
         # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
@@ -103,6 +103,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     def url(self) -> str:
         """NATS URL this mesh connects to."""
         return self._url
+
+    @property
+    def kv(self) -> KVStore:
+        """Shared KV store (``mesh-context`` bucket). Available once connected."""
+        if self._kv is None:
+            raise ConnectionFailed("Mesh is not connected; use 'async with mesh:' first")
+        return self._kv
+
+    @property
+    def workspace(self) -> Workspace:
+        """Object Store workspace (``mesh-artifacts`` bucket). Available once connected."""
+        if self._workspace is None:
+            raise ConnectionFailed("Mesh is not connected; use 'async with mesh:' first")
+        return self._workspace
 
     def __repr__(self) -> str:
         status = "connected" if self._nc is not None else "disconnected"
@@ -169,8 +183,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 val = await create(bucket=bucket)
             setattr(self, attr, val)
 
-        self.kv = KVStore(self._context_kv)
-        self.workspace = Workspace(self._artifacts_os)
+        self._kv = KVStore(self._context_kv)
+        self._workspace = Workspace(self._artifacts_os)
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""
@@ -352,7 +366,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             self._url = original_url
             await embedded.stop()
 
-    def local(self_or_cls=None) -> AsyncIterator[AgentMesh]:
+    def local(self_or_cls=None) -> AbstractAsyncContextManager[AgentMesh]:
         """Embedded NATS for tests and demos.
 
         Works as both a classmethod (creates a new instance) and an
