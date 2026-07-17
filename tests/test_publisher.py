@@ -1,6 +1,5 @@
 """Tests for publisher agent emission (ADR-0034)."""
 
-import asyncio
 
 import pytest
 from pydantic import BaseModel

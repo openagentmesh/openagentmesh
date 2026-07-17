@@ -7,9 +7,9 @@ Each test uses AgentMesh.local() for a fully isolated embedded NATS instance.
 import asyncio
 
 import pytest
+from nats.js.errors import ObjectNotFoundError
 
 from openagentmesh import AgentMesh
-
 
 # ---------------------------------------------------------------------------
 # Layer 2: Technical invariants
@@ -59,7 +59,7 @@ class TestWorkspaceDelete:
             await mesh.workspace.put("test/temp.txt", b"temporary")
             await mesh.workspace.delete("test/temp.txt")
 
-            with pytest.raises(Exception):
+            with pytest.raises(ObjectNotFoundError):
                 await mesh.workspace.get("test/temp.txt")
 
 
@@ -88,6 +88,7 @@ class TestAgentArtifactSharing:
 
     async def test_producer_consumer_share_artifact(self):
         from pydantic import BaseModel
+
         from openagentmesh import AgentSpec
 
         class StoreRequest(BaseModel):

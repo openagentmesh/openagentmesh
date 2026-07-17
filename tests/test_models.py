@@ -13,7 +13,6 @@ from openagentmesh import (
 )
 from openagentmesh._handler import inspect_handler
 
-
 # --- Test fixtures ---
 
 

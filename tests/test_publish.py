@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from openagentmesh import AgentMesh
 
-
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
 X_MESH_REQUEST_ID = "X-Mesh-Request-Id"
 X_MESH_CONTENT_TYPE = "X-Mesh-Content-Type"

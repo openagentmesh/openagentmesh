@@ -9,11 +9,9 @@ Each test uses AgentMesh.local() for a fully isolated embedded NATS instance.
 import asyncio
 import time
 
-import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec
-
 
 # --- Shared models (same as docs/cookbook/shared-plan.md) ---
 

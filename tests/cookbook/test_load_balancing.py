@@ -2,8 +2,6 @@
 
 import asyncio
 
-import pytest
-
 from openagentmesh import AgentMesh
 from openagentmesh.demos.load_balancing import TranslateInput, main
 

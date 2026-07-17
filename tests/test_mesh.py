@@ -11,7 +11,6 @@ from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, CatalogEntry, InvocationMismatch, MeshError
 
-
 # --- Test models ---
 
 

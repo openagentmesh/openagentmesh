@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 
-import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec
-
 
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
 

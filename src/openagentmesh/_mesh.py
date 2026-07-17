@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 import nats
@@ -174,7 +174,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""
-        for name, (spec, info, contract) in self._agents.items():
+        for name, (_spec, info, contract) in self._agents.items():
             if name not in self._subscribed:
                 if info.invocable:
                     await self._subscribe_agent(name, info, contract)
@@ -246,17 +246,13 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         # 1. Stop catalog watcher: the KV iterator and its consumer task.
         if self._catalog_watcher is not None:
-            try:
+            with suppress(Exception):
                 await self._catalog_watcher.stop()
-            except Exception:
-                pass
             self._catalog_watcher = None
         if self._catalog_watcher_task is not None:
             self._catalog_watcher_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await self._catalog_watcher_task
-            except (asyncio.CancelledError, Exception):
-                pass
             self._catalog_watcher_task = None
 
         # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
@@ -265,10 +261,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._watcher_tasks.values():
             task.cancel()
         for task in self._watcher_tasks.values():
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._watcher_tasks.clear()
 
         # 3. Cancel publisher emission tasks (ADR-0034). Same two-pass pattern;
@@ -277,10 +271,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._publisher_tasks.values():
             task.cancel()
         for task in self._publisher_tasks.values():
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._publisher_tasks.clear()
 
         # 3b. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
@@ -288,26 +280,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._source_tasks:
             task.cancel()
         for task in self._source_tasks:
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._source_tasks.clear()
 
         for sub in self._source_subscriptions:
-            try:
+            with suppress(Exception):
                 await sub.unsubscribe()
-            except Exception:
-                pass
         self._source_subscriptions.clear()
 
         # 4. Unsubscribe invocable-agent subscriptions so the broker stops
         # routing requests to this process before we tear down the registry.
         for sub in self._subscriptions:
-            try:
+            with suppress(Exception):
                 await sub.unsubscribe()
-            except Exception:
-                pass
         self._subscriptions.clear()
 
         # 5. Deregister from the cluster: remove each owned agent from the
@@ -318,14 +304,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             for name in self._subscribed:
                 if name in self._agents:
                     _, _, contract = self._agents[name]
-                    try:
+                    with suppress(Exception):
                         await self._update_catalog(contract, add=False)
-                    except Exception:
-                        pass
-                    try:
+                    with suppress(Exception):
                         await self._registry_kv.delete(name)
-                    except Exception:
-                        pass
 
         self._subscribed.clear()
 
@@ -336,10 +318,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             try:
                 await self._nc.drain()
             except Exception:
-                try:
+                with suppress(Exception):
                     await self._nc.close()
-                except Exception:
-                    pass
             self._nc = None
 
     # --- local() ---
@@ -518,15 +498,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         async def _run_forever():
             async with self:
-                try:
+                with suppress(asyncio.CancelledError):
                     await asyncio.Event().wait()
-                except asyncio.CancelledError:
-                    pass
 
-        try:
+        with suppress(KeyboardInterrupt):
             asyncio.run(_run_forever())
-        except KeyboardInterrupt:
-            pass
 
     # --- Agent subscription ---
 
@@ -686,10 +662,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _run_watcher(self, name: str, info: HandlerInfo) -> None:
         """Run a watcher handler as a background task."""
-        try:
+        with suppress(asyncio.CancelledError):
             await info.func()
-        except asyncio.CancelledError:
-            pass
 
     # --- Publisher emission (ADR-0034) ---
 
@@ -727,7 +701,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 }),
             )
         except asyncio.CancelledError:
-            try:
+            with suppress(Exception):
                 await self._nc.publish(
                     event_subject,
                     b"",
@@ -736,8 +710,6 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         "X-Mesh-Stream-End": "true",
                     }),
                 )
-            except Exception:
-                pass
         except Exception as e:
             _log.warning("Publisher '%s' failed: %s", name, e)
             error = HandlerError(message=str(e), agent=name)
@@ -774,7 +746,6 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             )
 
     async def _bind_subject_source(self, name: str, info: HandlerInfo, source: Any) -> None:
-        from ._sources import MeshMessage
 
         async def cb(msg):
             try:
@@ -838,10 +809,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         except asyncio.CancelledError:
             pass
         finally:
-            try:
+            with suppress(Exception):
                 await watcher.stop()
-            except Exception:
-                pass
 
     def _build_source_input(
         self,

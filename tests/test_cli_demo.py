@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from typer.testing import CliRunner
 
 from openagentmesh import AgentMesh
