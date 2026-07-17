@@ -13,9 +13,9 @@ from openagentmesh import AgentMesh
 mesh = AgentMesh("nats://mesh.company.com:4222")
 contract = await mesh.contract("summarizer")
 
-# The contract is already A2A-compatible.
-# A future to_agent_card() method will project it
-# with a url injected at federation boundaries.
+# The contract is already A2A-compatible. Project it to an
+# A2A Agent Card, injecting the url at the federation boundary:
+card = contract.to_agent_card(url="https://agents.example.com/summarizer")
 ```
 
 ## Contract compatibility
@@ -52,7 +52,7 @@ The projection from OAM contract to A2A Agent Card is a **thin operation**: stri
 
 Internally, agents are addressed by NATS subject (`mesh.agent.nlp.summarizer`). They don't have HTTP URLs. When you expose an agent externally via an A2A-compatible gateway, the gateway assigns the URL.
 
-The contract's `to_registry_json()` method already produces A2A-compatible JSON. A dedicated `to_agent_card()` convenience method is planned.
+The contract's `to_agent_card(url=None)` method produces the A2A Agent Card: the registry document with the `x-agentmesh` block stripped and the `url` injected when you pass one. Without a `url` (the default), the field is omitted — useful for inspecting the card shape before a gateway assigns the address.
 
 ## When to use which
 

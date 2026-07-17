@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "TypeScript client SDK for OpenAgentMesh — the fabric for multi-agent systems.",
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

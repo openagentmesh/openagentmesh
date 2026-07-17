@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP export bridge** (ADR-0002/0003): any MCP client (Claude Code, Claude Desktop, Cursor) can list and call mesh agents as tools. Opt agents in per-agent with `@mesh.agent(spec, mcp=True/False)` and set the mesh policy via `mesh.run_mcp(default_mcp=...)` (blocking) or `await mesh.serve_mcp(...)` (async). `oam mcp serve --url nats://...` gateways an already-running mesh — register it with `claude mcp add mesh -- oam mcp serve`. Requires the new `mcp` extra: `pip install 'openagentmesh[mcp]'`.
+- `contract.to_agent_card(url=None)` (ADR-0012): project a contract to an A2A Agent Card — the registry document minus `x-agentmesh`, with the `url` injected at the federation boundary.
+- npm release workflow for `@openagentmesh/sdk`: pushing an `sdk-ts-v*` tag runs the full TS suite and publishes to npm.
 - `py.typed` marker: the package now advertises its inline type annotations to type checkers (PEP 561), and the codebase passes `ty check` with zero diagnostics.
 - CI on GitHub Actions: every push and PR runs ruff, ty, the Python test suite, and the TypeScript SDK typecheck + test suite.
 
@@ -18,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `@openagentmesh/sdk` package metadata declared Apache-2.0; the project license is MIT. Corrected before first npm publish.
+- `mesh.contract()` now restores `input_schema`/`output_schema` from the registry document; contracts fetched from the registry previously lost their schemas (breaking tool projection for remote agents).
 - TypeScript SDK test harness: agent simulators now flush their subscription interest before tests proceed, eliminating intermittent "No agent serving" failures in full-suite runs.
 
 - `mesh.instance_id`: stable per-process identifier (UUID4 hex), auto-stamped as `X-Mesh-Instance-Id` header on every outbound message (ADR-0059). Lets receivers attribute messages to a specific replica when multiple instances of the same agent name are running.

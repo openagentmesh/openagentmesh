@@ -8,8 +8,8 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | ADR | Decision | Status | Branch |
 |-----|----------|--------|--------|
 | [ADR-0001](0001-reject-json-rpc-as-internal-message-standard.md) | Reject JSON-RPC as internal message standard | documented | |
-| [ADR-0002](0002-bidirectional-mcp-bridge-design.md) | Bidirectional MCP bridge design | spec | roadmap/stage-1 |
-| [ADR-0003](0003-mcp-export-flag-as-boolean.md) | MCP export flag as boolean | spec | roadmap/stage-1 |
+| [ADR-0002](0002-bidirectional-mcp-bridge-design.md) | Bidirectional MCP bridge design | documented (run_mcp; add_mcp still spec, Phase 3) | roadmap/stage-1 |
+| [ADR-0003](0003-mcp-export-flag-as-boolean.md) | MCP export flag as boolean | documented | roadmap/stage-1 |
 | [ADR-0004](0004-schema-quality-tiers-for-mcp-intake.md) | Schema quality tiers for MCP intake | discussion | |
 | [ADR-0005](0005-streaming-wire-protocol.md) | Streaming wire protocol | documented | feature/streaming-protocol |
 | [ADR-0006](0006-sla-gating-for-mcp-export.md) | SLA gating for MCP export | spec | |
