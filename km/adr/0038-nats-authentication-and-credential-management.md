@@ -66,9 +66,21 @@ Output is a standard NATS `.creds` file usable by any NATS client, not just OAM.
 
 | Role | Intent | NATS publish allow | NATS subscribe allow |
 |------|--------|--------------------|----------------------|
-| `worker` | hosts agents, emits events, serves invocations | `mesh.health.>`, `mesh.agent.*.*`, `mesh.agent.*.*.events`, `mesh.errors.>`, `_INBOX.>`, `$JS.API.>`, `$KV.mesh-registry.>` (own-key only, enforced by policy template) | `mesh.agent.>`, `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>` |
-| `invoker` | calls agents, reads the catalog | `mesh.agent.>`, `_INBOX.>` | `_INBOX.>`, `mesh.results.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>` |
-| `observer` | read-only: catalog, health, events | (none beyond `_INBOX.>`) | `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.health.>`, `mesh.agent.>.events` |
+| `worker` | hosts agents, emits events, serves invocations, full SDK surface | `mesh.>`, `_INBOX.>`, `$JS.API.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `$KV.mesh-context.>`, `$O.mesh-artifacts.>` | `mesh.>`, `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `$KV.mesh-context.>`, `$O.mesh-artifacts.>` |
+| `invoker` | calls agents, reads the catalog | `mesh.agent.>`, `_INBOX.>`, `$JS.API.>` | `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.agent.*.*.events` |
+| `observer` | read-only: catalog, health, events | `_INBOX.>`, `$JS.API.>` | `_INBOX.>`, `$KV.mesh-catalog.>`, `$KV.mesh-registry.>`, `mesh.agent.*.*.events`, `mesh.errors.>`, `mesh.health.>` |
+
+> **Amended 2026-07-17 (implementation):** the original table was derived from
+> the subject taxonomy, not from what the SDK actually publishes, and a
+> credential built from it could not even complete registration. Corrections
+> found by running real role-credentialed meshes against a JWT-auth'd server:
+> catalog updates are CAS writes by every registering process, so workers need
+> publish on `$KV.mesh-catalog.>`; `mesh.kv` / `mesh.workspace` need the
+> `mesh-context` KV and `mesh-artifacts` Object Store subjects; and *reading*
+> KV (catalog included) goes through `$JS.API.>` requests, so even observers
+> need publish there (`$KV.*` publish stays denied, which is what blocks
+> writes). JS API access is coarse in v1 — an observer could create unrelated
+> streams; refining to the read-only `$JS.API` subset is a follow-up.
 
 Roles are coarse-by-design. A process that hosts multiple agents takes `worker`, gaining publish rights on `mesh.agent.*.*`. The tighter "this process may only serve `finance.risk.scorer`" property belongs to the OAM scope layer (ADR-0037), not to NATS-level permissions, because enforcing it at NATS forces one process per agent.
 
