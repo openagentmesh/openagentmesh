@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-18
-- **Status:** spec
+- **Status:** documented
 - **Related:** ADR-0033 (CLI surface, auth deferred), ADR-0035 (control plane), ADR-0037 (OAM scope), ADR-0022 (`AgentMesh.local()`)
 - **Source:** conversation (shaping session on authn/z)
 
