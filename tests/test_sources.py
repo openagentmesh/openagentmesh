@@ -38,7 +38,7 @@ class TestSubjectSource:
 
             # Publish to the subject; the source should fire the handler.
             await mesh.publish("test.sensor.temperature", Reading(sensor_id="s1", value=42.0))
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.1)
 
             assert len(received) == 1
@@ -58,7 +58,7 @@ class TestSubjectSource:
 
             await mesh._subscribe_pending()
             await mesh.publish("test.raw", b"\x00\x01\x02")
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.1)
 
             assert received == [b"\x00\x01\x02"]
@@ -76,7 +76,7 @@ class TestSubjectSource:
 
             await mesh._subscribe_pending()
             await mesh.publish("test.msg", Reading(sensor_id="s1", value=1.0))
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.1)
 
             assert len(received) == 1
@@ -233,6 +233,6 @@ class TestSourceCatalogVisibility:
 
             # Source still drives the handler.
             await mesh.publish("test.cat.events", b"x")
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.1)
             assert received == [b"fired"]

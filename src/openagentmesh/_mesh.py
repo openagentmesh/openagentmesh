@@ -105,6 +105,13 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         return self._url
 
     @property
+    def _conn(self) -> NatsClient:
+        """The live NATS connection; only valid after connect."""
+        if self._nc is None:
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
+        return self._nc
+
+    @property
     def kv(self) -> KVStore:
         """Shared KV store (``mesh-context`` bucket). Available once connected."""
         if self._kv is None:
@@ -572,7 +579,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 error = e
                 if wants_stream:
                     stream_subject = f"mesh.stream.{request_id}"
-                    await self._nc.publish(
+                    await self._conn.publish(
                         stream_subject,
                         error.to_json(),
                         headers=self._with_instance_id({
@@ -582,7 +589,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         }),
                     )
                 elif msg.reply:
-                    await self._nc.publish(
+                    await self._conn.publish(
                         msg.reply,
                         error.to_json(),
                         headers=self._with_instance_id({
@@ -590,7 +597,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                             "X-Mesh-Request-Id": request_id,
                         }),
                     )
-                await self._nc.publish(
+                await self._conn.publish(
                     compute_error_subject(name),
                     error.to_json(),
                     headers=self._with_instance_id({
@@ -599,7 +606,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     }),
                 )
 
-        sub = await self._nc.subscribe(subject, queue=queue, cb=handler)
+        sub = await self._conn.subscribe(subject, queue=queue, cb=handler)
         self._subscriptions.append(sub)
 
     async def _handle_responder(
@@ -621,7 +628,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             response_data = json.dumps(result).encode() if result is not None else b"{}"
 
         if msg.reply:
-            await self._nc.publish(
+            await self._conn.publish(
                 msg.reply,
                 response_data,
                 headers=self._with_instance_id({
@@ -649,7 +656,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             else:
                 chunk_data = json.dumps(chunk).encode()
 
-            await self._nc.publish(
+            await self._conn.publish(
                 stream_subject,
                 chunk_data,
                 headers=self._with_instance_id({
@@ -658,10 +665,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     "X-Mesh-Request-Id": request_id,
                 }),
             )
-            await self._nc.flush()
+            await self._conn.flush()
             seq += 1
 
-        await self._nc.publish(
+        await self._conn.publish(
             stream_subject,
             b"",
             headers=self._with_instance_id({
@@ -670,7 +677,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 "X-Mesh-Request-Id": request_id,
             }),
         )
-        await self._nc.flush()
+        await self._conn.flush()
 
     # --- Watcher execution (ADR-0042) ---
 
@@ -696,7 +703,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 else:
                     data = json.dumps(chunk).encode()
 
-                await self._nc.publish(
+                await self._conn.publish(
                     event_subject,
                     data,
                     headers=self._with_instance_id({
@@ -706,7 +713,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 )
                 seq += 1
 
-            await self._nc.publish(
+            await self._conn.publish(
                 event_subject,
                 b"",
                 headers=self._with_instance_id({
@@ -716,7 +723,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             )
         except asyncio.CancelledError:
             with suppress(Exception):
-                await self._nc.publish(
+                await self._conn.publish(
                     event_subject,
                     b"",
                     headers=self._with_instance_id({
@@ -728,7 +735,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             _log.warning("Publisher '%s' failed: %s", name, e)
             error = HandlerError(message=str(e), agent=name)
             try:
-                await self._nc.publish(
+                await self._conn.publish(
                     event_subject,
                     error.to_json(),
                     headers=self._with_instance_id({
@@ -736,7 +743,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         "X-Mesh-Status": "error",
                     }),
                 )
-                await self._nc.publish(
+                await self._conn.publish(
                     compute_error_subject(name),
                     error.to_json(),
                     headers=self._with_instance_id({"X-Mesh-Status": "error"}),
@@ -774,7 +781,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             except Exception as e:
                 _log.warning("Source handler for '%s' raised: %s", name, e)
 
-        sub = await self._nc.subscribe(
+        sub = await self._conn.subscribe(
             source.subject,
             queue=source.queue_group,
             cb=cb,

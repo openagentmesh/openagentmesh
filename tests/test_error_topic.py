@@ -31,7 +31,7 @@ class TestErrorTopicPublishing:
             async def on_error(msg):
                 received.append(json.loads(msg.data))
 
-            await mesh._nc.subscribe("mesh.errors.fail-agent", cb=on_error)
+            await mesh._conn.subscribe("mesh.errors.fail-agent", cb=on_error)
 
             with pytest.raises(MeshError, match="something went wrong"):
                 await mesh.call("fail-agent", {"text": "hello"})
@@ -60,7 +60,7 @@ class TestErrorTopicPublishing:
             async def on_error(msg):
                 received.append(json.loads(msg.data))
 
-            await mesh._nc.subscribe("mesh.errors.nlp.fail-agent", cb=on_error)
+            await mesh._conn.subscribe("mesh.errors.nlp.fail-agent", cb=on_error)
 
             with pytest.raises(MeshError, match="channel error"):
                 await mesh.call("nlp.fail-agent", {"text": "hello"})
@@ -86,7 +86,7 @@ class TestErrorTopicPublishing:
             async def on_error(msg):
                 received.append(json.loads(msg.data))
 
-            await mesh._nc.subscribe("mesh.errors.fail-agent", cb=on_error)
+            await mesh._conn.subscribe("mesh.errors.fail-agent", cb=on_error)
 
             chunks = []
             with pytest.raises(MeshError, match="stream exploded"):

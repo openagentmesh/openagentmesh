@@ -39,7 +39,7 @@ class InvocationMixin:
         request_id = uuid.uuid4().hex
         data = self._serialize_payload(payload)
 
-        response = await self._nc.request(
+        response = await self._conn.request(
             subject, data, timeout=timeout,
             headers=self._with_instance_id({"X-Mesh-Request-Id": request_id}),
         )
@@ -108,7 +108,7 @@ class InvocationMixin:
                 expected_seq[0] += 1
                 await chunks.put(json.loads(msg.data))
 
-        sub = await self._nc.subscribe(stream_subject, cb=chunk_handler)
+        sub = await self._conn.subscribe(stream_subject, cb=chunk_handler)
 
         try:
             data = self._serialize_payload(payload)
@@ -116,7 +116,7 @@ class InvocationMixin:
                 "X-Mesh-Request-Id": request_id,
                 "X-Mesh-Stream": "true",
             })
-            await self._nc.publish(subject, data, headers=headers)
+            await self._conn.publish(subject, data, headers=headers)
 
             deadline = asyncio.get_event_loop().time() + timeout
             while True:
@@ -191,7 +191,7 @@ class InvocationMixin:
             if is_end:
                 await items.put(None)
 
-        sub = await self._nc.subscribe(resolved, cb=_on_msg)
+        sub = await self._conn.subscribe(resolved, cb=_on_msg)
         await self._subscribe_pending()
 
         try:
@@ -263,13 +263,13 @@ class InvocationMixin:
             asyncio.create_task(_callback_task())
 
             headers = self._with_instance_id({"X-Mesh-Request-Id": request_id})
-            await self._nc.publish(subject, data, headers=headers, reply=reply_subject)
+            await self._conn.publish(subject, data, headers=headers, reply=reply_subject)
         else:
             base: dict[str, str] = {"X-Mesh-Request-Id": request_id}
             if reply_to:
                 base["X-Mesh-Reply-To"] = reply_to
             headers = self._with_instance_id(base)
-            await self._nc.publish(subject, data, headers=headers, reply=reply_to or "")
+            await self._conn.publish(subject, data, headers=headers, reply=reply_to or "")
 
     async def publish(
         self: AgentMesh,
@@ -325,4 +325,4 @@ class InvocationMixin:
         if headers:
             merged.update(headers)
 
-        await self._nc.publish(subject, data, headers=merged)
+        await self._conn.publish(subject, data, headers=merged)
