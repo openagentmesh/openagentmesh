@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `py.typed` marker: the package now advertises its inline type annotations to type checkers (PEP 561), and the codebase passes `ty check` with zero diagnostics.
+- CI on GitHub Actions: every push and PR runs ruff, ty, the Python test suite, and the TypeScript SDK typecheck + test suite.
+
+### Changed
+
+- `mesh.kv` and `mesh.workspace` accessed before connecting now raise `ConnectionFailed` with a clear message instead of surfacing as `AttributeError: 'NoneType' object has no attribute ...` at the first call site.
+
+### Fixed
+
+- TypeScript SDK test harness: agent simulators now flush their subscription interest before tests proceed, eliminating intermittent "No agent serving" failures in full-suite runs.
+
 - `mesh.instance_id`: stable per-process identifier (UUID4 hex), auto-stamped as `X-Mesh-Instance-Id` header on every outbound message (ADR-0059). Lets receivers attribute messages to a specific replica when multiple instances of the same agent name are running.
 - `mesh.publish(subject, payload, *, headers=None)`: public method to publish a Pydantic model, bytes, or str to an arbitrary NATS subject (ADR-0058). Auto-stamps OAM headers (`X-Mesh-Request-Id`, `X-Mesh-Instance-Id`, `X-Mesh-Content-Type`); rejects wildcard subjects. Replaces the need to reach into `mesh._nc.publish` for flat domain subjects.
 - KV ergonomics extensions on `mesh.kv` (ADR-0060):
