@@ -108,14 +108,14 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     def kv(self) -> KVStore:
         """Shared KV store (``mesh-context`` bucket). Available once connected."""
         if self._kv is None:
-            raise ConnectionFailed("Mesh is not connected; use 'async with mesh:' first")
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
         return self._kv
 
     @property
     def workspace(self) -> Workspace:
         """Object Store workspace (``mesh-artifacts`` bucket). Available once connected."""
         if self._workspace is None:
-            raise ConnectionFailed("Mesh is not connected; use 'async with mesh:' first")
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
         return self._workspace
 
     def __repr__(self) -> str:
