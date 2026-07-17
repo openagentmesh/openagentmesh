@@ -8,8 +8,8 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | ADR | Decision | Status | Branch |
 |-----|----------|--------|--------|
 | [ADR-0001](0001-reject-json-rpc-as-internal-message-standard.md) | Reject JSON-RPC as internal message standard | documented | |
-| [ADR-0002](0002-bidirectional-mcp-bridge-design.md) | Bidirectional MCP bridge design | spec | |
-| [ADR-0003](0003-mcp-export-flag-as-boolean.md) | MCP export flag as boolean | spec | |
+| [ADR-0002](0002-bidirectional-mcp-bridge-design.md) | Bidirectional MCP bridge design | spec | roadmap/stage-1 |
+| [ADR-0003](0003-mcp-export-flag-as-boolean.md) | MCP export flag as boolean | spec | roadmap/stage-1 |
 | [ADR-0004](0004-schema-quality-tiers-for-mcp-intake.md) | Schema quality tiers for MCP intake | discussion | |
 | [ADR-0005](0005-streaming-wire-protocol.md) | Streaming wire protocol | documented | feature/streaming-protocol |
 | [ADR-0006](0006-sla-gating-for-mcp-export.md) | SLA gating for MCP export | spec | |
@@ -18,7 +18,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0009](0009-catalog-as-sole-discovery-primitive.md) | Catalog as sole discovery primitive | documented | |
 | [ADR-0010](0010-pull-object-store-into-phase-1.md) | Pull object store into Phase 1 | documented | feature/object-store |
 | [ADR-0011](0011-use-uv-with-ruff-and-ty.md) | Use uv with ruff and ty | documented | |
-| [ADR-0012](0012-contract-schema-a2a-compatible-with-namespace.md) | Contract schema: A2A-compatible with namespace | documented | |
+| [ADR-0012](0012-contract-schema-a2a-compatible-with-namespace.md) | Contract schema: A2A-compatible with namespace | documented | roadmap/stage-1 (to_agent_card) |
 | [ADR-0013](0013-hyphenated-kv-bucket-names.md) | Hyphenated KV bucket names | documented | |
 | [ADR-0014](0014-single-key-denormalized-catalog.md) | Single-key denormalized catalog | documented | |
 | [ADR-0015](0015-prefer-path-nats-server-over-download.md) | Prefer PATH nats-server over download | implemented | |
