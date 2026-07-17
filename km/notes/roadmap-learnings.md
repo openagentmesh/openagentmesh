@@ -38,3 +38,35 @@ update that file too and say so here.
 - Two stale remote branches (`feature/error-taxonomy`, `feature/tool-conversion`) predate
   their content landing on main (verified: main has the tests/modules, branches are behind).
   Deletion is destructive → left for Luca.
+
+## 2026-07-17 — Stage 1, run 2 (cloud executor)
+
+- **Two executor runs overlapped.** Run 2's cron fired while run 1 was still pushing;
+  both did the same ty work in parallel and run 2 threw its duplicates away. Proposed
+  lock protocol for future runs: before starting work, check `git log -1 --format=%ci`
+  on origin/main and any roadmap/* branch — if the newest commit is less than ~15 min
+  old, assume a sibling run is live: re-fetch every few minutes and only proceed once
+  origin has been quiet for 15 min (or limit yourself to read-only verification).
+  Never force-push a roadmap branch; on divergence, adopt origin and diff for anything
+  yours adds.
+- **The MCP SDK validates tool arguments client-side** against inputSchema before the
+  server sees the call, so ADR-0057 caller faults (invalid_input) rarely reach the mesh
+  through the bridge. Provider faults do: the bridge prefixes tool errors with the
+  taxonomy code (e.g. `handler_error: ...`).
+- **`mcp.shared.memory.create_connected_server_and_client_session` gives a genuine
+  client↔server protocol exchange without subprocesses** — ideal for cookbook twins.
+  The stdio subprocess e2e (`python -m openagentmesh.cli mcp serve`) adds only ~1.5 s
+  and proves the real transport.
+- **mesh.contract() had been silently dropping input/output schemas** on the registry
+  round-trip (skills[0].inputSchema was never mapped back). Local contracts masked it
+  (`self._agents` short-circuit). Found because the bridge's remote-agent test showed
+  an empty tool schema. Cross-process tests catch what single-process tests structurally
+  cannot; worth a chaos-style two-process test pass someday (Stage 3 candidate).
+- **pytest module basename collision:** tests/test_mcp_bridge.py vs
+  tests/cookbook/test_mcp_bridge.py broke collection (no __init__.py in test dirs).
+  Cookbook twins keep the recipe name; give root tests a distinct name.
+- **Registration is lazy** (contracts publish on the next mesh operation, not at
+  decoration). A gateway connecting to a fresh host sees nothing until the host flushes.
+  Fine for real deployments (serve_mcp enters the mesh context), but multi-connection
+  tests need a warmup call. DX question for later: should @mesh.agent on a connected
+  mesh subscribe eagerly?

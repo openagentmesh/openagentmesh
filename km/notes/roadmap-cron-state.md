@@ -5,12 +5,13 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 0 — Consolidate (in progress; all cloud-doable items done, 3 items blocked on Luca)
+Stage 1 — Interop (in progress; core items done and merged, npm publish blocked on Luca).
+Stage 0 remains open only on its Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 
 ## Stage checklist
 
 - [ ] Stage 0 — Consolidate (blocked on Needs-Luca items below; everything else done)
-- [ ] Stage 1 — Interop
+- [ ] Stage 1 — Interop (core done: MCP bridge, to_agent_card, docs; npm publish blocked)
 - [ ] Stage 2 — Launch
 - [ ] Stage 3 — Production trust
 - [ ] Stage 4 — Frontier
@@ -42,8 +43,35 @@ Stage 0 — Consolidate (in progress; all cloud-doable items done, 3 items block
 All of the above merged to main (`merge: stage-0 consolidation`, --no-ff). Test suite on
 the merged tree: 232→235 pytest passing, 53 vitest passing, ruff/ty clean.
 
+## Stage 1 item status (verified 2026-07-17, run 2)
+
+1. **to_agent_card(url=None)** — DONE (ADR-0012's promised projection; 6 tests;
+   docs/welcome/oam-and-a2a.md and docs/api/contract.md updated to match reality).
+2. **MCP export bridge** — DONE per amended ADR-0002 (stdio-only v1; amendment records
+   that upstream deprecated SSE for Streamable HTTP). `@mesh.agent(spec, mcp=...)`,
+   `mesh.run_mcp()/serve_mcp()`, `oam mcp serve` CLI, `openagentmesh[mcp]` extra.
+   E2E proof actually run: the official MCP SDK client spawned `oam mcp serve` over
+   stdio, listed the mesh agent, called it, got the right reply
+   (tests/test_mcp_stdio_e2e.py, passing). Trying Claude Code itself as the client is a
+   nice manual follow-up for Luca: `claude mcp add mesh -- oam mcp serve`.
+3. **npm publish** — PREPARED, publish BLOCKED. License field fixed (Apache-2.0→MIT),
+   publish-npm.yml workflow added (sdk-ts-v* tags, full test gate, tag/version check).
+   Publishing needs an npm credential → Needs Luca. No tag pushed (tag push = publish).
+4. **Docs** — DONE. Cookbook recipe docs/cookbook/mcp-bridge.md + executable twin
+   tests/cookbook/test_mcp_bridge.py; oam-and-mcp.md rewritten around the shipped bridge.
+
+Out of scope, untouched: A2A inbound gateway, add_mcp (Phase 3), SLA gating (ADR-0006 —
+did not fall out trivially).
+
+All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified this run:
+253 pytest passed, 53 vitest passed, ruff/ty zero.
+
 ## Needs Luca
 
+5. **npm credential for @openagentmesh/sdk.** Add an NPM_TOKEN secret (or configure a
+   trusted publisher) for the 'npm' environment, then say "publish sdk-ts 0.1.0" here;
+   the next run will tag sdk-ts-v0.1.0 and the workflow publishes. The `npm i` exit
+   criterion stays open until then.
 1. **Push feature/wildfire-demo to origin.** The branch (~50 commits, wildfire test
    suite) exists only on your machine. Until it's on origin, Stage 0 item 1 can't proceed
    and Stage 2's demo recording has no code to run. `git push origin feature/wildfire-demo`
@@ -61,6 +89,32 @@ the merged tree: 232→235 pytest passing, 53 vitest passing, ruff/ty clean.
    tests/modules are on main). Deleting remote branches is destructive, so left alone.
 
 ## Run log
+
+### 2026-07-17 ~06:05–07:15 UTC — run 2 (Fable 5, cloud)
+
+**Overlap warning:** this run started while run 1 was still finishing (cron fired at the
+6h mark; run 1 ran long). Both runs independently did the Stage-0 ty work; run 2
+discarded its duplicate commits in favor of run 1's pushed branch. Lesson + proposed
+lock protocol recorded in roadmap-learnings.md.
+
+Verified: run 1's state-file claims all check out against the repo (ruff/ty zero, 235
+tests passing at main before stage-1, CI run #5 on main tip concluded success — the
+merge-commit run #4 was superseded/cancelled by the same-tree docs push, not a failure).
+nats-server built from Go module proxy again (learnings workaround works).
+
+Advanced (all on roadmap/stage-1, merged to main --no-ff, verified locally post-merge):
+- Stage 1 items 1, 2, 4 done + item 3 prepared (see item status above).
+- ADR-0002 amended (stdio-only v1, whole-mesh export semantics, code sample added);
+  ADR-0002/0003 statuses updated; ADR claims recorded in the index Branch column.
+- Bug found & fixed along the way: mesh.contract() dropped input/output schemas on the
+  registry round-trip, so remote agents projected empty tool schemas.
+- CHANGELOG updated under [Unreleased].
+
+Left open: Stage 0 items 1/2/7 and Stage 1 npm publish — all Needs Luca. Next run:
+check Needs Luca answers; verify CI green on the stage-1 merge (pushed at end of run,
+CI result not yet observed); then Stage 2 prep that doesn't need answers (launch-post
+and Show HN drafts, README fold) — note Stage 2's demo recording is blocked on the
+wildfire branch and OPENROUTER_API_KEY, and the docs-URL decision is Luca's.
 
 ### 2026-07-17 ~05:15–06:30 UTC — run 1 (Fable 5, cloud)
 
