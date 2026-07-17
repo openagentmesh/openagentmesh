@@ -23,6 +23,7 @@ class Workspace:
     async def get(self, key: str) -> bytes:
         """Retrieve a binary artifact by key."""
         result = await self._store.get(key)
+        assert result.data is not None
         return result.data
 
     async def delete(self, key: str) -> None:

@@ -10,7 +10,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-import nats
+from nats.aio.msg import Msg
 from pydantic import BaseModel
 
 from ._errors import ChunkSequenceError, MeshError, MeshTimeout, from_envelope
@@ -76,7 +76,7 @@ class InvocationMixin:
         chunks: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
         expected_seq = [0]
 
-        async def chunk_handler(msg: nats.aio.msg.Msg) -> None:
+        async def chunk_handler(msg: Msg) -> None:
             is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
             is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
 
@@ -169,7 +169,7 @@ class InvocationMixin:
 
         items: asyncio.Queue[dict | MeshError | None] = asyncio.Queue()
 
-        async def _on_msg(msg: nats.aio.msg.Msg) -> None:
+        async def _on_msg(msg: Msg) -> None:
             is_end = msg.headers and msg.headers.get("X-Mesh-Stream-End") == "true"
             is_error = msg.headers and msg.headers.get("X-Mesh-Status") == "error"
 

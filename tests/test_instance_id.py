@@ -99,7 +99,7 @@ class TestInstanceIdOnInvocation:
                     timeout=2.0,
                     headers={"X-Mesh-Request-Id": "test-rid"},
                 )
-                assert response.headers.get(X_MESH_INSTANCE_ID) == host.instance_id
+                assert (response.headers or {}).get(X_MESH_INSTANCE_ID) == host.instance_id
                 assert host.instance_id != caller.instance_id
 
     async def test_send_carries_caller_instance_id(self):

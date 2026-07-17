@@ -58,6 +58,8 @@ class DiscoveryMixin:
             entry = await self._registry_kv.get(name)
         except Exception as e:
             raise NotFound(agent=name) from e
+        if entry.value is None:
+            raise NotFound(agent=name)
 
         data = json.loads(entry.value)
         xam = data.get("x-agentmesh", {})

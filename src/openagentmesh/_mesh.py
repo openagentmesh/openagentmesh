@@ -8,11 +8,12 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
-from typing import Any
+from typing import Any, Literal
 
 import nats
 import pydantic
 from nats.aio.client import Client as NatsClient
+from nats.aio.msg import Msg
 from nats.js import JetStreamContext
 from nats.js.kv import KeyValue
 from pydantic import BaseModel
@@ -190,6 +191,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 val = await create(bucket=bucket)
             setattr(self, attr, val)
 
+        assert self._context_kv is not None and self._artifacts_os is not None
         self._kv = KVStore(self._context_kv)
         self._workspace = Workspace(self._artifacts_os)
 
@@ -228,7 +230,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         assert self._catalog_kv is not None
         try:
             entry = await self._catalog_kv.get(_CATALOG_KEY)
-            entries = json.loads(entry.value)
+            entries = json.loads(entry.value or b"[]")
             self._catalog_cache = {
                 e["name"]: CatalogEntry.model_validate(e) for e in entries
             }
@@ -238,11 +240,12 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     async def _start_catalog_watcher(self) -> None:
         """Start background task that watches the catalog KV for changes (ADR-0032)."""
         assert self._catalog_kv is not None
-        self._catalog_watcher = await self._catalog_kv.watchall()
+        watcher = await self._catalog_kv.watchall()
+        self._catalog_watcher = watcher
 
         async def _watch() -> None:
             try:
-                async for entry in self._catalog_watcher:
+                async for entry in watcher:
                     if entry is None or entry.value is None:
                         continue
                     if entry.key != _CATALOG_KEY:
@@ -478,7 +481,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         pattern: str,
         *,
         queue_group: str | None = None,
-        on_init: str = "replay",
+        on_init: Literal["replay", "skip"] = "replay",
     ):
         """Create a KV-watch source on the ``mesh-context`` bucket (ADR-0052).
 
@@ -533,7 +536,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         subject = contract.subject
         queue = f"q.{name}"
 
-        async def handler(msg: nats.aio.msg.Msg) -> None:
+        async def handler(msg: Msg) -> None:
             request_id = ""
             wants_stream = False
             if msg.headers:
@@ -611,7 +614,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _handle_responder(
         self,
-        msg: nats.aio.msg.Msg,
+        msg: Msg,
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
@@ -640,7 +643,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _handle_streaming(
         self,
-        msg: nats.aio.msg.Msg,
+        msg: Msg,
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
@@ -789,6 +792,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._source_subscriptions.append(sub)
 
     async def _bind_kv_source(self, name: str, info: HandlerInfo, source: Any) -> None:
+        assert self._context_kv is not None
         watcher = await self._context_kv.watch(source.pattern)
         task = asyncio.create_task(
             self._drain_kv_source(name, info, source, watcher)
@@ -874,7 +878,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 key=kv_key or "",
                 value=value,
                 revision=kv_revision or 0,
-                operation=kv_operation or "PUT",  # type: ignore[arg-type]
+                operation="DELETE" if kv_operation == "DELETE" else "PUT",
             )
 
         if kind == "mesh_message":
@@ -958,8 +962,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for _ in range(10):
             try:
                 kv_entry = await self._catalog_kv.get(_CATALOG_KEY)
-                current: list[dict] = json.loads(kv_entry.value)
-                revision = kv_entry.revision
+                current: list[dict] = json.loads(kv_entry.value or b"[]")
+                revision = kv_entry.revision or 0
             except (KeyNotFoundError, Exception):
                 current = []
                 revision = 0

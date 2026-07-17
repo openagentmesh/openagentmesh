@@ -1,5 +1,7 @@
 """Tests for AgentContract tool conversion methods (ADR-0039)."""
 
+from typing import Any
+
 import pytest
 
 from openagentmesh import AgentContract
@@ -10,7 +12,7 @@ def _contract(
     description: str = "Summarizes text",
     **kwargs,
 ) -> AgentContract:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         input_schema={
             "type": "object",
             "properties": {
@@ -234,7 +236,7 @@ class TestToAnthropicTool:
         """to_anthropic_tool has no strict parameter."""
         c = _contract()
         with pytest.raises(TypeError):
-            c.to_anthropic_tool(strict=True)
+            c.to_anthropic_tool(strict=True)  # ty: ignore[unknown-argument]
 
     def test_publisher_raises(self):
         c = _contract(invocable=False)
