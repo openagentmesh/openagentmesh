@@ -18,7 +18,9 @@ this order:
 4. Default: `nats://localhost:4222`
 
 `oam mesh up` writes `.oam-url` to the current directory automatically. To
-point at a different mesh, use `oam mesh connect <url>`.
+point at a different mesh, use `oam mesh connect <url>`; add
+`--creds <file>` for a secured mesh (the file then also supplies credentials
+to `oam` commands and SDK processes run from that directory).
 
 ## `oam mesh`
 
@@ -133,6 +135,65 @@ oam agent contract translator --text       # compact text summary
     handler with a sentinel payload is noisy and surprising. A dedicated
     framework-level ping subject, handled by the runtime rather than the
     user's code, will land in a future ADR.
+
+## `oam auth`
+
+Credential management for secured meshes (wraps
+[nsc](https://github.com/nats-io/nsc); requires the `nsc` binary on PATH or
+in `~/.agentmesh/bin/`). See [Securing the Mesh](../concepts/security.md).
+
+### `oam auth init`
+
+Bootstrap a credential tree in `.oam/`: an operator (with the system account
+JetStream requires), a JetStream-enabled application account, and a
+ready-to-run `server.conf` using a memory resolver.
+
+```bash
+oam auth init --name mymesh
+nats-server -c .oam/server.conf
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--name` | `mesh` | Operator and account name |
+| `--dir` | `.oam` | Where to put the credential store |
+
+### `oam auth user add`
+
+Create a user from a role template and write its `.creds` file (mode 0600).
+
+```bash
+oam auth user add risk-pipeline --role worker
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--role` | (required) | `worker`, `invoker`, or `observer` |
+| `--dir` | `.oam` | Credential store directory |
+| `--out` | `./<name>.creds` | Where to write the credentials |
+
+Roles: `worker` hosts agents and uses the full SDK surface; `invoker` calls
+agents and reads the catalog; `observer` is read-only (catalog, events,
+errors, health).
+
+### `oam auth user revoke`
+
+Revoke a user and regenerate `server.conf`; reload or restart the server to
+apply.
+
+```bash
+oam auth user revoke risk-pipeline
+```
+
+### `oam auth whoami`
+
+Show the identity the CLI would connect with (resolved from `--creds`,
+`OAM_CREDS`, or `.oam-url`), including the user name, public NKey, and
+account.
+
+```bash
+oam auth whoami
+```
 
 ## Output conventions
 
