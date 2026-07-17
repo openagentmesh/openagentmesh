@@ -106,12 +106,29 @@ class TestToolCall:
                 assert payload == {"summary": "hello worl"}
 
     async def test_invalid_input_surfaces_as_tool_error(self):
+        # The MCP SDK validates arguments against the tool's inputSchema
+        # before the bridge sees the call, so caller faults fail fast
+        # client-side with a validation message.
         async with AgentMesh.local() as mesh:
             _register_agents(mesh, summarizer_mcp=True)
             async with await _client(mesh, default_mcp=False) as session:
                 result = await session.call_tool("nlp_summarizer", {"wrong": 1})
                 assert result.isError is True
-                assert "invalid_input" in result.content[0].text
+                assert "required" in result.content[0].text
+
+    async def test_handler_fault_carries_taxonomy_code(self):
+        async with AgentMesh.local() as mesh:
+
+            @mesh.agent(
+                AgentSpec(name="flaky", description="Always fails"), mcp=True
+            )
+            async def flaky(req: SummarizeInput) -> SummarizeOutput:
+                raise RuntimeError("boom")
+
+            async with await _client(mesh, default_mcp=False) as session:
+                result = await session.call_tool("flaky", {"text": "x"})
+                assert result.isError is True
+                assert "handler_error" in result.content[0].text
 
     async def test_unknown_tool_is_an_error(self):
         async with AgentMesh.local() as mesh:
@@ -125,8 +142,12 @@ class TestToolCall:
         process (contract carries x-agentmesh.mcp) are listed and callable."""
         async with AgentMesh.local() as host:
             _register_agents(host, summarizer_mcp=True)
+            # Flush the lazy registration so contracts reach the registry
+            # before the second connection looks.
+            await host.call("nlp.summarizer", {"text": "warmup"})
             async with AgentMesh(host.url) as gateway:
-                async with await _client(gateway, default_mcp=False) as session:
+                session_cm = await _client(gateway, default_mcp=False)
+                async with session_cm as session:
                     names = {t.name for t in (await session.list_tools()).tools}
                     assert "nlp_summarizer" in names
                     result = await session.call_tool(

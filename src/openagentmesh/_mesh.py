@@ -408,6 +408,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         spec: AgentSpec,
         *,
         sources: list[Any] | None = None,
+        mcp: bool | None = None,
     ):
         """Decorator to register an async function as a mesh agent.
 
@@ -456,6 +457,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             )
             if info.streaming:
                 contract.output_schema = None
+            contract.mcp = mcp
 
             self._agents[spec.name] = (spec, info, contract)
             if sources:
@@ -527,6 +529,28 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         with suppress(KeyboardInterrupt):
             asyncio.run(_run_forever())
+
+    async def serve_mcp(self, *, default_mcp: bool = True) -> None:
+        """Serve mesh agents to an MCP client over stdio (ADR-0002).
+
+        Requires the ``mcp`` extra: ``pip install 'openagentmesh[mcp]'``.
+        """
+        from ._mcp import serve_mcp
+
+        await serve_mcp(self, default_mcp=default_mcp)
+
+    def run_mcp(self, *, default_mcp: bool = True) -> None:
+        """Block serving MCP over stdio. Like ``run()``, for MCP clients::
+
+            mesh = AgentMesh()
+
+            @mesh.agent(spec, mcp=True)
+            async def summarize(req: In) -> Out: ...
+
+            mesh.run_mcp(default_mcp=False)  # opt-in export
+        """
+        with suppress(KeyboardInterrupt):
+            asyncio.run(self.serve_mcp(default_mcp=default_mcp))
 
     # --- Agent subscription ---
 

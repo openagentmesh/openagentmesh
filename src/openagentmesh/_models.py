@@ -84,6 +84,7 @@ class AgentContract(BaseModel):
     input_schema: dict[str, Any] | None = None
     output_schema: dict[str, Any] | None = None
     chunk_schema: dict[str, Any] | None = None
+    mcp: bool | None = None  # MCP export opt-in/out (ADR-0003); None = mesh default
     registered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def to_tool_schema(self) -> dict[str, Any]:
@@ -166,6 +167,8 @@ class AgentContract(BaseModel):
         }
         if self.chunk_schema:
             xam["chunk_schema"] = self.chunk_schema
+        if self.mcp is not None:
+            xam["mcp"] = self.mcp
 
         doc: dict[str, Any] = {
             "name": self.name,

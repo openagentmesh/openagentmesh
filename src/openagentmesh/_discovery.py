@@ -64,18 +64,23 @@ class DiscoveryMixin:
         data = json.loads(entry.value)
         xam = data.get("x-agentmesh", {})
         caps = data.get("capabilities", {})
+        skills = data.get("skills", [])
+        skill = skills[0] if skills else {}
 
         return AgentContract(
             name=data["name"],
             description=data["description"],
             version=data.get("version", "0.1.0"),
             capabilities=caps,
-            skills=data.get("skills", []),
+            skills=skills,
             subject=xam.get("subject", ""),
             tags=xam.get("tags", []),
             invocable=caps.get("invocable", True),
             streaming=caps.get("streaming", False),
+            input_schema=skill.get("inputSchema"),
+            output_schema=skill.get("outputSchema"),
             chunk_schema=xam.get("chunk_schema"),
+            mcp=xam.get("mcp"),
         )
 
     async def discover(self: AgentMesh, channel: str | None = None) -> list[AgentContract]:
