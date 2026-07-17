@@ -112,6 +112,17 @@ class ConnectionFailed(MeshError):
     code: str = "connection_failed"
 
 
+class ConnectionDenied(MeshError):
+    """The NATS server rejected the connection or a subject operation (ADR-0038).
+
+    Raised when the server requires credentials the client did not present,
+    the presented credentials are invalid, or a publish/subscribe hits a
+    permission the connection's identity lacks.
+    """
+
+    code: str = "connection_denied"
+
+
 class KVKeyExists(MeshError):
     """A KV ``create()`` call collided with an existing key (ADR-0060)."""
 
@@ -170,6 +181,7 @@ _CODE_TO_CLASS: dict[str, type[MeshError]] = {
         InvocationMismatch,
         NotFound,
         ConnectionFailed,
+        ConnectionDenied,
         KVKeyExists,
         MeshTimeout,
         ChunkSequenceError,

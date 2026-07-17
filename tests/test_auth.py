@@ -103,7 +103,7 @@ async def test_creds_connect_register_and_call(worker_mesh):
 
     async with worker_mesh:
         result = await worker_mesh.call("echo-auth", {"message": "hi"})
-        assert result.reply == "echo: hi"
+        assert result["reply"] == "echo: hi"
 
 
 async def test_anonymous_connect_raises_connection_denied(auth_server):
