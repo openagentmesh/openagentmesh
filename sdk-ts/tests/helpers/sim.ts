@@ -46,9 +46,10 @@ export class Sim {
   constructor(readonly nc: NatsConnection) {}
 
   /** Respond to call()/send() with the handler's return value (or an ErrorResult). */
-  responder(name: string, handler: (payload: any, m: Msg) => unknown): this {
+  async responder(name: string, handler: (payload: any, m: Msg) => unknown): Promise<this> {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
+    await this.nc.flush(); // interest must reach the server before the caller invokes the agent
     void (async () => {
       for await (const m of sub) {
         if (isStreamRequest(m)) continue;
@@ -70,9 +71,10 @@ export class Sim {
   }
 
   /** Stream chunks back on mesh.stream.{reqId} when the agent is invoked with X-Mesh-Stream: true. */
-  streamer(name: string, chunksFor: (payload: any) => unknown[]): this {
+  async streamer(name: string, chunksFor: (payload: any) => unknown[]): Promise<this> {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
+    await this.nc.flush();
     void (async () => {
       for await (const m of sub) {
         if (!isStreamRequest(m)) continue;
@@ -97,9 +99,10 @@ export class Sim {
   }
 
   /** Emit an error mid-stream after `okChunks` good chunks. */
-  streamerError(name: string, okChunks: unknown[], err: ErrorResult["__error"]): this {
+  async streamerError(name: string, okChunks: unknown[], err: ErrorResult["__error"]): Promise<this> {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
+    await this.nc.flush();
     void (async () => {
       for await (const m of sub) {
         if (!isStreamRequest(m)) continue;
@@ -123,9 +126,10 @@ export class Sim {
   }
 
   /** Capture the next message published to an agent's invocation subject (for fire-and-forget asserts). */
-  capture(name: string, onMsg: (payload: any, m: Msg) => void): this {
+  async capture(name: string, onMsg: (payload: any, m: Msg) => void): Promise<this> {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
+    await this.nc.flush();
     void (async () => {
       for await (const m of sub) onMsg(tryDec(m.data), m);
     })();
@@ -133,24 +137,21 @@ export class Sim {
   }
 
   /** Capture messages on an arbitrary subject (for publish() asserts). */
-  captureSubject(subject: string, onMsg: (payload: any, m: Msg) => void): this {
+  async captureSubject(subject: string, onMsg: (payload: any, m: Msg) => void): Promise<this> {
     const sub = this.nc.subscribe(subject);
     this.subs.push(sub);
+    await this.nc.flush();
     void (async () => {
       for await (const m of sub) onMsg(tryDec(m.data), m);
     })();
     return this;
   }
 
-  /** Flush the underlying connection so a freshly-created subscription's interest reaches the server. */
-  async ready(): Promise<void> {
-    await this.nc.flush();
-  }
-
   /** Stream chunks but with a gap in the sequence numbers to force a ChunkSequenceError. */
-  streamerBadSeq(name: string, chunks: unknown[]): this {
+  async streamerBadSeq(name: string, chunks: unknown[]): Promise<this> {
     const sub = this.nc.subscribe(agentSubject(name), { queue: `q.${name}` });
     this.subs.push(sub);
+    await this.nc.flush();
     void (async () => {
       for await (const m of sub) {
         if (!isStreamRequest(m)) continue;

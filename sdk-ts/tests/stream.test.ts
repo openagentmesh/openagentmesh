@@ -16,10 +16,10 @@ beforeAll(async () => {
   await ensureBuckets(raw);
   sim = new Sim(raw);
 
-  sim.streamer("nlp.summarizer", () => [{ token: "a" }, { token: "b" }, { token: "c" }]);
-  sim.streamerError("flaky.stream", [{ token: "a" }], { code: "handler_error", message: "mid-stream boom" });
-  sim.streamerBadSeq("gap.stream", [{ token: "a" }, { token: "b" }]);
-  sim.capture("stream.silent", () => {}); // receives stream request, never emits chunks
+  await sim.streamer("nlp.summarizer", () => [{ token: "a" }, { token: "b" }, { token: "c" }]);
+  await sim.streamerError("flaky.stream", [{ token: "a" }], { code: "handler_error", message: "mid-stream boom" });
+  await sim.streamerBadSeq("gap.stream", [{ token: "a" }, { token: "b" }]);
+  await sim.capture("stream.silent", () => {}); // receives stream request, never emits chunks
 
   mesh = await AgentMesh.connect({ servers: server.url });
 });
