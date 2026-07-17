@@ -5,9 +5,12 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 2 — Launch (in progress; unblocked items being worked, demo recording and all
-publishing blocked on Luca). Stage 1 remains open only on npm publish (Needs Luca).
-Stage 0 remains open only on its Needs-Luca items (wildfire merge, worktrees, v0.3.0).
+Stage 3 — Production trust (shaping pass done run 4; prioritized plan in
+km/notes/2026-07-17-stage3-plan.md awaiting sign-off, item 10; executing the
+plan's default order — ADR-0038 auth first — meanwhile).
+Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
+publishing). Stage 1 open only on npm publish. Stage 0 open only on its
+Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 
 ## Stage checklist
 
@@ -133,6 +136,13 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    2026-07-17-launch-post-draft.md and 2026-07-17-show-hn-draft.md (on roadmap/stage-2;
    on main after merge). Posting anywhere is your explicit go — the executor will never
    post them. Edit in place or leave notes here.
+10. **Stage 3 prioritized plan — sign-off requested** (the stage prompt asks for
+   your sign-off before execution). Plan: km/notes/2026-07-17-stage3-plan.md.
+   Order: 0038 auth → 0016+0040 liveness pair → 0048 observability (trimmed v1)
+   → 0055 lifecycle gates → 0056 UI if deferral confirmed. The executor started
+   on 0038 (the prompt's own default priority) rather than idle; items are
+   independent, so reordering on your answer loses nothing. Edit the plan file
+   or leave notes here to reorder/veto.
 9. **ADR-0056 admin UI: OK to defer to Stage 3?** Shaping estimate 4–6 sessions
    (details in Stage 2 item status above). The stage prompt says propose deferral if
    over ~2 sessions — this is the proposal. Silence = defer; say "build it in Stage 2"
