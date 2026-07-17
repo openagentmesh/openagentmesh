@@ -227,6 +227,31 @@ tls {
 
 **Application-layer governance frameworks (Microsoft Agent Governance Toolkit, similar).** Rejected as the auth foundation; viable as a peer integration. Frameworks like [AGT](https://github.com/microsoft/agent-governance-toolkit) provide in-process policy enforcement (intercept tool calls, evaluate against rules, allow/deny before execution) plus their own identity stack (Ed25519 + ML-DSA-65 credentials, trust scoring, SPIFFE/SVID). They occupy the same layer as ADR-0037 OAM scope (caller-side, cooperative, in-process), not the wire-level identity layer this ADR addresses. Adopting AGT as OAM's identity foundation would contradict the Non-goals above (no OAM-native identity abstraction, no issuer service, no OAM-format tokens) and re-route credentials through a Microsoft-controlled stack still in Public Preview with declared breaking changes ahead. The ecosystem-fit framing applies: AGT-governed agents and OAM agents are complementary populations. The right shape is a documented integration alongside the future MCP and A2A bridges, either as a cookbook recipe (handler body calls AGT's `PolicyEvaluator` before doing work, pure developer territory per ADR-0008) or as an optional adapter package outside core. Note also a naming collision: AGT ships an `agentmesh-platform` Python package, so any integration documentation must disambiguate `from openagentmesh import AgentMesh` from AGT's `AgentMesh` symbols.
 
+## Implementation notes (2026-07-17, SDK slice)
+
+- **The system-account open question answered itself:** a nats-server in
+  operator (JWT) mode refuses to start JetStream at all without a
+  `system_account` (`Can't start JetStream: ... system account not setup`).
+  Since OAM requires JetStream, `oam auth init` MUST create a SYS account and
+  wire it into the emitted server config — it is not an operator choice.
+- **`nkeys` became a core dependency.** nats-py imports the `nkeys` package
+  lazily when `user_credentials` is set; without it, presenting a `.creds`
+  file dies with `ModuleNotFoundError`. Bundled by default so auth works out
+  of the box.
+- **Denial semantics as implemented:** connect-time rejections raise
+  `ConnectionDenied`. Runtime permission violations arrive asynchronously on
+  the NATS error callback (the server does not fail the offending publish
+  synchronously), so they are logged at WARNING with the `connection_denied`
+  framing; the blocked call itself surfaces as a timeout. Mapping those
+  violations back to the originating call site is deferred — revisit with the
+  ADR-0016/0040 liveness work, which builds the machinery for correlating
+  async failure signals to in-flight requests.
+- **`AgentMesh.local()` ignores ambient credentials** (`OAM_CREDS`, `.oam-url`):
+  §2's "local dev stays open" would otherwise break in any shell that has
+  credentials configured for a remote mesh.
+- Static test credentials live in `tests/auth_fixtures/` (nsc-generated,
+  memory resolver + preload, no nsc needed at test time).
+
 ## Open Questions
 
 - **TLS posture in `oam auth init`.** Should the CLI generate a self-signed server cert and CA by default, or require the operator to provide their own? Self-signed is convenient for preview deployments but risks being shipped to production by accident.

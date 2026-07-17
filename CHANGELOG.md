@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Mesh authentication (SDK)** (ADR-0038): connect to a secured mesh with `AgentMesh(url=..., creds="./agent.creds")` using standard NATS NKey + JWT credentials. Credentials also resolve from the `OAM_CREDS` environment variable or a `creds` field in `.oam-url`, which now accepts a small TOML form (`url = "..."`, `creds = "..."`) alongside the legacy bare-URL line. Optional mTLS via `tls_cert=`, `tls_key=`, `tls_ca=`. A server that rejects the connection raises `ConnectionDenied` (code `connection_denied`) explaining which credentials were used, instead of a generic connection failure. `AgentMesh.local()` stays open and ignores ambient credentials.
 - **MCP export bridge** (ADR-0002/0003): any MCP client (Claude Code, Claude Desktop, Cursor) can list and call mesh agents as tools. Opt agents in per-agent with `@mesh.agent(spec, mcp=True/False)` and set the mesh policy via `mesh.run_mcp(default_mcp=...)` (blocking) or `await mesh.serve_mcp(...)` (async). `oam mcp serve --url nats://...` gateways an already-running mesh — register it with `claude mcp add mesh -- oam mcp serve`. Requires the new `mcp` extra: `pip install 'openagentmesh[mcp]'`.
 - `contract.to_agent_card(url=None)` (ADR-0012): project a contract to an A2A Agent Card — the registry document minus `x-agentmesh`, with the `url` injected at the federation boundary.
 - npm release workflow for `@openagentmesh/sdk`: pushing an `sdk-ts-v*` tag runs the full TS suite and publishes to npm.
