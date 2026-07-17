@@ -10,10 +10,17 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
+import nats.errors
 from nats.aio.msg import Msg
 from pydantic import BaseModel
 
-from ._errors import ChunkSequenceError, MeshError, MeshTimeout, from_envelope
+from ._errors import (
+    ChunkSequenceError,
+    ConnectionDenied,
+    MeshError,
+    MeshTimeout,
+    from_envelope,
+)
 
 if TYPE_CHECKING:
     from ._mesh import AgentMesh
@@ -39,10 +46,23 @@ class InvocationMixin:
         request_id = uuid.uuid4().hex
         data = self._serialize_payload(payload)
 
-        response = await self._conn.request(
-            subject, data, timeout=timeout,
-            headers=self._with_instance_id({"X-Mesh-Request-Id": request_id}),
-        )
+        try:
+            response = await self._conn.request(
+                subject, data, timeout=timeout,
+                headers=self._with_instance_id({"X-Mesh-Request-Id": request_id}),
+            )
+        except nats.errors.TimeoutError as e:
+            if subject.lower() in self._denied_subjects:
+                raise ConnectionDenied(
+                    message=(
+                        f"The server denied publishing to '{subject}': this "
+                        "connection's credentials lack permission to invoke "
+                        f"'{name}'"
+                    ),
+                    agent=name,
+                    request_id=request_id,
+                ) from e
+            raise MeshTimeout(subject=subject, timeout=timeout) from e
 
         status = ""
         if response.headers:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
@@ -114,6 +115,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._watcher_tasks: dict[str, asyncio.Task] = {}
         self._source_subscriptions: list[Any] = []
         self._source_tasks: list[asyncio.Task] = []
+        # Subjects the server denied us on (ADR-0038): violations arrive
+        # asynchronously, so call sites consult this to turn a bare timeout
+        # into a ConnectionDenied.
+        self._denied_subjects: set[str] = set()
 
     @property
     def url(self) -> str:
@@ -219,6 +224,9 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     async def _nats_error_cb(self, e: Exception) -> None:
         if is_auth_error(e):
             _log.warning("nats connection_denied: %s", e)
+            match = re.search(r'violation for (?:publish|subscription) to "([^"]+)"', str(e))
+            if match:
+                self._denied_subjects.add(match.group(1).lower())
         else:
             _log.debug("nats: %s", e)
 
