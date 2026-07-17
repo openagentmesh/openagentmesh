@@ -26,18 +26,20 @@ afterAll(async () => {
 
 const DEC = new TextDecoder();
 
-function captureOne(subject: string): Promise<Msg> {
-  return new Promise((resolve) => {
-    sim.captureSubject(subject, (_p, m) => resolve(m));
-  });
+// Wrapped in an object because a bare Promise<Msg> would be unwrapped by the
+// caller's `await` before publish() ever ran, deadlocking the test.
+async function captureOne(subject: string): Promise<{ msg: Promise<Msg> }> {
+  let resolve!: (m: Msg) => void;
+  const msg = new Promise<Msg>((r) => (resolve = r));
+  await sim.captureSubject(subject, (_p, m) => resolve(m));
+  return { msg };
 }
 
 describe("publish", () => {
   it("publishes an object as application/json with stamped headers", async () => {
-    const p = captureOne("telemetry.uav.42");
-    await sim.ready();
+    const { msg } = await captureOne("telemetry.uav.42");
     await mesh.publish("telemetry.uav.42", { x: 10, y: 4 });
-    const m = await p;
+    const m = await msg;
     expect(m.headers?.get("X-Mesh-Content-Type")).toBe("application/json");
     expect(m.headers?.get("X-Mesh-Instance-Id")).toBe(mesh.instanceId);
     expect(m.headers?.get("X-Mesh-Request-Id")).toMatch(/^[0-9a-f]{32}$/);
@@ -45,28 +47,25 @@ describe("publish", () => {
   });
 
   it("publishes a string as text/plain", async () => {
-    const p = captureOne("log.line");
-    await sim.ready();
+    const { msg } = await captureOne("log.line");
     await mesh.publish("log.line", "hello");
-    const m = await p;
+    const m = await msg;
     expect(m.headers?.get("X-Mesh-Content-Type")).toBe("text/plain");
     expect(DEC.decode(m.data)).toBe("hello");
   });
 
   it("publishes bytes as application/octet-stream", async () => {
-    const p = captureOne("blob.raw");
-    await sim.ready();
+    const { msg } = await captureOne("blob.raw");
     await mesh.publish("blob.raw", new Uint8Array([1, 2, 3]));
-    const m = await p;
+    const m = await msg;
     expect(m.headers?.get("X-Mesh-Content-Type")).toBe("application/octet-stream");
     expect([...m.data]).toEqual([1, 2, 3]);
   });
 
   it("merges caller headers (caller wins)", async () => {
-    const p = captureOne("trace.line");
-    await sim.ready();
+    const { msg } = await captureOne("trace.line");
     await mesh.publish("trace.line", { a: 1 }, { headers: { "X-Trace": "abc" } });
-    const m = await p;
+    const m = await msg;
     expect(m.headers?.get("X-Trace")).toBe("abc");
   });
 

@@ -11,7 +11,6 @@ from pydantic import BaseModel, TypeAdapter
 from ._context import KVEntry
 from ._sources import MeshMessage
 
-
 SourceParamKind = Literal["kv_entry", "mesh_message", "model", "bytes", "none"]
 
 

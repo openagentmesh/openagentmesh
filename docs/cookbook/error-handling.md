@@ -44,7 +44,7 @@ async def call_with_retry(mesh: AgentMesh, agent: str, payload, retries: int = 3
 
 
 async def call_with_fallback(mesh: AgentMesh, agents: list[str], payload):
-    last_error = None
+    last_error: MeshError | None = None
     for agent in agents:
         try:
             return await mesh.call(agent, payload, timeout=5.0)
@@ -55,6 +55,7 @@ async def call_with_fallback(mesh: AgentMesh, agents: list[str], payload):
             last_error = e
             print(f"  {agent} failed ({e.code}), trying next...")
             continue
+    assert last_error is not None, "agents list must not be empty"
     raise last_error
 
 

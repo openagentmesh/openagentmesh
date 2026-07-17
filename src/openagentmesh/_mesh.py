@@ -7,12 +7,13 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from typing import Any
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
+from typing import Any, Literal
 
 import nats
 import pydantic
 from nats.aio.client import Client as NatsClient
+from nats.aio.msg import Msg
 from nats.js import JetStreamContext
 from nats.js.kv import KeyValue
 from pydantic import BaseModel
@@ -82,8 +83,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._registry_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
         self._artifacts_os: Any | None = None
-        self.kv: KVStore | None = None
-        self.workspace: Workspace | None = None
+        self._kv: KVStore | None = None
+        self._workspace: Workspace | None = None
 
         # Registered agents and subscription tracking
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
@@ -103,6 +104,27 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     def url(self) -> str:
         """NATS URL this mesh connects to."""
         return self._url
+
+    @property
+    def _conn(self) -> NatsClient:
+        """The live NATS connection; only valid after connect."""
+        if self._nc is None:
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
+        return self._nc
+
+    @property
+    def kv(self) -> KVStore:
+        """Shared KV store (``mesh-context`` bucket). Available once connected."""
+        if self._kv is None:
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
+        return self._kv
+
+    @property
+    def workspace(self) -> Workspace:
+        """Object Store workspace (``mesh-artifacts`` bucket). Available once connected."""
+        if self._workspace is None:
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
+        return self._workspace
 
     def __repr__(self) -> str:
         status = "connected" if self._nc is not None else "disconnected"
@@ -169,12 +191,13 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 val = await create(bucket=bucket)
             setattr(self, attr, val)
 
-        self.kv = KVStore(self._context_kv)
-        self.workspace = Workspace(self._artifacts_os)
+        assert self._context_kv is not None and self._artifacts_os is not None
+        self._kv = KVStore(self._context_kv)
+        self._workspace = Workspace(self._artifacts_os)
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""
-        for name, (spec, info, contract) in self._agents.items():
+        for name, (_spec, info, contract) in self._agents.items():
             if name not in self._subscribed:
                 if info.invocable:
                     await self._subscribe_agent(name, info, contract)
@@ -207,7 +230,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         assert self._catalog_kv is not None
         try:
             entry = await self._catalog_kv.get(_CATALOG_KEY)
-            entries = json.loads(entry.value)
+            entries = json.loads(entry.value or b"[]")
             self._catalog_cache = {
                 e["name"]: CatalogEntry.model_validate(e) for e in entries
             }
@@ -217,11 +240,12 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     async def _start_catalog_watcher(self) -> None:
         """Start background task that watches the catalog KV for changes (ADR-0032)."""
         assert self._catalog_kv is not None
-        self._catalog_watcher = await self._catalog_kv.watchall()
+        watcher = await self._catalog_kv.watchall()
+        self._catalog_watcher = watcher
 
         async def _watch() -> None:
             try:
-                async for entry in self._catalog_watcher:
+                async for entry in watcher:
                     if entry is None or entry.value is None:
                         continue
                     if entry.key != _CATALOG_KEY:
@@ -246,17 +270,13 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         # 1. Stop catalog watcher: the KV iterator and its consumer task.
         if self._catalog_watcher is not None:
-            try:
+            with suppress(Exception):
                 await self._catalog_watcher.stop()
-            except Exception:
-                pass
             self._catalog_watcher = None
         if self._catalog_watcher_task is not None:
             self._catalog_watcher_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await self._catalog_watcher_task
-            except (asyncio.CancelledError, Exception):
-                pass
             self._catalog_watcher_task = None
 
         # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
@@ -265,10 +285,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._watcher_tasks.values():
             task.cancel()
         for task in self._watcher_tasks.values():
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._watcher_tasks.clear()
 
         # 3. Cancel publisher emission tasks (ADR-0034). Same two-pass pattern;
@@ -277,10 +295,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._publisher_tasks.values():
             task.cancel()
         for task in self._publisher_tasks.values():
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._publisher_tasks.clear()
 
         # 3b. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
@@ -288,26 +304,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for task in self._source_tasks:
             task.cancel()
         for task in self._source_tasks:
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
         self._source_tasks.clear()
 
         for sub in self._source_subscriptions:
-            try:
+            with suppress(Exception):
                 await sub.unsubscribe()
-            except Exception:
-                pass
         self._source_subscriptions.clear()
 
         # 4. Unsubscribe invocable-agent subscriptions so the broker stops
         # routing requests to this process before we tear down the registry.
         for sub in self._subscriptions:
-            try:
+            with suppress(Exception):
                 await sub.unsubscribe()
-            except Exception:
-                pass
         self._subscriptions.clear()
 
         # 5. Deregister from the cluster: remove each owned agent from the
@@ -318,14 +328,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             for name in self._subscribed:
                 if name in self._agents:
                     _, _, contract = self._agents[name]
-                    try:
+                    with suppress(Exception):
                         await self._update_catalog(contract, add=False)
-                    except Exception:
-                        pass
-                    try:
+                    with suppress(Exception):
                         await self._registry_kv.delete(name)
-                    except Exception:
-                        pass
 
         self._subscribed.clear()
 
@@ -336,10 +342,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             try:
                 await self._nc.drain()
             except Exception:
-                try:
+                with suppress(Exception):
                     await self._nc.close()
-                except Exception:
-                    pass
             self._nc = None
 
     # --- local() ---
@@ -372,7 +376,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             self._url = original_url
             await embedded.stop()
 
-    def local(self_or_cls=None) -> AsyncIterator[AgentMesh]:
+    def local(self_or_cls=None) -> AbstractAsyncContextManager[AgentMesh]:
         """Embedded NATS for tests and demos.
 
         Works as both a classmethod (creates a new instance) and an
@@ -477,7 +481,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         pattern: str,
         *,
         queue_group: str | None = None,
-        on_init: str = "replay",
+        on_init: Literal["replay", "skip"] = "replay",
     ):
         """Create a KV-watch source on the ``mesh-context`` bucket (ADR-0052).
 
@@ -518,15 +522,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         async def _run_forever():
             async with self:
-                try:
+                with suppress(asyncio.CancelledError):
                     await asyncio.Event().wait()
-                except asyncio.CancelledError:
-                    pass
 
-        try:
+        with suppress(KeyboardInterrupt):
             asyncio.run(_run_forever())
-        except KeyboardInterrupt:
-            pass
 
     # --- Agent subscription ---
 
@@ -536,7 +536,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         subject = contract.subject
         queue = f"q.{name}"
 
-        async def handler(msg: nats.aio.msg.Msg) -> None:
+        async def handler(msg: Msg) -> None:
             request_id = ""
             wants_stream = False
             if msg.headers:
@@ -582,7 +582,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 error = e
                 if wants_stream:
                     stream_subject = f"mesh.stream.{request_id}"
-                    await self._nc.publish(
+                    await self._conn.publish(
                         stream_subject,
                         error.to_json(),
                         headers=self._with_instance_id({
@@ -592,7 +592,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         }),
                     )
                 elif msg.reply:
-                    await self._nc.publish(
+                    await self._conn.publish(
                         msg.reply,
                         error.to_json(),
                         headers=self._with_instance_id({
@@ -600,7 +600,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                             "X-Mesh-Request-Id": request_id,
                         }),
                     )
-                await self._nc.publish(
+                await self._conn.publish(
                     compute_error_subject(name),
                     error.to_json(),
                     headers=self._with_instance_id({
@@ -609,12 +609,12 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     }),
                 )
 
-        sub = await self._nc.subscribe(subject, queue=queue, cb=handler)
+        sub = await self._conn.subscribe(subject, queue=queue, cb=handler)
         self._subscriptions.append(sub)
 
     async def _handle_responder(
         self,
-        msg: nats.aio.msg.Msg,
+        msg: Msg,
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
@@ -631,7 +631,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             response_data = json.dumps(result).encode() if result is not None else b"{}"
 
         if msg.reply:
-            await self._nc.publish(
+            await self._conn.publish(
                 msg.reply,
                 response_data,
                 headers=self._with_instance_id({
@@ -643,7 +643,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _handle_streaming(
         self,
-        msg: nats.aio.msg.Msg,
+        msg: Msg,
         info: HandlerInfo,
         agent_name: str,
         request_id: str,
@@ -659,7 +659,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             else:
                 chunk_data = json.dumps(chunk).encode()
 
-            await self._nc.publish(
+            await self._conn.publish(
                 stream_subject,
                 chunk_data,
                 headers=self._with_instance_id({
@@ -668,10 +668,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     "X-Mesh-Request-Id": request_id,
                 }),
             )
-            await self._nc.flush()
+            await self._conn.flush()
             seq += 1
 
-        await self._nc.publish(
+        await self._conn.publish(
             stream_subject,
             b"",
             headers=self._with_instance_id({
@@ -680,16 +680,14 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 "X-Mesh-Request-Id": request_id,
             }),
         )
-        await self._nc.flush()
+        await self._conn.flush()
 
     # --- Watcher execution (ADR-0042) ---
 
     async def _run_watcher(self, name: str, info: HandlerInfo) -> None:
         """Run a watcher handler as a background task."""
-        try:
+        with suppress(asyncio.CancelledError):
             await info.func()
-        except asyncio.CancelledError:
-            pass
 
     # --- Publisher emission (ADR-0034) ---
 
@@ -708,7 +706,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 else:
                     data = json.dumps(chunk).encode()
 
-                await self._nc.publish(
+                await self._conn.publish(
                     event_subject,
                     data,
                     headers=self._with_instance_id({
@@ -718,7 +716,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 )
                 seq += 1
 
-            await self._nc.publish(
+            await self._conn.publish(
                 event_subject,
                 b"",
                 headers=self._with_instance_id({
@@ -727,8 +725,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 }),
             )
         except asyncio.CancelledError:
-            try:
-                await self._nc.publish(
+            with suppress(Exception):
+                await self._conn.publish(
                     event_subject,
                     b"",
                     headers=self._with_instance_id({
@@ -736,13 +734,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         "X-Mesh-Stream-End": "true",
                     }),
                 )
-            except Exception:
-                pass
         except Exception as e:
             _log.warning("Publisher '%s' failed: %s", name, e)
             error = HandlerError(message=str(e), agent=name)
             try:
-                await self._nc.publish(
+                await self._conn.publish(
                     event_subject,
                     error.to_json(),
                     headers=self._with_instance_id({
@@ -750,7 +746,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         "X-Mesh-Status": "error",
                     }),
                 )
-                await self._nc.publish(
+                await self._conn.publish(
                     compute_error_subject(name),
                     error.to_json(),
                     headers=self._with_instance_id({"X-Mesh-Status": "error"}),
@@ -774,7 +770,6 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             )
 
     async def _bind_subject_source(self, name: str, info: HandlerInfo, source: Any) -> None:
-        from ._sources import MeshMessage
 
         async def cb(msg):
             try:
@@ -789,7 +784,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             except Exception as e:
                 _log.warning("Source handler for '%s' raised: %s", name, e)
 
-        sub = await self._nc.subscribe(
+        sub = await self._conn.subscribe(
             source.subject,
             queue=source.queue_group,
             cb=cb,
@@ -797,6 +792,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._source_subscriptions.append(sub)
 
     async def _bind_kv_source(self, name: str, info: HandlerInfo, source: Any) -> None:
+        assert self._context_kv is not None
         watcher = await self._context_kv.watch(source.pattern)
         task = asyncio.create_task(
             self._drain_kv_source(name, info, source, watcher)
@@ -838,10 +834,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         except asyncio.CancelledError:
             pass
         finally:
-            try:
+            with suppress(Exception):
                 await watcher.stop()
-            except Exception:
-                pass
 
     def _build_source_input(
         self,
@@ -884,7 +878,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 key=kv_key or "",
                 value=value,
                 revision=kv_revision or 0,
-                operation=kv_operation or "PUT",  # type: ignore[arg-type]
+                operation="DELETE" if kv_operation == "DELETE" else "PUT",
             )
 
         if kind == "mesh_message":
@@ -968,8 +962,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         for _ in range(10):
             try:
                 kv_entry = await self._catalog_kv.get(_CATALOG_KEY)
-                current: list[dict] = json.loads(kv_entry.value)
-                revision = kv_entry.revision
+                current: list[dict] = json.loads(kv_entry.value or b"[]")
+                revision = kv_entry.revision or 0
             except (KeyNotFoundError, Exception):
                 current = []
                 revision = 0

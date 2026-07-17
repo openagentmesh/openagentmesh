@@ -16,9 +16,9 @@ beforeAll(async () => {
   await ensureBuckets(raw);
   sim = new Sim(raw);
 
-  sim.responder("billing.charge", (p: any) => ({ ack: true, amount: p.amount }));
-  sim.responder("send.boom", () => errorResult("handler_error", "charge failed"));
-  sim.capture("send.silent", () => {}); // never replies
+  await sim.responder("billing.charge", (p: any) => ({ ack: true, amount: p.amount }));
+  await sim.responder("send.boom", () => errorResult("handler_error", "charge failed"));
+  await sim.capture("send.silent", () => {}); // never replies
 
   mesh = await AgentMesh.connect({ servers: server.url });
 });
@@ -39,8 +39,7 @@ function once<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
 describe("send", () => {
   it("fire-and-forget delivers the payload with stamped headers", async () => {
     const got = once<{ payload: any; m: Msg }>();
-    sim.capture("audit.logger", (payload, m) => got.resolve({ payload, m }));
-    await sim.ready();
+    await sim.capture("audit.logger", (payload, m) => got.resolve({ payload, m }));
     await mesh.send("audit.logger", { event: "login" });
     const { payload, m } = await got.promise;
     expect(payload).toEqual({ event: "login" });
@@ -69,8 +68,7 @@ describe("send", () => {
 
   it("manual replyTo stamps X-Mesh-Reply-To and the NATS reply subject", async () => {
     const got = once<Msg>();
-    sim.capture("worker.task", (_p, m) => got.resolve(m));
-    await sim.ready();
+    await sim.capture("worker.task", (_p, m) => got.resolve(m));
     await mesh.send("worker.task", { id: 7 }, { replyTo: "my.custom.inbox" });
     const m = await got.promise;
     expect(m.headers?.get("X-Mesh-Reply-To")).toBe("my.custom.inbox");

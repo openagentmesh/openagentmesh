@@ -15,9 +15,9 @@ beforeAll(async () => {
   await ensureBuckets(raw);
   sim = new Sim(raw);
 
-  sim.responder("finance.risk.scorer", (payload: any) => ({ score: 0.9, applicant: payload.applicant }));
-  sim.responder("boom", () => errorResult("handler_error", "kaboom"));
-  sim.capture("silent", () => {}); // receives but never replies → timeout
+  await sim.responder("finance.risk.scorer", (payload: any) => ({ score: 0.9, applicant: payload.applicant }));
+  await sim.responder("boom", () => errorResult("handler_error", "kaboom"));
+  await sim.capture("silent", () => {}); // receives but never replies → timeout
 
   mesh = await AgentMesh.connect({ servers: server.url });
 });
@@ -37,7 +37,7 @@ describe("call", () => {
 
   it("stamps X-Mesh-Request-Id (uuid hex) and X-Mesh-Instance-Id on the request", async () => {
     let seen: Msg | undefined;
-    sim.responder("echo.headers", (_p, m: Msg) => {
+    await sim.responder("echo.headers", (_p, m: Msg) => {
       seen = m;
       return { ok: true };
     });

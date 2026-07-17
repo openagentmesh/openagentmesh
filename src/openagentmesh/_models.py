@@ -148,7 +148,7 @@ class AgentContract(BaseModel):
 
     def to_registry_json(self) -> str:
         """Serialize to the registry JSON format (A2A-compatible with x-agentmesh)."""
-        skill = {
+        skill: dict[str, Any] = {
             "id": self.name,
             "name": self.name,
             "description": self.description,
@@ -159,6 +159,14 @@ class AgentContract(BaseModel):
         if self.output_schema:
             skill["outputSchema"] = self.output_schema
 
+        xam: dict[str, Any] = {
+            "subject": self.subject,
+            "tags": self.tags,
+            "registered_at": self.registered_at.isoformat(),
+        }
+        if self.chunk_schema:
+            xam["chunk_schema"] = self.chunk_schema
+
         doc: dict[str, Any] = {
             "name": self.name,
             "description": self.description,
@@ -168,14 +176,8 @@ class AgentContract(BaseModel):
                 "invocable": self.invocable,
             },
             "skills": [skill],
-            "x-agentmesh": {
-                "subject": self.subject,
-                "tags": self.tags,
-                "registered_at": self.registered_at.isoformat(),
-            },
+            "x-agentmesh": xam,
         }
-        if self.chunk_schema:
-            doc["x-agentmesh"]["chunk_schema"] = self.chunk_schema
 
         import json
 

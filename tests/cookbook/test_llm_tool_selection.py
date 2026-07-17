@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from openagentmesh import AgentMesh
 from openagentmesh.demos.llm_tool_selection import TaskRequest, main
 

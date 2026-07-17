@@ -1,9 +1,8 @@
 """Tests for the multi-agent cookbook recipe (provider/consumer pattern)."""
 
-import pytest
 
 from openagentmesh import AgentMesh
-from openagentmesh.demos.multi_agent import main, SummarizeInput
+from openagentmesh.demos.multi_agent import SummarizeInput, main
 
 
 class TestMultiAgentRecipe:

@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
-
 import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh
-from openagentmesh._errors import MeshError
 
 
 class Detection(BaseModel):

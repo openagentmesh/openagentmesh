@@ -305,8 +305,8 @@ class TestValidationVsHandlerDistinction:
             async def cb_h(msg):
                 h_errors.append(json.loads(msg.data))
 
-            await mesh._nc.subscribe("mesh.errors.needs-text", cb=cb_v)
-            await mesh._nc.subscribe("mesh.errors.crashes", cb=cb_h)
+            await mesh._conn.subscribe("mesh.errors.needs-text", cb=cb_v)
+            await mesh._conn.subscribe("mesh.errors.crashes", cb=cb_h)
 
             with pytest.raises(InvalidInput):
                 await mesh.call("needs-text", {"wrong": "shape"})

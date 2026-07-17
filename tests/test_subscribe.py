@@ -35,7 +35,7 @@ class TestSubscribeRawSubject:
 
             async def publisher():
                 await asyncio.sleep(0.05)
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     subject,
                     json.dumps({"event": "hello"}).encode(),
                     headers={
@@ -65,14 +65,14 @@ class TestSubscribeRawSubject:
             async def publisher():
                 await asyncio.sleep(0.05)
                 for i in range(2):
-                    await mesh._nc.publish(
+                    await mesh._conn.publish(
                         subject,
                         json.dumps({"seq": i}).encode(),
                         headers={"X-Mesh-Stream-End": "false"},
                     )
                     await asyncio.sleep(0.01)
                 # Terminal: empty body, end=true
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     subject,
                     b"",
                     headers={"X-Mesh-Stream-End": "true"},
@@ -103,7 +103,7 @@ class TestSubscribeRawSubject:
                     "code": "agent_crashed",
                     "message": "something broke",
                 }).encode()
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     subject,
                     error_body,
                     headers={
@@ -141,7 +141,7 @@ class TestSubscribeRawSubject:
             async def publisher():
                 await asyncio.sleep(0.05)
                 for i in range(10):
-                    await mesh._nc.publish(
+                    await mesh._conn.publish(
                         subject,
                         json.dumps({"n": i}).encode(),
                         headers={"X-Mesh-Stream-End": "false"},
@@ -246,19 +246,19 @@ class TestSubscribeChannelWildcard:
 
             async def publisher():
                 await asyncio.sleep(0.05)
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     "mesh.agent.finance.stock-feed.events",
                     json.dumps({"source": "stock"}).encode(),
                     headers={"X-Mesh-Stream-End": "false"},
                 )
                 await asyncio.sleep(0.02)
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     "mesh.agent.finance.bond-feed.events",
                     json.dumps({"source": "bond"}).encode(),
                     headers={"X-Mesh-Stream-End": "false"},
                 )
                 await asyncio.sleep(0.02)
-                await mesh._nc.publish(
+                await mesh._conn.publish(
                     "mesh.agent.finance.stock-feed.events",
                     b"",
                     headers={"X-Mesh-Stream-End": "true"},

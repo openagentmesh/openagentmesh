@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from openagentmesh import AgentMesh, AgentSpec, MeshError
+from openagentmesh import AgentMesh, AgentSpec
 from openagentmesh.demos.error_handling import (
     SummarizeInput,
     SummarizeOutput,

@@ -53,3 +53,13 @@ asyncio_mode = "auto"
 
 [tool.ty.environment]
 python = ".venv"
+
+# ADR-0031 streamer convention: a streaming handler is an async generator whose
+# return annotation names the CHUNK type (used for schema inference), not
+# AsyncIterator[Chunk]. Tests and demos follow that documented convention, so
+# the resulting invalid-return-type diagnostics are suppressed there.
+[[tool.ty.overrides]]
+include = ["tests/**", "src/openagentmesh/demos/**"]
+
+[tool.ty.overrides.rules]
+invalid-return-type = "ignore"

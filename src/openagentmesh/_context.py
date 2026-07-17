@@ -19,6 +19,11 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+M = TypeVar("M", bound=BaseModel)
+
+# In KVStore's method signatures, `list` resolves to the sibling `list()` method
+# rather than the builtin, so return annotations use this alias.
+_List = list
 
 
 @dataclass
@@ -72,6 +77,7 @@ class CASContext:
 
     async def __aenter__(self) -> CASEntry:
         kv_entry = await self._kv.get(self._key)
+        assert kv_entry.value is not None and kv_entry.revision is not None
         self._entry = CASEntry(self._key, kv_entry.value, kv_entry.revision, self._kv)
         return self._entry
 
@@ -130,6 +136,7 @@ class TryCASContext:
 
     async def __aenter__(self) -> TryCASEntry:
         kv_entry = await self._kv.get(self._key)
+        assert kv_entry.value is not None and kv_entry.revision is not None
         self._entry = TryCASEntry(self._key, kv_entry.value, kv_entry.revision, self._kv)
         return self._entry
 
@@ -139,30 +146,26 @@ class TryCASContext:
         await self._entry._commit()
 
 
-class CASModelEntry(Generic[T]):
+class CASModelEntry(Generic[M]):
     """Mutable entry holding a validated Pydantic model for CAS updates."""
 
     def __init__(
         self,
         key: str,
-        value: T,
+        value: M,
         revision: int,
         kv: KeyValue,
-        model_cls: type[T],
+        model_cls: type[M],
     ):
         self.key = key
-        self.value: T = value
+        self.value: M = value
         self._revision = revision
         self._kv = kv
         self._model_cls = model_cls
-        self._original_json = (
-            value.model_dump_json() if isinstance(value, BaseModel) else None
-        )
+        self._original_json = value.model_dump_json()
 
     async def _commit(self) -> None:
-        new_json = (
-            self.value.model_dump_json() if isinstance(self.value, BaseModel) else None
-        )
+        new_json = self.value.model_dump_json()
         if new_json == self._original_json:
             return
         self._revision = await self._kv.update(
@@ -170,15 +173,16 @@ class CASModelEntry(Generic[T]):
         )
 
 
-class CASModelContext(Generic[T]):
-    def __init__(self, key: str, kv: KeyValue, model_cls: type[T]):
+class CASModelContext(Generic[M]):
+    def __init__(self, key: str, kv: KeyValue, model_cls: type[M]):
         self._key = key
         self._kv = kv
         self._model_cls = model_cls
-        self._entry: CASModelEntry[T] | None = None
+        self._entry: CASModelEntry[M] | None = None
 
-    async def __aenter__(self) -> CASModelEntry[T]:
+    async def __aenter__(self) -> CASModelEntry[M]:
         kv_entry = await self._kv.get(self._key)
+        assert kv_entry.value is not None and kv_entry.revision is not None
         value = self._model_cls.model_validate_json(kv_entry.value)
         self._entry = CASModelEntry(
             self._key, value, kv_entry.revision, self._kv, self._model_cls,
@@ -191,34 +195,30 @@ class CASModelContext(Generic[T]):
         await self._entry._commit()
 
 
-class TryCASModelEntry(Generic[T]):
+class TryCASModelEntry(Generic[M]):
     """Non-raising CAS entry carrying a validated Pydantic model."""
 
     def __init__(
         self,
         key: str,
-        value: T,
+        value: M,
         revision: int,
         kv: KeyValue,
-        model_cls: type[T],
+        model_cls: type[M],
     ):
         self.key = key
-        self.value: T = value
+        self.value: M = value
         self._revision = revision
         self._kv = kv
         self._model_cls = model_cls
-        self._original_json = (
-            value.model_dump_json() if isinstance(value, BaseModel) else None
-        )
+        self._original_json = value.model_dump_json()
         self.committed: bool = False
         self.attempted_write: bool = False
 
     async def _commit(self) -> None:
         from nats.js.errors import KeyWrongLastSequenceError
 
-        new_json = (
-            self.value.model_dump_json() if isinstance(self.value, BaseModel) else None
-        )
+        new_json = self.value.model_dump_json()
         if new_json == self._original_json:
             self.committed = True
             self.attempted_write = False
@@ -234,15 +234,16 @@ class TryCASModelEntry(Generic[T]):
             self.committed = False
 
 
-class TryCASModelContext(Generic[T]):
-    def __init__(self, key: str, kv: KeyValue, model_cls: type[T]):
+class TryCASModelContext(Generic[M]):
+    def __init__(self, key: str, kv: KeyValue, model_cls: type[M]):
         self._key = key
         self._kv = kv
         self._model_cls = model_cls
-        self._entry: TryCASModelEntry[T] | None = None
+        self._entry: TryCASModelEntry[M] | None = None
 
-    async def __aenter__(self) -> TryCASModelEntry[T]:
+    async def __aenter__(self) -> TryCASModelEntry[M]:
         kv_entry = await self._kv.get(self._key)
+        assert kv_entry.value is not None and kv_entry.revision is not None
         value = self._model_cls.model_validate_json(kv_entry.value)
         self._entry = TryCASModelEntry(
             self._key, value, kv_entry.revision, self._kv, self._model_cls,
@@ -269,6 +270,7 @@ class KVStore:
     async def get(self, key: str) -> str:
         """Retrieve a value by key."""
         entry = await self._kv.get(key)
+        assert entry.value is not None
         return entry.value.decode()
 
     def cas(self, key: str) -> CASContext:
@@ -341,13 +343,11 @@ class KVStore:
 
         for _ in range(max_retries):
             kv_entry = await self._kv.get(key)
+            assert kv_entry.value is not None
             current = kv_entry.value.decode()
 
             result = fn(current)
-            if isinstance(result, Awaitable):
-                new_value = await result
-            else:
-                new_value = result
+            new_value = result if isinstance(result, str) else await result
 
             if new_value == current:
                 return
@@ -372,7 +372,7 @@ class KVStore:
         """Delete a key."""
         await self._kv.delete(key)
 
-    async def list(self, prefix: str) -> list[KVEntry[bytes]]:
+    async def list(self, prefix: str) -> _List[KVEntry[bytes]]:
         """One-shot snapshot of all entries under a prefix or wildcard (ADR-0060).
 
         NATS subject wildcards (``*``, ``>``) are accepted. Returns current
@@ -410,22 +410,23 @@ class KVStore:
         """Serialize ``model`` to JSON and store. Returns the revision number."""
         return await self._kv.put(key, model.model_dump_json().encode())
 
-    async def get_model(self, key: str, model_cls: type[T]) -> T:
+    async def get_model(self, key: str, model_cls: type[M]) -> M:
         """Read ``key`` and validate the JSON payload against ``model_cls``."""
         entry = await self._kv.get(key)
+        assert entry.value is not None
         return model_cls.model_validate_json(entry.value)
 
-    def cas_model(self, key: str, model_cls: type[T]) -> CASModelContext[T]:
+    def cas_model(self, key: str, model_cls: type[M]) -> CASModelContext[M]:
         """Pydantic-aware CAS context manager (raises on conflict)."""
         return CASModelContext(key, self._kv, model_cls)
 
-    def try_cas_model(self, key: str, model_cls: type[T]) -> TryCASModelContext[T]:
+    def try_cas_model(self, key: str, model_cls: type[M]) -> TryCASModelContext[M]:
         """Pydantic-aware non-raising CAS context manager."""
         return TryCASModelContext(key, self._kv, model_cls)
 
     async def list_models(
-        self, prefix: str, model_cls: type[T],
-    ) -> list[KVEntry[T]]:
+        self, prefix: str, model_cls: type[M],
+    ) -> _List[KVEntry[M]]:
         """One-shot snapshot under a prefix; each value validated to ``model_cls``."""
         raw = await self.list(prefix)
         return [

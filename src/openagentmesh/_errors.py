@@ -1,7 +1,8 @@
 """Mesh error taxonomy (ADR-0057).
 
 Single home for `MeshError` and every categorical subclass. Each subclass
-declares its wire `code` as a `ClassVar`; the base constructor reads it.
+declares its wire `code` as a class-level default; the base constructor reads it
+and instances may carry an overriding code (e.g. errors decoded off the wire).
 
 Wire-side reconstruction (`from_envelope`) maps codes back to the matching
 subclass so a remote agent's `InvalidInput` is caught locally as
@@ -11,7 +12,7 @@ subclass so a remote agent's `InvalidInput` is caught locally as
 from __future__ import annotations
 
 import json
-from typing import Any, ClassVar
+from typing import Any
 
 
 class MeshError(Exception):
@@ -21,7 +22,7 @@ class MeshError(Exception):
     `code`, `message`, `agent`, `request_id`, `details`.
     """
 
-    code: ClassVar[str] = "mesh_error"
+    code: str = "mesh_error"
 
     def __init__(
         self,
@@ -55,7 +56,7 @@ class MeshError(Exception):
 class InvalidInput(MeshError):
     """Caller's input failed schema validation."""
 
-    code: ClassVar[str] = "invalid_input"
+    code: str = "invalid_input"
 
     def __init__(
         self,
@@ -76,13 +77,13 @@ class InvalidInput(MeshError):
 class HandlerError(MeshError):
     """Uncategorized exception raised inside the agent handler body."""
 
-    code: ClassVar[str] = "handler_error"
+    code: str = "handler_error"
 
 
 class InvocationMismatch(MeshError):
     """Verb/shape mismatch between the call and the agent's capabilities (ADR-0047)."""
 
-    code: ClassVar[str] = "invocation_mismatch"
+    code: str = "invocation_mismatch"
 
     def __init__(self, *, agent: str = "", message: str = "", request_id: str = ""):
         super().__init__(
@@ -95,7 +96,7 @@ class InvocationMismatch(MeshError):
 class NotFound(MeshError):
     """Agent missing from registry/catalog."""
 
-    code: ClassVar[str] = "not_found"
+    code: str = "not_found"
 
     def __init__(self, *, agent: str, request_id: str = ""):
         super().__init__(
@@ -108,13 +109,13 @@ class NotFound(MeshError):
 class ConnectionFailed(MeshError):
     """Initial NATS connect or reconnect failed."""
 
-    code: ClassVar[str] = "connection_failed"
+    code: str = "connection_failed"
 
 
 class KVKeyExists(MeshError):
     """A KV ``create()`` call collided with an existing key (ADR-0060)."""
 
-    code: ClassVar[str] = "kv_key_exists"
+    code: str = "kv_key_exists"
 
     def __init__(self, *, key: str = "", message: str = ""):
         super().__init__(
@@ -127,7 +128,7 @@ class KVKeyExists(MeshError):
 class MeshTimeout(MeshError):
     """No reply within the deadline (ADR-0034)."""
 
-    code: ClassVar[str] = "timeout"
+    code: str = "timeout"
 
     def __init__(self, subject: str, timeout: float):
         super().__init__(
@@ -140,7 +141,7 @@ class MeshTimeout(MeshError):
 class ChunkSequenceError(MeshError):
     """Stream chunks arrived out of order (ADR-0005, defensive)."""
 
-    code: ClassVar[str] = "chunk_sequence_error"
+    code: str = "chunk_sequence_error"
 
     def __init__(
         self,

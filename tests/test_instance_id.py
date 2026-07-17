@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 
-import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec
-
 
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
 
@@ -67,18 +65,18 @@ class TestInstanceIdOnInvocation:
                 async def sniff(msg):
                     received.append(dict(msg.headers or {}))
 
-                sub = await caller._nc.subscribe("mesh.agent.echo", cb=sniff)
-                await caller._nc.flush()
+                sub = await caller._conn.subscribe("mesh.agent.echo", cb=sniff)
+                await caller._conn.flush()
 
                 # mesh.call needs to resolve "echo" via the catalog cache;
                 # bypass that by hitting the subject directly.
-                await caller._nc.request(
+                await caller._conn.request(
                     "mesh.agent.echo",
                     json.dumps({"text": "hi"}).encode(),
                     timeout=2.0,
                     headers=caller._with_instance_id({"X-Mesh-Request-Id": "rid-1"}),
                 )
-                await caller._nc.flush()
+                await caller._conn.flush()
                 await asyncio.sleep(0.05)
                 await sub.unsubscribe()
 
@@ -95,13 +93,13 @@ class TestInstanceIdOnInvocation:
             await host._subscribe_pending()
 
             async with AgentMesh(host.url) as caller:
-                response = await caller._nc.request(
+                response = await caller._conn.request(
                     "mesh.agent.echo",
                     json.dumps({"text": "hi"}).encode(),
                     timeout=2.0,
                     headers={"X-Mesh-Request-Id": "test-rid"},
                 )
-                assert response.headers.get(X_MESH_INSTANCE_ID) == host.instance_id
+                assert (response.headers or {}).get(X_MESH_INSTANCE_ID) == host.instance_id
                 assert host.instance_id != caller.instance_id
 
     async def test_send_carries_caller_instance_id(self):
@@ -118,17 +116,17 @@ class TestInstanceIdOnInvocation:
                 async def sniff(msg):
                     received_invocations.append(dict(msg.headers or {}))
 
-                sub = await caller._nc.subscribe("mesh.agent.sink", cb=sniff)
-                await caller._nc.flush()
+                sub = await caller._conn.subscribe("mesh.agent.sink", cb=sniff)
+                await caller._conn.flush()
 
                 # Bypass catalog resolution; raw publish exercises caller's
                 # _with_instance_id default through the SDK send path:
-                await caller._nc.publish(
+                await caller._conn.publish(
                     "mesh.agent.sink",
                     json.dumps({"text": "fire"}).encode(),
                     headers=caller._with_instance_id({"X-Mesh-Request-Id": "rid-2"}),
                 )
-                await caller._nc.flush()
+                await caller._conn.flush()
                 await asyncio.sleep(0.05)
                 await sub.unsubscribe()
 
@@ -152,12 +150,12 @@ class TestInstanceIdOnInvocation:
                 # The stream subject is mesh.stream.{request_id}; pick our own.
                 request_id = "stream-rid"
                 stream_subject = f"mesh.stream.{request_id}"
-                sub = await caller._nc.subscribe(stream_subject, cb=sniff)
-                await caller._nc.flush()
+                sub = await caller._conn.subscribe(stream_subject, cb=sniff)
+                await caller._conn.flush()
 
                 # Fire the stream request directly (bypass mesh.stream caller-side
                 # subscription which would race ours):
-                await caller._nc.publish(
+                await caller._conn.publish(
                     "mesh.agent.stream",
                     json.dumps({"text": "x"}).encode(),
                     headers=caller._with_instance_id({
@@ -165,7 +163,7 @@ class TestInstanceIdOnInvocation:
                         "X-Mesh-Stream": "true",
                     }),
                 )
-                await caller._nc.flush()
+                await caller._conn.flush()
                 await asyncio.sleep(0.5)  # allow streamer to emit chunks
                 await sub.unsubscribe()
 
@@ -191,8 +189,8 @@ class TestInstanceIdOnPublisher:
 
                 # Subscribe BEFORE triggering the publisher; core NATS doesn't
                 # replay missed messages.
-                sub = await caller._nc.subscribe("mesh.agent.ticker.events", cb=sniff)
-                await caller._nc.flush()
+                sub = await caller._conn.subscribe("mesh.agent.ticker.events", cb=sniff)
+                await caller._conn.flush()
 
                 # Now start the publisher emit task.
                 await host._subscribe_pending()
@@ -220,13 +218,13 @@ class TestInstanceIdOverride:
             async def sniff(msg):
                 received.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.override", cb=sniff)
-            await mesh._nc.publish(
+            sub = await mesh._conn.subscribe("test.override", cb=sniff)
+            await mesh._conn.publish(
                 "test.override",
                 b"x",
                 headers={X_MESH_INSTANCE_ID: "user-supplied"},
             )
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 

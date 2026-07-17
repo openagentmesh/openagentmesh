@@ -1,11 +1,9 @@
 """Tests for the reactive-pipeline cookbook recipe (KV watch coordination)."""
 
-import json
 
-import pytest
 
 from openagentmesh import AgentMesh
-from openagentmesh.demos.reactive_pipeline import Document, Extracted, Summary, main
+from openagentmesh.demos.reactive_pipeline import Extracted, Summary, main
 
 
 class TestReactivePipelineRecipe:

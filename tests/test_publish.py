@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from openagentmesh import AgentMesh
 
-
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
 X_MESH_REQUEST_ID = "X-Mesh-Request-Id"
 X_MESH_CONTENT_TYPE = "X-Mesh-Content-Type"
@@ -34,13 +33,13 @@ class TestPublishPayloadTypes:
                 received.append(msg.data)
                 received_headers.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.model", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.model", cb=cb)
+            await mesh._conn.flush()
 
             payload = Reading(sensor_id="s1", value=42.0)
             await mesh.publish("test.pub.model", payload)
 
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
@@ -57,12 +56,12 @@ class TestPublishPayloadTypes:
                 received.append(msg.data)
                 received_headers.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.bytes", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.bytes", cb=cb)
+            await mesh._conn.flush()
 
             await mesh.publish("test.pub.bytes", b"\x00\x01\x02raw")
 
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
@@ -78,12 +77,12 @@ class TestPublishPayloadTypes:
                 received.append(msg.data)
                 received_headers.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.text", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.text", cb=cb)
+            await mesh._conn.flush()
 
             await mesh.publish("test.pub.text", "hello world")
 
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
@@ -102,11 +101,11 @@ class TestPublishHeaders:
             async def cb(msg):
                 received.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.headers", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.headers", cb=cb)
+            await mesh._conn.flush()
 
             await mesh.publish("test.pub.headers", "x")
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
@@ -119,12 +118,12 @@ class TestPublishHeaders:
             async def cb(msg):
                 received.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.rid", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.rid", cb=cb)
+            await mesh._conn.flush()
 
             await mesh.publish("test.pub.rid", "a")
             await mesh.publish("test.pub.rid", "b")
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
@@ -139,8 +138,8 @@ class TestPublishHeaders:
             async def cb(msg):
                 received.append(dict(msg.headers or {}))
 
-            sub = await mesh._nc.subscribe("test.pub.userhdr", cb=cb)
-            await mesh._nc.flush()
+            sub = await mesh._conn.subscribe("test.pub.userhdr", cb=cb)
+            await mesh._conn.flush()
 
             await mesh.publish(
                 "test.pub.userhdr",
@@ -150,7 +149,7 @@ class TestPublishHeaders:
                     "X-Custom": "demo",
                 },
             )
-            await mesh._nc.flush()
+            await mesh._conn.flush()
             await asyncio.sleep(0.05)
             await sub.unsubscribe()
 
