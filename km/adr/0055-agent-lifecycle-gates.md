@@ -5,6 +5,7 @@
 - **Status:** spec
 - **Amends:** ADR-0042 (formally retires Watcher as a handler shape), ADR-0031 (removes Watcher row from capability table)
 - **Depends on:** ADR-0052 (generic sources), ADR-0031 (capability inference)
+- **Amended:** 2026-07-18 (implementation shaping; see Amendment section)
 
 ## Context
 
@@ -36,6 +37,42 @@ When `active_when` is set, the SDK watches the condition and:
 - **On true:** subscribes the agent to its RPC subject and activates all sources.
 - **On false:** drains in-flight handlers, then unsubscribes from all subjects and sources.
 
+## Amendment (2026-07-18, implementation shaping)
+
+Four corrections against the repo as shipped, recorded before implementation:
+
+1. **Conditions are mesh factory methods, not a public submodule.** The original
+   sample imported from `openagentmesh.lifecycle`, but the package has no public
+   submodules (private `_modules` + top-level exports throughout), and ADR-0052
+   shipped sources as factories on the mesh (`mesh.kv_source(...)`). Conditions
+   follow the same pattern: `mesh.kv_condition(key, predicate, *, initial=False,
+   drain_timeout=30.0)` and `mesh.subject_condition(subject, predicate, *,
+   initial=False, drain_timeout=30.0)`. The dataclasses (`KVCondition`,
+   `SubjectCondition`) and the `Condition` protocol live in `_lifecycle.py` and
+   are exported top-level for typing. The sample's bare `kv_source(...)` is
+   likewise corrected to `mesh.kv_source(...)`.
+2. **`not_available` is a caller-side mapping, not an agent reply.** The original
+   mechanics said drain-phase callers "receive `not_available`" — but an agent
+   that has left its queue group cannot reply with anything. Actual mechanics:
+   when a request gets NATS no-responders, the caller consults its catalog cache
+   — agent present in the catalog → `NotAvailable` (`not_available`), absent →
+   `NotFound` (`not_found`). This refines ADR-0040's no-responders→`not_found`
+   mapping and gives one consistent behavior for both the drain window and the
+   fully-offline gate state. It leans on this ADR's own catalog-visibility rule
+   (gated agents stay in the catalog).
+3. **`kv_condition` watches the `mesh-context` bucket** (the same bucket as
+   `kv_source` and `mesh.kv`), so gates compose with the KV the wildfire agents
+   already share. The predicate receives the raw `bytes` value, or `None` when
+   the key is absent or deleted.
+4. **Startup evaluation is a synchronous read, not just `initial`.** On
+   `__aenter__` the SDK reads the key's current value and applies the predicate
+   immediately (deterministic: a mesh entered while the gate is already true
+   comes online before `__aenter__` returns). `initial` remains the fallback
+   state when the initial read fails (e.g. permissions). The background watcher
+   then re-evaluates on every change; transitions are idempotent, which absorbs
+   the get-then-watch race. The drain timeout is a per-condition parameter
+   (`drain_timeout`, default 30 s) — resolves the TBD below.
+
 ### `Condition` Protocol
 
 ```python
@@ -53,29 +90,26 @@ class Condition(Protocol):
     initial: bool         # default state before first signal arrives (default: False)
 ```
 
-The SDK provides `kv_condition` as the primary concrete implementation:
+The SDK provides `mesh.kv_condition` as the primary concrete implementation (a factory method, per the amendment):
 
 ```python
-from openagentmesh.lifecycle import kv_condition
-
-kv_condition(key: str, predicate: Callable[[bytes | None], bool], *, initial: bool = False) -> Condition
+mesh.kv_condition(key: str, predicate: Callable[[bytes | None], bool], *, initial: bool = False, drain_timeout: float = 30.0) -> KVCondition
 ```
 
-A subject-based condition (`subject_condition`) follows the same shape but watches a plain NATS subject for any message. Future conditions (e.g., cron-activated windows, HTTP health checks) implement the same Protocol.
+A subject-based condition (`mesh.subject_condition`) follows the same shape but watches a plain NATS subject: the predicate receives each message's payload bytes. Future conditions (e.g., cron-activated windows, HTTP health checks) implement the same Protocol.
 
 ### Code sample (the DX contract)
 
 ```python
 import json
 from openagentmesh import AgentMesh, AgentSpec
-from openagentmesh.lifecycle import kv_condition
 
 mesh = AgentMesh()
 
-# Only subscribes while incident.mode KV key is "active".
+# Only subscribes while the incident.mode KV key is "active".
 @mesh.agent(
     AgentSpec(name="wildfire.coordinator", description="Assigns tasks to response fleets during active wildfire incidents"),
-    active_when=kv_condition("incident.mode", lambda v: json.loads(v) == "active" if v else False),
+    active_when=mesh.kv_condition("incident.mode", lambda v: json.loads(v) == "active" if v else False),
 )
 async def coordinator(brief: IncidentBrief) -> TaskAssignment:
     return await llm.assign_tasks(brief)
@@ -83,8 +117,8 @@ async def coordinator(brief: IncidentBrief) -> TaskAssignment:
 # Source-only agent (no invocable surface) that is also lifecycle-gated.
 @mesh.agent(
     AgentSpec(name="wildfire.monitor", description="Watches perimeter sensors during active incidents"),
-    sources=[kv_source("sensors.*.perimeter")],
-    active_when=kv_condition("incident.mode", lambda v: json.loads(v) == "active" if v else False),
+    sources=[mesh.kv_source("sensors.*.perimeter")],
+    active_when=mesh.kv_condition("incident.mode", lambda v: json.loads(v) == "active" if v else False),
 )
 async def monitor(reading: PerimeterReading) -> None:
     await alert_if_critical(reading)
@@ -138,11 +172,10 @@ The handler-body watch loop form from ADR-0042 (`async for value in mesh.kv.watc
 ## Consequences
 
 - `@mesh.agent` decorator gains `active_when: Condition | None = None` keyword argument.
-- `Condition` Protocol added to `openagentmesh.lifecycle` (new module).
-- `kv_condition` concrete implementation in `openagentmesh.lifecycle`.
-- SDK runtime: on `mesh.__aenter__`, evaluates `initial`; starts background watcher for condition subject; subscribes/unsubscribes on predicate changes.
-- New error code `not_available` added to error taxonomy and `docs/concepts/errors.md`.
-- Drain timeout (default 30 s) exposed as a parameter on `Condition` or as a global mesh config (TBD).
+- `Condition` Protocol, `KVCondition`, `SubjectCondition` in `_lifecycle.py` (new private module), exported top-level; `mesh.kv_condition` / `mesh.subject_condition` factories (amended).
+- SDK runtime: on `mesh.__aenter__`, evaluates the current KV value (fallback `initial`); starts background watcher for the condition; subscribes/unsubscribes on predicate changes.
+- New error code `not_available` (`NotAvailable`) added to error taxonomy and `docs/concepts/errors.md`; caller-side no-responders mapping refined per the amendment.
+- Drain timeout: per-condition `drain_timeout` parameter, default 30 s (TBD resolved by the amendment).
 - ADR-0042 → `superseded by ADR-0055`. Handler-body KV loop form remains supported.
 - ADR-0031 capability table: Watcher row removed. Add note: "`invocable=False, streaming=False` means source-only agent; see ADR-0052."
 - `docs/concepts/agents.md`: remove Watcher from handler shapes table.
