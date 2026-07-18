@@ -290,9 +290,10 @@ ty clean on the merged tree; 53 vitest on the branch; zensical build
 clean; CI success on branch tip 426cde3 (run 52; run 49's failure was
 the expected red phase).
 
-Left open: CI on the main merge commit b7e4093 and the state-file commit
-(pushed at end of run — verify next run); all Needs-Luca items still
-unanswered. Next run: check Needs-Luca answers, then start ADR-0056
+CI on main verified before run end: run 53 on merge commit b7e4093 and
+run 54 on state commit 744cf8a, both success. No open verifications.
+Left open: all Needs-Luca items still unanswered. Next run: check
+Needs-Luca answers, then start ADR-0056
 admin UI (in Stage 3 scope via item 9's silence-deferral; 4–6 session
 estimate — expect it to span several runs; re-read the ADR and the
 Stage-2 shaping notes in this file before building).
