@@ -1,6 +1,6 @@
 # ADR-0048: Mesh-native observability
 
-**Status:** discussion
+**Status:** spec (v1: structured logs + KV level control + `oam observe logs`; traces, heartbeat metrics, and `$SYS` bridging deferred — see Amendment)
 
 ## Context
 
@@ -239,3 +239,166 @@ Which `$SYS.>` subjects are worth bridging? Slow consumer and auth failure are c
 - The `mesh.observe` SDK namespace and `oam observe` CLI namespace are new API surfaces that need to stay stable.
 - Heartbeat stats give dashboards a lightweight metrics story without a separate metrics pipeline.
 - Adding `traceparent` to the envelope (if open question 1 resolves to option a) is a partial pull-forward of Phase 2 OTel work, but makes the trace data immediately portable.
+
+## Amendment (2026-07-18): v1 scope, subject correction, stale-context fixes
+
+Shaped discussion → spec for Stage 3 execution (see
+`km/notes/2026-07-17-stage3-plan.md`). The original text above is kept for the
+full design; this amendment corrects what drifted and pins the v1 slice.
+
+### Stale context corrected
+
+The Context section claims heartbeats on `mesh.health.{channel}.{name}` and
+death notices already exist. Reality after ADR-0016/0040 (2026-07-18): death
+notices exist on `mesh.death.{name}`; **the heartbeat layer was explicitly
+deferred** in ADR-0016's v1 amendment — no `mesh.health.*` publishing exists
+anywhere in `src/`. Consequences for this ADR:
+
+- **"Metrics folded into the heartbeat" is deferred with the heartbeat layer.**
+  There is no heartbeat to fold counters into. When the heartbeat increment
+  lands (ADR-0016 follow-up), it should carry the counters exactly as
+  specified above; v1 of this ADR ships no metrics.
+- Agent lifecycle detection (registration, death) is already observable via
+  the catalog, `mesh.death.>`, and `mesh.errors.>`; v1 logs complement those
+  rather than duplicating them.
+
+### Subject correction: `mesh.logs.{name}`, not `mesh.agent.{name}.logs`
+
+The original design hangs logs off the agent subject
+(`mesh.agent.{channel}.{name}.logs`) and claims wildcard aggregation via
+`mesh.agent.>.logs`. **That wildcard is invalid NATS** — `>` matches only at
+the end of a subject — so the one thing the sibling placement was chosen for
+(easy aggregation) does not actually work; `mesh.agent.*.*.logs` would pin
+agent names to exactly two tokens, which ADR-0049's dotted names do not
+guarantee.
+
+v1 therefore uses a dedicated root, matching the `mesh.errors.{name}` and
+`mesh.death.{name}` precedent:
+
+```
+mesh.logs.{name}          # e.g. mesh.logs.nlp.summarizer
+
+mesh.logs.>               # all logs, all agents
+mesh.logs.nlp.>           # all logs from the nlp channel
+```
+
+Ephemeral plain NATS subjects, as originally decided (no JetStream, no
+retention).
+
+### v1 scope
+
+**In:** structured, level-gated lifecycle/invocation logs auto-published by
+the SDK; the `mesh-observability` KV control plane (log level only); the
+`mesh.observe` SDK namespace (`logs()`, `get()`, `set()`, `set_global()`);
+`oam observe logs|config|set` CLI. The six log events in the table above ship
+as specified, on `mesh.logs.{name}`.
+
+**Deferred, with reasons:**
+
+- **Traces** — depend on the trace-context decision (open question 1), which
+  is a partial Phase 2 OTel pull-forward; nothing in v1 needs it. The
+  `.traces` subject, span publishing, `oam observe traces`, and the `traces`
+  config key all move to a v2 increment. Leaning (a) (standard `traceparent`
+  header) stands.
+- **Metrics in heartbeats** — blocked on the heartbeat layer ADR-0016
+  deferred (see above).
+- **`$SYS` bridging (`mesh.system.*`)** — the `oam mesh up` monitor process
+  from ADR-0016 is the natural host and now exists, but bridging adds new
+  wire surface + role-template churn for advisories nobody consumes yet.
+  Revisit with the heartbeat increment.
+- **Custom logging from handlers** (open question 2) — needs either context
+  injection (its own ADR) or an ADR-0026 mesh reference; not required for
+  the production-debugging story v1 targets. Leaning: the Python `logging`
+  bridge, so agent code stays framework-free.
+- **`AgentMesh(observe=...)` constructor param** — dropped, not deferred.
+  Two control planes (constructor + KV) would race each other and make
+  `oam observe set` lie about effective config. The KV bucket is the single
+  source of truth; `oam mesh up --log-level debug` just seeds the global key.
+
+### v1 decisions
+
+- **Config schema (v1):** `{"log_level": "debug"|"info"|"warn"|"error"|"off"}`.
+  Default `info`. Per-agent key (the dotted name, e.g. `nlp.summarizer`)
+  overrides `global`. The `traces` key returns with the traces increment.
+- **Log event schema (open question 3 resolved):** a formal Pydantic model
+  `LogEvent` in the SDK — `timestamp`, `level`, `agent`, `event`,
+  `request_id`, `message`, `data` (freeform dict, `{}` default). Typed
+  models keep the CLI/SDK consumers honest; freeform `data` keeps the SDK
+  out of the business of versioning per-event payloads.
+- **Performance (open question 4 resolved for v1):** hosts cache effective
+  config in-process and update it via KV watch; the per-request cost when a
+  level is gated off is a dict lookup and an integer compare, no publish.
+  At the default `info` level the per-request events (`request_received`,
+  `request_completed`) are `debug` and not published at all — the default
+  steady-state overhead is zero publishes per request. `request_failed` and
+  `validation_error` are `warn` and always visible by default, which is the
+  right bias for production debugging.
+- **Role templates ship in the same change** (lesson from ADR-0016/0038:
+  new wire surfaces break freshly-minted creds unless ROLE_TEMPLATES moves
+  with them): `$KV.mesh-observability.>` joins the shared bucket list;
+  workers already cover `mesh.logs.>` via `mesh.>`; observer gains
+  `mesh.logs.>` sub; invoker is unchanged (tailing logs is observer work).
+  Stale credentials must degrade gracefully (warning, not crash), matching
+  the mesh-instances precedent.
+
+### Code sample (v1)
+
+```python
+from openagentmesh import AgentMesh, AgentSpec
+from pydantic import BaseModel
+
+
+class SummarizeInput(BaseModel):
+    text: str
+
+class SummarizeOutput(BaseModel):
+    summary: str
+
+
+# SDK auto-instruments lifecycle and invocations. No handler changes.
+mesh = AgentMesh()
+
+@mesh.agent(AgentSpec(
+    name="nlp.summarizer",
+    description="Summarizes text",
+))
+async def summarize(req: SummarizeInput) -> SummarizeOutput:
+    # At log_level "debug" the SDK publishes to mesh.logs.nlp.summarizer:
+    #   {"level": "debug", "event": "request_received", "request_id": "..."}
+    #   ... handler runs ...
+    #   {"level": "debug", "event": "request_completed", "data": {"duration_ms": 45}}
+    # A handler exception publishes {"level": "warn", "event": "request_failed"}.
+    return SummarizeOutput(summary=req.text[:60])
+
+
+# --- Consuming logs (any process on the mesh) ---
+
+async with AgentMesh() as tap:
+    async for event in tap.observe.logs():                  # all agents
+        print(f"[{event.level}] {event.agent}: {event.event}")
+
+    async for event in tap.observe.logs("nlp.summarizer"):  # one agent
+        print(f"[{event.level}] {event.event} {event.data}")
+
+    async for event in tap.observe.logs(level="warn"):      # warn and above
+        ...
+
+# --- Runtime config (no restart) ---
+
+    await tap.observe.set("nlp.summarizer", log_level="debug")
+    await tap.observe.set_global(log_level="warn")
+
+    config = await tap.observe.get("nlp.summarizer")
+    # ObserveConfig(log_level="debug", source="agent")
+    config = await tap.observe.get("nlp.classifier")
+    # ObserveConfig(log_level="warn", source="global")
+```
+
+```bash
+oam observe logs                       # tail all agents' logs
+oam observe logs nlp.summarizer        # tail one agent
+oam observe logs --level warn          # filter by minimum level
+oam observe config                     # show global + per-agent overrides
+oam observe set nlp.summarizer --log-level debug
+oam observe set --global --log-level warn
+```
