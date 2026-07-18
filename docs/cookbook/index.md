@@ -31,7 +31,11 @@ async with AgentMesh() as mesh:     # connects to nats://localhost:4222
 | [Multi-Module Projects](multi-module.md) | Scaling beyond a single file |
 | [Shared Plan Coordination](shared-plan.md) | CAS-based concurrent state |
 | [LLM-Driven Tool Selection](llm-tool-selection.md) | Runtime discovery for LLM tools |
+| [MCP Bridge](mcp-bridge.md) | Serve mesh agents to MCP clients |
+| [Secured Mesh](secured-mesh.md) | JWT credentials and roles |
 | [Error Handling](error-handling.md) | Retry, fallback, monitoring |
+| [Surviving Agent Failures](agent-liveness.md) | Death notices and fast failover |
+| [Observing the Mesh](observing-the-mesh.md) | Live log tailing and level control |
 | [Automatic Load Balancing](load-balancing.md) | Queue group scaling |
 | [Reactive Pipeline](reactive-pipeline.md) | KV watch coordination |
 | [Parallel RAG Indexing](parallel-rag-indexing.md) | ObjectStore + queue groups |

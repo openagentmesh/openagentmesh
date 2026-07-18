@@ -1,6 +1,6 @@
 # ADR-0048: Mesh-native observability
 
-**Status:** spec (v1: structured logs + KV level control + `oam observe logs`; traces, heartbeat metrics, and `$SYS` bridging deferred — see Amendment)
+**Status:** documented (v1: structured logs + KV level control + `oam observe logs`; traces, heartbeat metrics, and `$SYS` bridging deferred — see Amendment)
 
 ## Context
 

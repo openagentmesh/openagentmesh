@@ -20,6 +20,8 @@ from ._models import (
     AgentSpec,
     CatalogEntry,
     DeathNotice,
+    LogEvent,
+    ObserveConfig,
 )
 from ._sources import KVSource, MeshMessage, SubjectSource
 
@@ -39,9 +41,11 @@ __all__ = [
     "KVEntry",
     "KVKeyExists",
     "KVSource",
+    "LogEvent",
     "MeshError",
     "MeshMessage",
     "MeshTimeout",
     "NotFound",
+    "ObserveConfig",
     "SubjectSource",
 ]

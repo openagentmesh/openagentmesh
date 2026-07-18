@@ -278,3 +278,33 @@ class DeathNotice(BaseModel):
 
 
 # Error classes moved to ._errors per ADR-0057.
+
+
+class LogEvent(BaseModel):
+    """Structured log event published on ``mesh.logs.{name}`` (ADR-0048).
+
+    ``data`` carries event-specific payload (e.g. ``duration_ms`` on
+    ``request_completed``) and stays freeform so per-event payloads need no
+    schema versioning.
+    """
+
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat()
+    )
+    level: Literal["debug", "info", "warn", "error"]
+    agent: str
+    event: str
+    request_id: str = ""
+    message: str = ""
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class ObserveConfig(BaseModel):
+    """Effective observability config for an agent (ADR-0048).
+
+    ``source`` records which tier supplied the value: a per-agent override,
+    the mesh-wide ``global`` key, or the built-in default.
+    """
+
+    log_level: Literal["debug", "info", "warn", "error", "off"] = "info"
+    source: Literal["agent", "global", "default"] = "default"

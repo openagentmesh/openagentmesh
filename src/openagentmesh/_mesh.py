@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
@@ -39,11 +40,14 @@ from ._models import (
     AgentSpec,
     CatalogEntry,
     DeathNotice,
+    LogEvent,
 )
+from ._observe import GLOBAL_KEY, LEVELS, Observe, _parse_level
 from ._subjects import (
     compute_death_subject,
     compute_error_subject,
     compute_event_subject,
+    compute_log_subject,
     compute_subject,
 )
 from ._workspace import Workspace
@@ -55,6 +59,7 @@ _REGISTRY_BUCKET = "mesh-registry"
 _CONTEXT_BUCKET = "mesh-context"
 _ARTIFACTS_BUCKET = "mesh-artifacts"
 _INSTANCES_BUCKET = "mesh-instances"
+_OBSERVE_BUCKET = "mesh-observability"
 _CATALOG_KEY = "catalog"
 
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
@@ -101,6 +106,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._catalog_kv: KeyValue | None = None
         self._registry_kv: KeyValue | None = None
         self._instances_kv: KeyValue | None = None
+        self._observe_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
         self._artifacts_os: Any | None = None
         self._kv: KVStore | None = None
@@ -125,6 +131,11 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._denied_subjects: set[str] = set()
         # Agent names last written to the mesh-instances record (ADR-0016).
         self._instance_record: list[str] = []
+        # Observability (ADR-0048): cached level config, updated by KV watch.
+        self._observe_ns: Observe | None = None
+        self._observe_config: dict[str, str] = {}
+        self._observe_watcher: Any | None = None
+        self._observe_watcher_task: asyncio.Task | None = None
 
     @property
     def url(self) -> str:
@@ -152,6 +163,19 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
         return self._workspace
 
+    @property
+    def observe(self) -> Observe:
+        """Observability namespace (ADR-0048): tail logs, manage levels."""
+        if self._observe_ns is None:
+            self._observe_ns = Observe(self)
+        return self._observe_ns
+
+    @property
+    def _observe_kv_required(self) -> KeyValue:
+        if self._observe_kv is None:
+            raise ConnectionFailed(message="Mesh is not connected; use 'async with mesh:' first")
+        return self._observe_kv
+
     def __repr__(self) -> str:
         status = "connected" if self._nc is not None else "disconnected"
         mode = "local" if self._embedded is not None else "remote"
@@ -173,6 +197,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         await self._ensure_buckets()
         await self._seed_catalog_cache()
         await self._start_catalog_watcher()
+        await self._start_observe_watcher()
         await self._subscribe_pending()
         return self
 
@@ -246,6 +271,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             ("_catalog_kv",   _CATALOG_BUCKET,   self._js.key_value,    self._js.create_key_value),
             ("_registry_kv",  _REGISTRY_BUCKET,  self._js.key_value,    self._js.create_key_value),
             ("_instances_kv", _INSTANCES_BUCKET, self._js.key_value,    self._js.create_key_value),
+            ("_observe_kv",   _OBSERVE_BUCKET,   self._js.key_value,    self._js.create_key_value),
             ("_context_kv",   _CONTEXT_BUCKET,   self._js.key_value,    self._js.create_key_value),
             ("_artifacts_os", _ARTIFACTS_BUCKET, self._js.object_store, self._js.create_object_store),
         ]
@@ -289,6 +315,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
                 self._subscribed.add(name)
+                await self._publish_log(
+                    name, "info", "agent_registered",
+                    message=f"Agent '{name}' registered",
+                )
 
         await self._record_instance()
 
@@ -353,6 +383,79 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         self._catalog_watcher_task = asyncio.create_task(_watch())
 
+    async def _start_observe_watcher(self) -> None:
+        """Watch the mesh-observability KV bucket for level changes (ADR-0048).
+
+        The watcher replays current keys on start (seeding the cache) and then
+        streams updates, so runtime `oam observe set` calls apply without a
+        restart. Best-effort: on stale credentials the mesh runs at default
+        levels rather than failing.
+        """
+        if self._observe_kv is None:
+            return
+        try:
+            watcher = await self._observe_kv.watchall()
+        except Exception as e:
+            _log.warning("could not watch observability config (stale credentials?): %s", e)
+            return
+        self._observe_watcher = watcher
+
+        async def _watch() -> None:
+            try:
+                async for entry in watcher:
+                    if entry is None:
+                        continue
+                    level = _parse_level(entry.value)
+                    if level is None:
+                        self._observe_config.pop(entry.key, None)
+                    else:
+                        self._observe_config[entry.key] = level
+            except asyncio.CancelledError:
+                pass  # normal shutdown
+            except Exception:
+                pass  # best-effort; mesh keeps last known levels
+
+        self._observe_watcher_task = asyncio.create_task(_watch())
+
+    def _observe_threshold(self, agent: str) -> int:
+        """Effective numeric log threshold: per-agent > global > info."""
+        level = (
+            self._observe_config.get(agent)
+            or self._observe_config.get(GLOBAL_KEY)
+            or "info"
+        )
+        return LEVELS.get(level, LEVELS["info"])
+
+    async def _publish_log(
+        self,
+        agent: str,
+        level: Literal["debug", "info", "warn", "error"],
+        event: str,
+        *,
+        request_id: str = "",
+        message: str = "",
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        """Publish a structured log event (ADR-0048). Never fails the caller."""
+        if LEVELS[level] < self._observe_threshold(agent):
+            return
+        log_event = LogEvent(
+            level=level,
+            agent=agent,
+            event=event,
+            request_id=request_id,
+            message=message,
+            data=data or {},
+        )
+        try:
+            await self._conn.publish(
+                compute_log_subject(agent),
+                log_event.model_dump_json().encode(),
+                headers=self._with_instance_id(),
+            )
+        except Exception as e:
+            _log.debug("could not publish log event: %s", e)
+
     async def _shutdown(self) -> None:
         # Shutdown ordering: stop inbound watchers first so the catalog cache
         # stops mutating, then cancel background handler tasks, unsubscribe
@@ -370,6 +473,26 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             with suppress(asyncio.CancelledError, Exception):
                 await self._catalog_watcher_task
             self._catalog_watcher_task = None
+
+        # 1b. Stop the observability config watcher (ADR-0048), same pattern.
+        if self._observe_watcher is not None:
+            with suppress(Exception):
+                await self._observe_watcher.stop()
+            self._observe_watcher = None
+        if self._observe_watcher_task is not None:
+            self._observe_watcher_task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await self._observe_watcher_task
+            self._observe_watcher_task = None
+
+        # 1c. Deregistration log events (ADR-0048) while the connection is
+        # still fully live; _publish_log is itself best-effort.
+        for name in self._subscribed:
+            with suppress(Exception):
+                await self._publish_log(
+                    name, "info", "agent_deregistered",
+                    message=f"Agent '{name}' deregistered",
+                )
 
         # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
         # tasks receive cancel() before we await any one of them, avoiding
@@ -693,6 +816,10 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 request_id = msg.headers.get("X-Mesh-Request-Id", "")
                 wants_stream = msg.headers.get("X-Mesh-Stream") == "true"
 
+            started = time.monotonic()
+            await self._publish_log(
+                name, "debug", "request_received", request_id=request_id
+            )
             try:
                 # Pre-flight verb/shape check (ADR-0047)
                 if wants_stream and not info.streaming:
@@ -728,8 +855,25 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                         request_id=request_id,
                         message=str(e),
                     ) from e
+
+                duration_ms = int((time.monotonic() - started) * 1000)
+                await self._publish_log(
+                    name, "debug", "request_completed",
+                    request_id=request_id,
+                    message=f"Request completed in {duration_ms}ms",
+                    data={"duration_ms": duration_ms},
+                )
             except MeshError as e:
                 error = e
+                log_event = (
+                    "validation_error" if isinstance(e, InvalidInput) else "request_failed"
+                )
+                await self._publish_log(
+                    name, "warn", log_event,
+                    request_id=request_id,
+                    message=e.message,
+                    data={"code": e.code},
+                )
                 if wants_stream:
                     stream_subject = f"mesh.stream.{request_id}"
                     await self._conn.publish(

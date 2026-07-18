@@ -431,3 +431,41 @@ await mesh.workspace.put("results/output.png", image_bytes)
 data = await mesh.workspace.get("results/output.png")
 await mesh.workspace.delete("results/output.png")
 ```
+
+## Observability
+
+Structured log events and runtime level control (ADR-0048). See
+[Observability](../concepts/observability.md) for the model.
+
+### `async for event in mesh.observe.logs(agent=None, *, level=None)`
+
+Tail log events as typed `LogEvent` objects. Runs until the caller breaks
+out of the loop.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `agent` | `str \| None` | Agent name; `None` tails the whole mesh (`mesh.logs.>`) |
+| `level` | `str \| None` | Minimum level to yield (`debug`, `info`, `warn`, `error`) |
+
+**Yields:** `LogEvent` — fields `timestamp`, `level`, `agent`, `event`,
+`request_id`, `message`, `data`.
+
+### `await mesh.observe.get(agent)`
+
+Effective config for an agent. Returns `ObserveConfig` with `log_level` and
+`source` (`"agent"`, `"global"`, or `"default"`).
+
+### `await mesh.observe.set(agent, *, log_level)`
+
+Set the per-agent log level (`debug`, `info`, `warn`, `error`, `off`).
+Applies live via KV watch — no restart.
+
+### `await mesh.observe.set_global(*, log_level)`
+
+Set the mesh-wide default level. Per-agent overrides win.
+
+```python
+await mesh.observe.set("nlp.summarizer", log_level="debug")
+async for event in mesh.observe.logs("nlp.summarizer"):
+    print(event.event, event.data)
+```

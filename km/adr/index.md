@@ -55,7 +55,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0045](0045-unlink-cookbook-from-demos.md) | Unlink cookbook docs from demo modules (supersedes ADR-0041) | implemented | |
 | [ADR-0046](0046-scalar-and-generic-type-support.md) | Scalar and generic type support via TypeAdapter | documented | |
 | [ADR-0047](0047-invocation-mismatch-preflight-validation.md) | Invocation mismatch pre-flight validation | documented | |
-| [ADR-0048](0048-mesh-native-observability.md) | Mesh-native observability: structured logging and tracing on NATS subjects | spec | roadmap/stage-3 |
+| [ADR-0048](0048-mesh-native-observability.md) | Mesh-native observability: structured logging and tracing on NATS subjects | documented | roadmap/stage-3 |
 | [ADR-0049](0049-dotted-agent-name-as-identifier.md) | Dotted agent name as sole identifier (removes `channel` field) | documented | |
 | [ADR-0050](0050-docstring-as-description-fallback.md) | Docstring as fallback for `AgentSpec.description` | discussion | |
 | [ADR-0051](0051-notebook-ergonomics-for-local-embedded-nats.md) | Notebook ergonomics for `AgentMesh.local()`: sync entry, atexit, idempotent reuse | discussion | |

@@ -210,6 +210,44 @@ account.
 oam auth whoami
 ```
 
+## `oam observe`
+
+Tail mesh log events and control per-agent log levels. See
+[Observability](../concepts/observability.md).
+
+### `oam observe logs`
+
+Tail structured log events (Ctrl-C to stop).
+
+```bash
+oam observe logs                     # all agents
+oam observe logs nlp.summarizer      # one agent
+oam observe logs --level warn        # minimum level filter
+```
+
+### `oam observe config`
+
+Show observability config: the mesh-wide default plus per-agent overrides,
+or the effective config (and its source tier) for one agent.
+
+```bash
+oam observe config
+oam observe config nlp.summarizer
+oam observe config --json
+```
+
+### `oam observe set`
+
+Set the log level for one agent or mesh-wide. Applies live — hosts pick up
+the change via KV watch, no restart.
+
+```bash
+oam observe set nlp.summarizer --log-level debug
+oam observe set --global --log-level warn
+```
+
+Levels: `debug`, `info`, `warn`, `error`, `off`.
+
 ## Output conventions
 
 All commands that produce structured output default to a human-readable format
