@@ -2,7 +2,7 @@
 
 - **Type:** api-design
 - **Date:** 2026-05-06
-- **Status:** spec
+- **Status:** documented
 - **Amends:** ADR-0042 (formally retires Watcher as a handler shape), ADR-0031 (removes Watcher row from capability table)
 - **Depends on:** ADR-0052 (generic sources), ADR-0031 (capability inference)
 - **Amended:** 2026-07-18 (implementation shaping; see Amendment section)
