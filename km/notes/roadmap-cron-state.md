@@ -308,8 +308,10 @@ item status above. Verified this run: 326 pytest + 7 skips on the branch
 92bd408 (run 60; run 58 was the expected red phase); real `oam mesh up`
 websocket handshake + `oam ui` serving checked end-to-end in the sandbox.
 
-Left open: CI on the main merge commit 7b48e99 (pushed at end of run —
-verify next run); all Needs-Luca items still unanswered. Next run: check
+CI on main verified before run end: run 62 on tip d8e5323 success (the
+merge commit's own run 61 was superseded/cancelled by the same-tree km
+push — the known pattern, not a failure). No open verifications.
+Left open: all Needs-Luca items still unanswered. Next run: check
 Needs-Luca answers, verify CI on main, then ADR-0056 wave 2 per
 km/notes/2026-07-18-adr0056-ui-plan.md — ui/ scaffold with the TS SDK as
 the browser client (workspace link to sdk-ts/), registry + contract
