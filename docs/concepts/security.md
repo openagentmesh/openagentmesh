@@ -75,8 +75,8 @@ Users are minted from three coarse role templates:
 | Role | Can | Cannot |
 |------|-----|--------|
 | `worker` | host agents, invoke, read/write shared state | touch `$SYS.>` |
-| `invoker` | call agents, read the catalog, subscribe to events | host agents, write shared state |
-| `observer` | read the catalog, watch events/errors/health | invoke or publish anything on `mesh.>` |
+| `invoker` | call agents, read the catalog, subscribe to events and death notices | host agents, write shared state |
+| `observer` | read the catalog, watch events/errors/health/death notices | invoke or publish anything on `mesh.>` |
 
 Roles are process-level and deliberately coarse: a process hosting several
 agents holds one `worker` credential, and one connection is one identity.

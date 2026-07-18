@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Instant failure detection** (ADR-0016): a mesh health monitor turns NATS disconnect advisories into sub-second cleanup when an agent host crashes — the dead agent leaves the catalog immediately (not after a stale window) and a death notice is published on `mesh.death.{name}` for orchestrators, spawners, and dashboards to react to (`mesh.subscribe(subject="mesh.death.>")`). Graceful shutdowns publish their own notice. Replicated agents are handled correctly: notices fire only when the last instance goes, and shutting down one replica no longer removes the shared catalog entry. `AgentMesh.local()` and `oam mesh up` run the monitor automatically; secured meshes run `oam mesh monitor --sys-creds ... --creds ...`.
+- **Fast-fail for in-flight requests** (ADR-0040): `mesh.call()` and `mesh.stream()` race every request against the target's death notices. An agent that dies holding your request now raises `AgentDied` (code `agent_died`) in well under a second instead of stalling until the timeout — chaos-tested by SIGKILLing an agent mid-request.
+
 - **Mesh authentication (SDK)** (ADR-0038): connect to a secured mesh with `AgentMesh(url=..., creds="./agent.creds")` using standard NATS NKey + JWT credentials. Credentials also resolve from the `OAM_CREDS` environment variable or a `creds` field in `.oam-url`, which now accepts a small TOML form (`url = "..."`, `creds = "..."`) alongside the legacy bare-URL line. Optional mTLS via `tls_cert=`, `tls_key=`, `tls_ca=`. A server that rejects the connection raises `ConnectionDenied` (code `connection_denied`) explaining which credentials were used, instead of a generic connection failure. `AgentMesh.local()` stays open and ignores ambient credentials.
 - **`oam auth` CLI** (ADR-0038): `oam auth init` bootstraps a complete NKey/JWT credential tree (wrapping `nsc`) with a ready-to-run `server.conf`; `oam auth user add <name> --role worker|invoker|observer` mints role-templated `.creds` files; `oam auth user revoke` revokes a user; `oam auth whoami` shows the identity the CLI would connect with. `oam mesh connect --creds` persists credentials next to the mesh URL.
 - **MCP export bridge** (ADR-0002/0003): any MCP client (Claude Code, Claude Desktop, Cursor) can list and call mesh agents as tools. Opt agents in per-agent with `@mesh.agent(spec, mcp=True/False)` and set the mesh policy via `mesh.run_mcp(default_mcp=...)` (blocking) or `await mesh.serve_mcp(...)` (async). `oam mcp serve --url nats://...` gateways an already-running mesh — register it with `claude mcp add mesh -- oam mcp serve`. Requires the new `mcp` extra: `pip install 'openagentmesh[mcp]'`.
@@ -19,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Calling an agent nobody serves now raises `NotFound` immediately (NATS no-responders) instead of leaking the raw `nats.errors.NoRespondersError` — the error-handling cookbook's retry pattern now works as documented.
+- The dev NATS servers started by `oam mesh up` and `AgentMesh.local()` now run with a small accounts config (anonymous clients still connect exactly as before) and a 10s ping interval, so network partitions are detected in ~20s instead of NATS's ~4-minute default.
 - `mesh.kv` and `mesh.workspace` accessed before connecting now raise `ConnectionFailed` with a clear message instead of surfacing as `AttributeError: 'NoneType' object has no attribute ...` at the first call site.
 
 ### Fixed

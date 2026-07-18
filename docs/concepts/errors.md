@@ -52,9 +52,10 @@ Every error code maps to a dedicated `MeshError` subclass (ADR-0057). The class 
 | `invalid_input` | `InvalidInput` | Caller's payload failed schema validation | Fix the payload; do not retry as-is |
 | `handler_error` | `HandlerError` | Handler body raised a non-`MeshError` exception | Treat as opaque agent failure; retry/fallback |
 | `invocation_mismatch` | `InvocationMismatch` | Wrong verb (`call`/`stream`/`send`) for the agent's shape | Use the correct verb |
-| `not_found` | `NotFound` | Agent missing from registry/catalog | Check the name; verify the agent is running |
+| `not_found` | `NotFound` | Agent missing from registry/catalog, or nobody serving the subject | Check the name; verify the agent is running |
 | `connection_failed` | `ConnectionFailed` | Initial NATS connect or reconnect failed | Check transport / URL |
 | `timeout` | `MeshTimeout` | No reply within the deadline | Retry with backoff or raise SLA |
+| `agent_died` | `AgentDied` | The agent left the mesh during your in-flight request | Retry against a replacement; see [Liveness](liveness.md) |
 | `chunk_sequence_error` | `ChunkSequenceError` | Stream chunks arrived out of order | Treat as transport bug |
 
 All subclasses inherit from `MeshError`. `except MeshError:` still catches everything when you don't want to discriminate.
@@ -157,11 +158,16 @@ There are four ways an agent can leave the mesh. Each produces a different calle
 
 | Mode | Cause | What the caller sees | Detection speed |
 |------|-------|---------------------|-----------------|
-| Graceful shutdown | Context manager exit or process interrupt | `NotFound` on next call (agent already deregistered) | Instant |
+| Graceful shutdown | Context manager exit or process interrupt | `NotFound` on next call (agent already deregistered); `AgentDied` if a request was in flight | Instant |
 | Bad input | Caller sent a payload that fails the schema | `InvalidInput` with pydantic error list in `details` | Instant (no handler call) |
 | Handler exception | Bug in handler code | `HandlerError` with the exception message | Instant |
-| Process crash | OOM kill, SIGKILL, unhandled panic | `MeshTimeout` after the timeout window expires | Timeout (default varies by agent type) |
-| Network partition | Network failure between agent and NATS | `MeshTimeout` after the timeout window expires | Timeout |
+| Process crash | OOM kill, SIGKILL, unhandled panic | `AgentDied` on in-flight requests, `NotFound` afterwards (health monitor running); `MeshTimeout` otherwise | Sub-second with the health monitor; timeout without |
+| Network partition | Network failure between agent and NATS | Same as process crash | 10–20s (server ping settings) |
+| Zombie | Process alive but stuck (deadlock, hung LLM call) | `MeshTimeout` after the timeout window expires | Timeout |
+
+Fast failure for crashes and partitions comes from the mesh health monitor
+(disconnect advisories + death notices) — see [Liveness](liveness.md) for how
+it works and what runs it.
 
 ### Handler exceptions
 

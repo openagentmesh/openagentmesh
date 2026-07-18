@@ -36,20 +36,35 @@ oam mesh up
 ```text
 NATS listening on nats://127.0.0.1:4222
 KV buckets ready: mesh-catalog, mesh-registry, mesh-context
+Health monitor running (pid 12345)
 Wrote .oam-url
 ```
 
 The server runs detached by default. Use `--foreground` to block on the
-current terminal, or `--port <n>` to bind a different port.
+current terminal, or `--port <n>` to bind a different port. A
+[health monitor](../concepts/liveness.md) starts alongside the server so
+crashed agents leave the catalog immediately and death notices fire.
 
 ### `oam mesh down`
 
-Stop the mesh started by `oam mesh up`. This only affects meshes managed via the
-PID file; embedded meshes (from `oam demo` or `AgentMesh.local()`) are
-stopped with Ctrl+C in their own terminal.
+Stop the mesh (and its health monitor) started by `oam mesh up`. This only
+affects meshes managed via the PID file; embedded meshes (from `oam demo` or
+`AgentMesh.local()`) are stopped with Ctrl+C in their own terminal.
 
 ```bash
 oam mesh down
+```
+
+### `oam mesh monitor`
+
+Run the [health monitor](../concepts/liveness.md) in the foreground against
+any mesh. `oam mesh up` starts one for you; use this on secured meshes,
+where advisories need a system-account credential and cleanup needs a
+worker credential:
+
+```bash
+oam mesh monitor --url nats://mesh:4222 \
+    --sys-creds monitor-sys.creds --creds worker.creds
 ```
 
 ### `oam mesh connect`
