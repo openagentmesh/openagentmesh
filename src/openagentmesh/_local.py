@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import platform
+import secrets
 import shutil
 import socket
 import stat
 import subprocess
+import textwrap
 from pathlib import Path
 
 import nats
@@ -101,12 +103,43 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def render_mesh_server_conf(
+    *, port: int, store_dir: Path, sys_password: str
+) -> str:
+    """NATS config for a dev mesh (ADR-0016).
+
+    Anonymous clients map to the APP account (JetStream enabled) via
+    ``no_auth_user``, preserving the open-by-default local DX. The SYS
+    account exists so the health monitor can subscribe to ``$SYS.>``
+    disconnect advisories. Ping settings follow the liveness spec (§5.2):
+    partitions are detected in ~20s instead of NATS's ~4min default.
+    """
+    return textwrap.dedent(f"""
+        port: {port}
+        jetstream {{ store_dir: "{store_dir}" }}
+        accounts {{
+          APP: {{
+            jetstream: enabled
+            users: [ {{ user: "oam-app", password: "{sys_password}" }} ]
+          }}
+          SYS: {{
+            users: [ {{ user: "oam-sys", password: "{sys_password}" }} ]
+          }}
+        }}
+        no_auth_user: "oam-app"
+        system_account: SYS
+        ping_interval: "10s"
+        ping_max: 2
+        """)
+
+
 class EmbeddedNats:
     """Manages an embedded NATS server subprocess with JetStream."""
 
     def __init__(self, port: int = 0) -> None:
         self.port: int = port
         self.url: str = ""
+        self.sys_url: str = ""  # system-account URL for the health monitor
         self._process: subprocess.Popen | None = None
         self._data_dir: Path | None = None
 
@@ -117,17 +150,22 @@ class EmbeddedNats:
 
         if self.port == 0:
             self.port = _free_port()
+        sys_password = secrets.token_hex(16)
         self.url = f"nats://127.0.0.1:{self.port}"
+        self.sys_url = f"nats://oam-sys:{sys_password}@127.0.0.1:{self.port}"
         self._data_dir = AGENTMESH_DIR / "data" / f"embedded-{self.port}"
         self._data_dir.mkdir(parents=True, exist_ok=True)
 
+        conf_path = self._data_dir / "nats.conf"
+        conf_path.write_text(
+            render_mesh_server_conf(
+                port=self.port, store_dir=self._data_dir, sys_password=sys_password
+            )
+        )
+        conf_path.chmod(0o600)
+
         self._process = subprocess.Popen(
-            [
-                str(binary),
-                "-p", str(self.port),
-                "-js",
-                "--store_dir", str(self._data_dir),
-            ],
+            [str(binary), "-c", str(conf_path)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             start_new_session=True,

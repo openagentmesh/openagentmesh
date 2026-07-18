@@ -169,9 +169,15 @@ Synchronous request/reply. Blocks until the agent responds or times out.
 
 **Returns:** `dict` with the deserialized response payload.
 
+**Raises:** `NotFound` when nobody serves the agent (immediate, via NATS
+no-responders); `AgentDied` when the agent leaves the mesh while your request
+is in flight (sub-second, via [death notices](../concepts/liveness.md));
+`MeshTimeout` when the deadline expires with the agent still connected.
+
 ### `async for chunk in mesh.stream(name, payload, *, timeout=60.0)`
 
-Streaming request. Yields response chunks as dicts.
+Streaming request. Yields response chunks as dicts. Raises `AgentDied` from
+the generator if the agent leaves the mesh mid-stream.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|

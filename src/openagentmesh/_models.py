@@ -260,4 +260,21 @@ def _strict_clean_node(node: dict[str, Any]) -> dict[str, Any]:
     return node
 
 
+class DeathNotice(BaseModel):
+    """Payload published on ``mesh.death.{name}`` when an agent leaves the
+    mesh (ADR-0016).
+
+    ``reason`` is ``"disconnect"`` when the health monitor detected the
+    host's connection drop, ``"graceful_shutdown"`` when the host
+    deregistered itself.
+    """
+
+    agent: str
+    reason: Literal["disconnect", "graceful_shutdown"]
+    detected_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat()
+    )
+    instance_id: str = ""
+
+
 # Error classes moved to ._errors per ADR-0057.

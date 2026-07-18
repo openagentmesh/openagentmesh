@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import re
@@ -15,12 +16,15 @@ from nats.aio.msg import Msg
 from pydantic import BaseModel
 
 from ._errors import (
+    AgentDied,
     ChunkSequenceError,
     ConnectionDenied,
     MeshError,
     MeshTimeout,
+    NotFound,
     from_envelope,
 )
+from ._subjects import compute_death_subject
 
 if TYPE_CHECKING:
     from ._mesh import AgentMesh
@@ -46,23 +50,59 @@ class InvocationMixin:
         request_id = uuid.uuid4().hex
         data = self._serialize_payload(payload)
 
-        try:
-            response = await self._conn.request(
+        # Race the request against a death notice for the target (ADR-0040):
+        # if the agent leaves the mesh mid-request, fail sub-second instead
+        # of waiting out the timeout.
+        death_fut: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
+
+        async def _on_death(msg: Msg) -> None:
+            if not death_fut.done():
+                try:
+                    death_fut.set_result(json.loads(msg.data) if msg.data else {})
+                except Exception:
+                    death_fut.set_result({})
+
+        death_sub = await self._conn.subscribe(compute_death_subject(name), cb=_on_death)
+        req_task = asyncio.ensure_future(
+            self._conn.request(
                 subject, data, timeout=timeout,
                 headers=self._with_instance_id({"X-Mesh-Request-Id": request_id}),
             )
-        except nats.errors.TimeoutError as e:
-            if subject.lower() in self._denied_subjects:
-                raise ConnectionDenied(
-                    message=(
-                        f"The server denied publishing to '{subject}': this "
-                        "connection's credentials lack permission to invoke "
-                        f"'{name}'"
-                    ),
+        )
+        try:
+            await asyncio.wait(
+                {req_task, death_fut}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if death_fut.done() and not req_task.done():
+                req_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await req_task
+                notice = death_fut.result()
+                raise AgentDied(
+                    message=f"Agent '{name}' left the mesh during the request",
                     agent=name,
                     request_id=request_id,
-                ) from e
-            raise MeshTimeout(subject=subject, timeout=timeout) from e
+                    details=notice,
+                )
+            try:
+                response = await req_task
+            except nats.errors.NoRespondersError as e:
+                raise NotFound(agent=name, request_id=request_id) from e
+            except nats.errors.TimeoutError as e:
+                if subject.lower() in self._denied_subjects:
+                    raise ConnectionDenied(
+                        message=(
+                            f"The server denied publishing to '{subject}': this "
+                            "connection's credentials lack permission to invoke "
+                            f"'{name}'"
+                        ),
+                        agent=name,
+                        request_id=request_id,
+                    ) from e
+                raise MeshTimeout(subject=subject, timeout=timeout) from e
+        finally:
+            with contextlib.suppress(Exception):
+                await death_sub.unsubscribe()
 
         status = ""
         if response.headers:
@@ -128,7 +168,23 @@ class InvocationMixin:
                 expected_seq[0] += 1
                 await chunks.put(json.loads(msg.data))
 
+        async def death_handler(msg: Msg) -> None:
+            try:
+                notice = json.loads(msg.data) if msg.data else {}
+            except Exception:
+                notice = {}
+            await chunks.put(AgentDied(
+                message=f"Agent '{name}' left the mesh mid-stream",
+                agent=name,
+                request_id=request_id,
+                details=notice,
+            ))
+
         sub = await self._conn.subscribe(stream_subject, cb=chunk_handler)
+        # ADR-0040: the death listener stays active until the stream ends.
+        death_sub = await self._conn.subscribe(
+            compute_death_subject(name), cb=death_handler
+        )
 
         try:
             data = self._serialize_payload(payload)
@@ -150,6 +206,8 @@ class InvocationMixin:
                     raise chunk
                 yield chunk
         finally:
+            with contextlib.suppress(Exception):
+                await death_sub.unsubscribe()
             await sub.unsubscribe()
 
     async def subscribe(

@@ -37,6 +37,7 @@ DEFAULT_DIR = ".oam"
 _MESH_BUCKET_SUBJECTS = [
     "$KV.mesh-catalog.>",
     "$KV.mesh-registry.>",
+    "$KV.mesh-instances.>",
     "$KV.mesh-context.>",
     "$O.mesh-artifacts.>",
 ]
@@ -53,6 +54,7 @@ ROLE_TEMPLATES: dict[str, dict[str, list[str]]] = {
             "$KV.mesh-catalog.>",
             "$KV.mesh-registry.>",
             "mesh.agent.*.*.events",
+            "mesh.death.>",  # fast-fail on in-flight death (ADR-0040)
         ],
     },
     "observer": {
@@ -64,6 +66,7 @@ ROLE_TEMPLATES: dict[str, dict[str, list[str]]] = {
             "mesh.agent.*.*.events",
             "mesh.errors.>",
             "mesh.health.>",
+            "mesh.death.>",
         ],
     },
 }

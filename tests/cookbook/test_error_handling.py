@@ -27,11 +27,13 @@ class TestRetryPattern:
             result = await call_with_retry(mesh, "flaky", SummarizeInput(text="test input"))
             assert "summary" in result
 
-    async def test_retry_raises_on_no_responders(self):
+    async def test_retry_raises_not_found_for_absent_agent(self):
+        # `no responders` maps to NotFound (ADR-0040), which the retry
+        # pattern treats as a caller fault: no retry, immediate raise.
         async with AgentMesh.local() as mesh:
-            from nats.errors import NoRespondersError
+            from openagentmesh import NotFound
 
-            with pytest.raises(NoRespondersError):
+            with pytest.raises(NotFound):
                 await call_with_retry(mesh, "nonexistent", SummarizeInput(text="x"))
 
 

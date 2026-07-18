@@ -123,6 +123,17 @@ class ConnectionDenied(MeshError):
     code: str = "connection_denied"
 
 
+class AgentDied(MeshError):
+    """The target agent left the mesh during an in-flight request (ADR-0040).
+
+    Raised when a death notice for the target arrives before its reply:
+    sub-second failure instead of waiting out the timeout. `details` carries
+    the death notice payload (reason, detected_at, instance_id).
+    """
+
+    code: str = "agent_died"
+
+
 class KVKeyExists(MeshError):
     """A KV ``create()`` call collided with an existing key (ADR-0060)."""
 
@@ -182,6 +193,7 @@ _CODE_TO_CLASS: dict[str, type[MeshError]] = {
         NotFound,
         ConnectionFailed,
         ConnectionDenied,
+        AgentDied,
         KVKeyExists,
         MeshTimeout,
         ChunkSequenceError,

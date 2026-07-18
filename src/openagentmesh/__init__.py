@@ -2,6 +2,7 @@
 
 from ._context import KVEntry
 from ._errors import (
+    AgentDied,
     ChunkSequenceError,
     ConnectionDenied,
     ConnectionFailed,
@@ -18,10 +19,12 @@ from ._models import (
     AgentContract,
     AgentSpec,
     CatalogEntry,
+    DeathNotice,
 )
 from ._sources import KVSource, MeshMessage, SubjectSource
 
 __all__ = [
+    "AgentDied",
     "AgentMesh",
     "AgentContract",
     "AgentSpec",
@@ -29,6 +32,7 @@ __all__ = [
     "ChunkSequenceError",
     "ConnectionDenied",
     "ConnectionFailed",
+    "DeathNotice",
     "HandlerError",
     "InvalidInput",
     "InvocationMismatch",

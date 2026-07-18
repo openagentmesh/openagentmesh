@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-20
-- **Status:** discussion
+- **Status:** documented
 - **Depends on:** ADR-0016 (disconnect advisories)
 - **Source:** conversation on failure modes during mid-request agent death
 
@@ -71,3 +71,40 @@ Recommendation: start with the pessimistic approach for single-instance agents; 
 ## Phase
 
 Not Phase 1. Depends on ADR-0016 (health monitor, death notices) being implemented first. Target: Phase 2.
+
+## Amendment (2026-07-18): shaped to spec, implemented with ADR-0016
+
+Decisions closing this ADR's open questions:
+
+- **Always on, no opt-in flag.** `mesh.call()` and `mesh.stream()` race the
+  death subject unconditionally. The cost is one extra core-NATS subscription
+  per in-flight invocation — negligible at OAM's target scale. The
+  shared-subscription-per-target optimization from Risks stays future work.
+- **New error class `AgentDied`** (`code="agent_died"`), a `MeshError`
+  subclass, carrying the death notice payload in `details`. The code sample
+  above is the DX contract and the source for the tests.
+- **Multi-instance resolution via ADR-0016's last-instance rule.** The
+  monitor publishes a death notice only when the *last* instance serving an
+  agent disconnects, so a notice always means "this agent is fully gone" and
+  fast-failing on it is always correct. The undetectable case — our request
+  was on the one replica that died while others live — falls back to the
+  timeout, exactly as today. Header-echo correlation stays deferred.
+- **`no responders` maps to `NotFound`.** When the monitor has already
+  deregistered the dead agent (or it never existed), NATS reports
+  no-responders on the request; the SDK raises `NotFound` instead of leaking
+  `nats.errors.NoRespondersError`. This closes the §3.3 gap in
+  km/agentmesh-liveness-and-failure.md: dead-agent calls fail in
+  milliseconds once the catalog is clean, and sub-second while the notice is
+  still in flight.
+- **`stream()` behavior:** the death listener stays active until the
+  end-of-stream marker; a notice mid-stream raises `AgentDied` from the
+  generator. `send(on_reply=...)` keeps timeout semantics in v1 (its reply
+  subscription is already managed; racing it adds complexity for a
+  fire-and-forget verb).
+
+### Chaos test (stage exit criterion)
+
+A subprocess host serves a deliberately slow agent on an embedded mesh; the
+test SIGKILLs the host mid-request and asserts the caller gets `AgentDied`
+in well under the request timeout (and that the catalog no longer lists the
+agent), rather than waiting out a `MeshTimeout`.
