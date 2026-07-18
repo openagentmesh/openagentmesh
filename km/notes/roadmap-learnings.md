@@ -197,6 +197,35 @@ update that file too and say so here.
   before the tasks/subscriptions they manage. Ordering rule: kill the
   thing that *creates* work before the things that *do* it.
 
+## 2026-07-18 — Stage 3, run 9 (cloud executor): ADR-0056 wave 1
+
+- **nats-server refuses to share the client port with the websocket
+  listener** — `websocket { port: 4222 }` next to `port: 4222` is a fatal
+  bind error at boot (verified on 2.10.24). ADR-0056's "share the standard
+  mesh port" option never existed; defaults are now mesh port + 1 for the
+  ws listener and 4224 for `oam ui`. Shaping check that caught it: boot the
+  config you're about to promise, before writing it into an ADR.
+- **`nats.ws` is deprecated on npm.** The JS ecosystem moved to
+  `@nats-io/nats-core` (+ `jetstream`, `kv`) — which sdk-ts already uses.
+  Discovered by probing the install, not by reading the ADR.
+- **The TS SDK was already browser-ready and nobody noticed.** It selects
+  `wsconnect` for ws:// URLs, keeps `transport-node` behind a dynamic
+  import, and its `configUrl` connect option implements exactly the
+  `/config.json` bootstrap ADR-0056 describes. Wave 2's browser client is
+  therefore `@openagentmesh/sdk` via a workspace link — not a
+  reimplementation of call/stream/catalog-watch. Check what an existing
+  artifact already does before designing its replacement.
+- **pnpm works in the cloud sandbox** via `corepack pnpm@10` (node 22 +
+  corepack preinstalled; npm registry reachable through the proxy —
+  installs resolve in under a second). No Go-proxy-style workaround needed.
+- **ruff B008 exempts `typer.Option` defaults only for immutable-annotated
+  parameters** (str/int/bool). A `Path`-annotated option trips it; the
+  CLI-wide convention is str options converted inside the function.
+- **ty flags `RequestHandlerClass(..., directory=...)`** because the
+  attribute is typed against the base handler; instantiate the concrete
+  handler class directly in `finish_request` instead of going through
+  `RequestHandlerClass`.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's

@@ -17,11 +17,12 @@ test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
 passing — caller gets agent_died in ~1s against a 30s timeout).
 ADR-0048 observability v1: COMPLETE (run 7) — merged to main 3e5e486.
 ADR-0055 lifecycle gates: COMPLETE (run 8) — merged to main b7e4093.
-Next: ADR-0056 admin UI — the only remaining planned Stage 3 item. Needs
-Luca 9 said "silence = defer [to Stage 3]" and Luca has stayed silent, so
-the deferral stands and the UI is in Stage 3 scope, after the liveness
-work it depended on (which is done). It is a 4–6 session build; the next
-run should start it unless Luca has said otherwise.
+ADR-0056 admin UI: IN PROGRESS (started run 9) — wave 1 of 5 merged to
+main 7b48e99 (websocket listener on dev meshes, `oam ui` static server +
+config.json, ADR amended against the shipped repo). Build waves tracked in
+km/notes/2026-07-18-adr0056-ui-plan.md; next run continues with wave 2
+(ui/ frontend scaffold; the browser client is `@openagentmesh/sdk` via
+workspace link — see the plan note and the 2026-07-18 ADR amendment).
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -265,10 +266,55 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      lifecycle files after fixing two test races (see learnings).
    - No role-template changes needed: gates ride existing surfaces
      (mesh-context KV; subject gates share subject_source's constraint).
-5. **ADR-0056 admin UI** — in Stage 3 scope by silence-deferral (Needs
-   Luca 9); not started. Next up (last planned Stage 3 item).
+5. **ADR-0056 admin UI** — IN PROGRESS (run 9). Wave 1/5 merged to main
+   7b48e99; ADR index at `test`. Waves in km/notes/2026-07-18-adr0056-ui-plan.md.
+   - ADR amended twice this run against reality: (a) the websocket listener
+     cannot share the NATS client port (verified fatal bind error on
+     2.10.24) — defaults are now ws = mesh port + 1, `oam ui` on 4224;
+     (b) KV layout corrected (mesh-catalog single `catalog` key,
+     mesh-registry per-agent, mesh-instances for liveness — no
+     `oam.catalog.>`); (c) Watcher shape retirement reflected; (d) the
+     browser client is `@openagentmesh/sdk` itself (it already ships
+     wsconnect + a configUrl bootstrap; `nats.ws` is deprecated upstream);
+     (e) assets are CI-built, not committed.
+   - Shipped wave 1: `render_mesh_server_conf(ws_port=)` + EmbeddedNats
+     `ws_url`; `oam mesh up` opens ws on port+1 and prints it; `oam ui`
+     (stdlib static server, /config.json, SPA fallback, free-port
+     fallback, --check, OAM_UI_HOST/OAM_NATS_WS_URL envvars, friendly
+     missing-assets error). 12 new tests (9 unit + 3 CLI).
+   - E2E verified in-sandbox: real `oam mesh up` → ws handshake 101 on
+     port+1; `oam ui` served config.json and SPA-fallback routes; derived
+     ws URL from .oam-url correctly.
+   - Remaining: waves 2–5 (frontend scaffold + registry screen, sandbox,
+     event feed + liveness dots, packaging/e2e/docs).
 
 ## Run log
+
+### 2026-07-18 ~18:05–19:00 UTC — run 9 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits since bootstrap are the
+executor's; origin quiet since 13:00, no overlap risk); all four
+roadmap/stage-* branches fully merged (0 unmerged commits each); baseline
+314 passed + 7 skipped on main tip a328dfa after the usual Go-proxy
+nats-server build.
+
+Advanced (Stage 3, ADR-0056 wave 1, on roadmap/stage-3, merged 7b48e99):
+amended the ADR against the shipped repo first (5 corrections — two found
+empirically this run: the ws-port bind conflict and the nats.ws
+deprecation/SDK-reuse discovery), wrote the build-wave plan note, then
+red tests → implementation → e2e verification. Full detail in Stage 3
+item status above. Verified this run: 326 pytest + 7 skips on the branch
+(and ruff/ty clean); CI success on branch tips e983d3f (run 59) and
+92bd408 (run 60; run 58 was the expected red phase); real `oam mesh up`
+websocket handshake + `oam ui` serving checked end-to-end in the sandbox.
+
+Left open: CI on the main merge commit 7b48e99 (pushed at end of run —
+verify next run); all Needs-Luca items still unanswered. Next run: check
+Needs-Luca answers, verify CI on main, then ADR-0056 wave 2 per
+km/notes/2026-07-18-adr0056-ui-plan.md — ui/ scaffold with the TS SDK as
+the browser client (workspace link to sdk-ts/), registry + contract
+screens, vitest + CI job. pnpm works in the sandbox via `corepack
+pnpm@10`.
 
 ### 2026-07-18 ~12:10–13:15 UTC — run 8 (Fable 5, cloud)
 
