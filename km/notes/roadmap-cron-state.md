@@ -252,9 +252,11 @@ ty clean locally on the branch tip; CI success on 630396c (run 42; the
 red-tests commit's CI failure, run 40, was the expected red phase);
 zensical docs build clean.
 
-Left open: CI on the merge commit 3e5e486 (pushed at end of run — verify
-next run); all Needs-Luca items still unanswered. Next run: verify CI on
-3e5e486, check Needs-Luca answers, then ADR-0055 lifecycle gates
+CI on main verified before run end: run 44 on tip 026c627 success (the
+merge commit's own run 43 was superseded/cancelled by the same-tree km
+push, matching the known pattern — not a failure). No open verifications.
+Left open: all Needs-Luca items still unanswered. Next run: check
+Needs-Luca answers, then ADR-0055 lifecycle gates
 (spec-ready with code sample; last planned Stage 3 item unless Luca
 confirms the ADR-0056 UI deferral, which would slot the UI after it).
 
