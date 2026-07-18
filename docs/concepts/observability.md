@@ -15,6 +15,8 @@ Handler code needs no changes.
 |-------|-------|------|
 | `agent_registered` | info | Agent starts and registers |
 | `agent_deregistered` | info | Agent shuts down gracefully |
+| `agent_activated` | info | [Lifecycle gate](lifecycle.md) opened; agent came online |
+| `agent_deactivated` | info | Lifecycle gate closed; agent drained and went offline |
 | `request_received` | debug | Incoming invocation |
 | `request_completed` | debug | Invocation completed (carries `duration_ms`) |
 | `request_failed` | warn | Invocation raised an error (carries the error `code`) |

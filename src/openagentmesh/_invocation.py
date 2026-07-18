@@ -21,6 +21,7 @@ from ._errors import (
     ConnectionDenied,
     MeshError,
     MeshTimeout,
+    NotAvailable,
     NotFound,
     from_envelope,
 )
@@ -87,6 +88,10 @@ class InvocationMixin:
             try:
                 response = await req_task
             except nats.errors.NoRespondersError as e:
+                # ADR-0055: an agent still in the catalog with no responders
+                # is gated offline (or draining), not missing.
+                if name in self._catalog_cache:
+                    raise NotAvailable(agent=name, request_id=request_id) from e
                 raise NotFound(agent=name, request_id=request_id) from e
             except nats.errors.TimeoutError as e:
                 if subject.lower() in self._denied_subjects:

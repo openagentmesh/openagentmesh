@@ -12,8 +12,10 @@ from ._errors import (
     KVKeyExists,
     MeshError,
     MeshTimeout,
+    NotAvailable,
     NotFound,
 )
+from ._lifecycle import Condition, KVCondition, SubjectCondition
 from ._mesh import AgentMesh
 from ._models import (
     AgentContract,
@@ -32,12 +34,14 @@ __all__ = [
     "AgentSpec",
     "CatalogEntry",
     "ChunkSequenceError",
+    "Condition",
     "ConnectionDenied",
     "ConnectionFailed",
     "DeathNotice",
     "HandlerError",
     "InvalidInput",
     "InvocationMismatch",
+    "KVCondition",
     "KVEntry",
     "KVKeyExists",
     "KVSource",
@@ -45,7 +49,9 @@ __all__ = [
     "MeshError",
     "MeshMessage",
     "MeshTimeout",
+    "NotAvailable",
     "NotFound",
+    "SubjectCondition",
     "ObserveConfig",
     "SubjectSource",
 ]

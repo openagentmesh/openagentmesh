@@ -8,7 +8,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, Literal
@@ -116,15 +116,27 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._agents: dict[str, tuple[AgentSpec, HandlerInfo, AgentContract]] = {}
         self._agent_sources: dict[str, list[Any]] = {}
         self._subscribed: set[str] = set()
-        self._subscriptions: list[Any] = []
+        self._subscriptions: dict[str, Any] = {}
         self._embedded: EmbeddedNats | None = None
         self._catalog_cache: dict[str, CatalogEntry] = {}
         self._catalog_watcher: Any | None = None
         self._catalog_watcher_task: asyncio.Task | None = None
         self._publisher_tasks: dict[str, asyncio.Task] = {}
         self._watcher_tasks: dict[str, asyncio.Task] = {}
-        self._source_subscriptions: list[Any] = []
-        self._source_tasks: list[asyncio.Task] = []
+        self._source_subscriptions: dict[str, list[Any]] = {}
+        self._source_tasks: dict[str, list[asyncio.Task]] = {}
+        # Lifecycle gates (ADR-0055): per-agent condition, current on/off
+        # state, and the background watcher driving transitions.
+        self._agent_gates: dict[str, Any] = {}
+        self._gate_state: dict[str, bool] = {}
+        self._gate_watch_tasks: dict[str, asyncio.Task] = {}
+        self._gate_subscriptions: dict[str, Any] = {}
+        # In-flight handler tasks for gated agents. Gated handlers run as
+        # tasks (not inline in the subscription callback) so deactivation can
+        # unsubscribe immediately and drain them separately — cancelling
+        # nats-py's Subscription.drain() mid-flush corrupts the client's
+        # pong futures and kills its read loop.
+        self._inflight_tasks: dict[str, set[asyncio.Task]] = {}
         # Subjects the server denied us on (ADR-0038): violations arrive
         # asynchronously, so call sites consult this to turn a bare timeout
         # into a ConnectionDenied.
@@ -288,28 +300,15 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     async def _subscribe_pending(self) -> None:
         """Subscribe any agents not yet subscribed."""
-        for name, (_spec, info, contract) in self._agents.items():
+        for name, (_spec, _info, contract) in self._agents.items():
             if name not in self._subscribed:
-                if info.invocable:
-                    await self._subscribe_agent(name, info, contract)
-                elif info.streaming:
-                    if name not in self._publisher_tasks:
-                        task = asyncio.create_task(
-                            self._emit_publisher_events(name, info)
-                        )
-                        self._publisher_tasks[name] = task
+                gate = self._agent_gates.get(name)
+                if gate is None:
+                    await self._activate_agent(name)
                 else:
-                    # Source-driven or legacy watcher. ADR-0052 sources bind
-                    # below; ADR-0042 watchers (no input, no return, no sources)
-                    # run a watch loop in the handler body.
-                    has_sources = bool(self._agent_sources.get(name))
-                    if not has_sources and name not in self._watcher_tasks:
-                        task = asyncio.create_task(self._run_watcher(name, info))
-                        self._watcher_tasks[name] = task
-
-                # Bind ADR-0052 sources for this agent.
-                for src in self._agent_sources.get(name, []):
-                    await self._bind_source(name, info, src)
+                    # Gated agent (ADR-0055): register in the catalog but let
+                    # the gate decide whether to subscribe.
+                    await self._start_gate(name, gate)
 
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
@@ -321,6 +320,155 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 )
 
         await self._record_instance()
+
+    async def _activate_agent(self, name: str) -> None:
+        """Bring an agent online: RPC subscription, background tasks, sources.
+
+        Idempotent — a second call while online is a no-op, which absorbs
+        the gate's get-then-watch startup race (ADR-0055).
+        """
+        if self._gate_state.get(name):
+            return
+        _spec, info, contract = self._agents[name]
+
+        if info.invocable:
+            if name not in self._subscriptions:
+                await self._subscribe_agent(name, info, contract)
+        elif info.streaming:
+            if name not in self._publisher_tasks:
+                task = asyncio.create_task(self._emit_publisher_events(name, info))
+                self._publisher_tasks[name] = task
+        else:
+            # Source-driven or legacy watcher. ADR-0052 sources bind
+            # below; ADR-0042 watchers (no input, no return, no sources)
+            # run a watch loop in the handler body.
+            has_sources = bool(self._agent_sources.get(name))
+            if not has_sources and name not in self._watcher_tasks:
+                task = asyncio.create_task(self._run_watcher(name, info))
+                self._watcher_tasks[name] = task
+
+        # Bind ADR-0052 sources for this agent.
+        for src in self._agent_sources.get(name, []):
+            await self._bind_source(name, info, src)
+
+        self._gate_state[name] = True
+
+    async def _deactivate_agent(self, name: str, drain_timeout: float = 30.0) -> None:
+        """Take an agent offline: drain in-flight handlers, then unsubscribe.
+
+        The RPC subscription is drained (leaves the queue group, lets
+        in-flight handlers complete, bounded by ``drain_timeout``); source
+        subscriptions and background tasks are torn down.
+        """
+        if not self._gate_state.get(name):
+            return
+        self._gate_state[name] = False
+
+        sub = self._subscriptions.pop(name, None)
+        if sub is not None:
+            # Leave the queue group first (new requests stop routing here),
+            # then wait out our own in-flight handler tasks. Never
+            # Subscription.drain(): it is not cancellation-safe (see
+            # _inflight_tasks in __init__).
+            with suppress(Exception):
+                await sub.unsubscribe()
+            pending = {t for t in self._inflight_tasks.get(name, ()) if not t.done()}
+            if pending:
+                _done, still_pending = await asyncio.wait(pending, timeout=drain_timeout)
+                for task in still_pending:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError, Exception):
+                        await task
+
+        for tasks_map in (self._publisher_tasks, self._watcher_tasks):
+            task = tasks_map.pop(name, None)
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError, Exception):
+                    await task
+
+        for task in self._source_tasks.pop(name, []):
+            task.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        for sub in self._source_subscriptions.pop(name, []):
+            with suppress(Exception):
+                await sub.unsubscribe()
+
+    # --- Lifecycle gates (ADR-0055) ---
+
+    async def _start_gate(self, name: str, gate: Any) -> None:
+        """Evaluate a gate's current signal, then watch it for changes."""
+        from ._lifecycle import KVCondition, SubjectCondition
+
+        state = bool(gate.initial)
+        if isinstance(gate, KVCondition):
+            from nats.js.errors import KeyDeletedError, KeyNotFoundError
+
+            assert self._context_kv is not None
+            try:
+                entry = await self._context_kv.get(gate.key)
+                state = bool(gate.predicate(entry.value))
+            except (KeyNotFoundError, KeyDeletedError):
+                state = bool(gate.predicate(None))
+            except Exception as e:
+                # Fall back to `initial` (ADR-0055 amendment) — e.g. the
+                # connection's credentials cannot read the context bucket.
+                _log.warning("Gate for '%s': initial read failed (%s)", name, e)
+
+        if state:
+            await self._activate_agent(name)
+
+        if name in self._gate_watch_tasks:
+            return
+        if isinstance(gate, KVCondition):
+            task = asyncio.create_task(self._watch_kv_gate(name, gate))
+            self._gate_watch_tasks[name] = task
+        elif isinstance(gate, SubjectCondition):
+            async def _on_signal(msg: Msg) -> None:
+                await self._apply_gate(name, gate, msg.data or b"")
+
+            gate_sub = await self._conn.subscribe(gate.subject, cb=_on_signal)
+            self._gate_subscriptions[name] = gate_sub
+        else:
+            raise TypeError(
+                f"Unknown condition type for agent '{name}': {type(gate).__name__}"
+            )
+
+    async def _watch_kv_gate(self, name: str, gate: Any) -> None:
+        assert self._context_kv is not None
+        watcher = await self._context_kv.watch(gate.key, ignore_deletes=False)
+        try:
+            async for entry in watcher:
+                if entry is None:  # end of initial replay
+                    continue
+                op = str(getattr(entry, "operation", "PUT") or "PUT").upper()
+                value = None if op.endswith(("DELETE", "PURGE")) else entry.value
+                await self._apply_gate(name, gate, value)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            with suppress(Exception):
+                await watcher.stop()
+
+    async def _apply_gate(self, name: str, gate: Any, value: Any) -> None:
+        try:
+            state = bool(gate.predicate(value))
+        except Exception as e:
+            _log.warning("Gate predicate for '%s' raised: %s", name, e)
+            return
+        if state and not self._gate_state.get(name):
+            await self._activate_agent(name)
+            await self._publish_log(
+                name, "info", "agent_activated",
+                message=f"Agent '{name}' came online (lifecycle gate opened)",
+            )
+        elif not state and self._gate_state.get(name):
+            await self._deactivate_agent(name, gate.drain_timeout)
+            await self._publish_log(
+                name, "info", "agent_deactivated",
+                message=f"Agent '{name}' went offline (lifecycle gate closed)",
+            )
 
     async def _record_instance(self) -> None:
         """Write this host's instance → agents mapping (ADR-0016).
@@ -494,6 +642,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     message=f"Agent '{name}' deregistered",
                 )
 
+        # 1d. Stop lifecycle-gate watchers (ADR-0055) before any of the
+        # subscriptions and tasks they manage are torn down, so no gate
+        # transition races the teardown below.
+        for task in self._gate_watch_tasks.values():
+            task.cancel()
+        for task in self._gate_watch_tasks.values():
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        self._gate_watch_tasks.clear()
+        for sub in self._gate_subscriptions.values():
+            with suppress(Exception):
+                await sub.unsubscribe()
+        self._gate_subscriptions.clear()
+
         # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
         # tasks receive cancel() before we await any one of them, avoiding
         # serialization of their shutdown latency.
@@ -516,24 +678,37 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         # 3b. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
         # source-driven NATS subscriptions.
-        for task in self._source_tasks:
+        all_source_tasks = [t for tasks in self._source_tasks.values() for t in tasks]
+        for task in all_source_tasks:
             task.cancel()
-        for task in self._source_tasks:
+        for task in all_source_tasks:
             with suppress(asyncio.CancelledError, Exception):
                 await task
         self._source_tasks.clear()
 
-        for sub in self._source_subscriptions:
-            with suppress(Exception):
-                await sub.unsubscribe()
+        for subs in self._source_subscriptions.values():
+            for sub in subs:
+                with suppress(Exception):
+                    await sub.unsubscribe()
         self._source_subscriptions.clear()
 
         # 4. Unsubscribe invocable-agent subscriptions so the broker stops
         # routing requests to this process before we tear down the registry.
-        for sub in self._subscriptions:
+        for sub in self._subscriptions.values():
             with suppress(Exception):
                 await sub.unsubscribe()
         self._subscriptions.clear()
+        self._gate_state.clear()
+
+        # 4b. Cancel any in-flight gated-handler tasks (ADR-0055) still
+        # running after their subscriptions are gone.
+        leftover = [t for tasks in self._inflight_tasks.values() for t in tasks if not t.done()]
+        for task in leftover:
+            task.cancel()
+        for task in leftover:
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        self._inflight_tasks.clear()
 
         # 5. Deregister from the cluster (ADR-0016): drop this host's
         # instance record first so the survivor scan below (ours and the
@@ -657,6 +832,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         spec: AgentSpec,
         *,
         sources: list[Any] | None = None,
+        active_when: Any | None = None,
         mcp: bool | None = None,
     ):
         """Decorator to register an async function as a mesh agent.
@@ -676,6 +852,16 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 sources=[mesh.kv_source("wildfire.detection.*")],
             )
             async def watcher(entry: KVEntry[DetectionRecord]) -> None:
+                ...
+
+        Lifecycle-gated agents (ADR-0055) subscribe only while the
+        condition holds; the contract stays in the catalog either way::
+
+            @mesh.agent(
+                AgentSpec(name="coordinator", description="active-incident work"),
+                active_when=mesh.kv_condition("incident.mode", lambda v: v == b'"active"'),
+            )
+            async def coordinator(brief: Brief) -> Assignment:
                 ...
         """
 
@@ -711,6 +897,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             self._agents[spec.name] = (spec, info, contract)
             if sources:
                 self._agent_sources[spec.name] = list(sources)
+            if active_when is not None:
+                self._agent_gates[spec.name] = active_when
             return func
 
         return decorator
@@ -755,6 +943,47 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             raise ValueError(f"on_init must be 'replay' or 'skip'; got {on_init!r}")
         from ._sources import KVSource
         return KVSource(pattern=pattern, queue_group=queue_group, on_init=on_init)
+
+    # --- Condition factories (ADR-0055) ---
+
+    def kv_condition(
+        self,
+        key: str,
+        predicate: Callable[[bytes | None], bool],
+        *,
+        initial: bool = False,
+        drain_timeout: float = 30.0,
+    ):
+        """Create a lifecycle gate on a ``mesh-context`` KV key (ADR-0055).
+
+        The predicate receives the key's raw ``bytes`` value (``None`` when
+        absent or deleted); the agent is subscribed only while it returns
+        True. On gate close, in-flight handlers drain for up to
+        ``drain_timeout`` seconds before the agent unsubscribes.
+        """
+        from ._lifecycle import KVCondition
+        return KVCondition(
+            key=key, predicate=predicate, initial=initial, drain_timeout=drain_timeout
+        )
+
+    def subject_condition(
+        self,
+        subject: str,
+        predicate: Callable[[bytes], bool],
+        *,
+        initial: bool = False,
+        drain_timeout: float = 30.0,
+    ):
+        """Create a lifecycle gate on a plain NATS subject (ADR-0055).
+
+        Each message on ``subject`` re-evaluates the predicate against the
+        payload bytes; the agent's state follows the most recent verdict.
+        ``initial`` is the state before the first message arrives.
+        """
+        from ._lifecycle import SubjectCondition
+        return SubjectCondition(
+            subject=subject, predicate=predicate, initial=initial, drain_timeout=drain_timeout
+        )
 
     # --- Lifecycle ---
 
@@ -903,8 +1132,23 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     }),
                 )
 
-        sub = await self._conn.subscribe(subject, queue=queue, cb=handler)
-        self._subscriptions.append(sub)
+        if name in self._agent_gates:
+            # Gated agents (ADR-0055) run each request as a tracked task so
+            # deactivation can unsubscribe instantly and drain the in-flight
+            # set on its own timeout.
+            inflight = self._inflight_tasks.setdefault(name, set())
+
+            async def dispatch(msg: Msg) -> None:
+                task = asyncio.create_task(handler(msg))
+                inflight.add(task)
+                task.add_done_callback(inflight.discard)
+
+            cb = dispatch
+        else:
+            cb = handler
+
+        sub = await self._conn.subscribe(subject, queue=queue, cb=cb)
+        self._subscriptions[name] = sub
 
     async def _handle_responder(
         self,
@@ -1083,7 +1327,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             queue=source.queue_group,
             cb=cb,
         )
-        self._source_subscriptions.append(sub)
+        self._source_subscriptions.setdefault(name, []).append(sub)
 
     async def _bind_kv_source(self, name: str, info: HandlerInfo, source: Any) -> None:
         assert self._context_kv is not None
@@ -1091,7 +1335,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         task = asyncio.create_task(
             self._drain_kv_source(name, info, source, watcher)
         )
-        self._source_tasks.append(task)
+        self._source_tasks.setdefault(name, []).append(task)
 
     async def _drain_kv_source(self, name: str, info: HandlerInfo, source: Any, watcher: Any) -> None:
         skip_initial = source.on_init == "skip"

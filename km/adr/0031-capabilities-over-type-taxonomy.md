@@ -38,9 +38,9 @@ These produce five valid combinations:
 | Streamer | `true` | `true` | `mesh.stream()` | LLM summarizer, translator |
 | Trigger | `true` | `false` | `mesh.call()` | Cache refresh, migration runner |
 | Event emitter | `false` | `true` | `mesh.subscribe()` | Price feed, log stream |
-| Watcher | `false` | `false` | N/A (reacts to KV) | Pipeline stage, state reactor |
+| Source-only | `false` | `false` | N/A (triggered by sources) | Pipeline stage, state reactor |
 
-The watcher combination was added by ADR-0042. The trigger combination was added by ADR-0043.
+The `invocable=false, streaming=false` combination means *source-only agent* (see ADR-0052); it no longer implies a specific handler shape. It was originally added as the "Watcher" shape by ADR-0042, which ADR-0055 retired. The trigger combination was added by ADR-0043.
 
 ### Updated `AgentSpec`
 

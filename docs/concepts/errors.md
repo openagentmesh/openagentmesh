@@ -53,6 +53,7 @@ Every error code maps to a dedicated `MeshError` subclass (ADR-0057). The class 
 | `handler_error` | `HandlerError` | Handler body raised a non-`MeshError` exception | Treat as opaque agent failure; retry/fallback |
 | `invocation_mismatch` | `InvocationMismatch` | Wrong verb (`call`/`stream`/`send`) for the agent's shape | Use the correct verb |
 | `not_found` | `NotFound` | Agent missing from registry/catalog, or nobody serving the subject | Check the name; verify the agent is running |
+| `not_available` | `NotAvailable` | Agent in the catalog but offline — a [lifecycle gate](lifecycle.md) closed it (or it is draining) | Retry when its condition changes |
 | `connection_failed` | `ConnectionFailed` | Initial NATS connect or reconnect failed | Check transport / URL |
 | `timeout` | `MeshTimeout` | No reply within the deadline | Retry with backoff or raise SLA |
 | `agent_died` | `AgentDied` | The agent left the mesh during your in-flight request | Retry against a replacement; see [Liveness](liveness.md) |

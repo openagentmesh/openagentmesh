@@ -153,6 +153,27 @@ KV-watch source on the `mesh-context` bucket. `on_init="replay"` (default) fires
 | `async def f() -> Event: yield ...` | `False` | `True` | `mesh.subscribe()` |
 | `async def f(): ...` | `False` | `False` | (background task) |
 
+### `@mesh.agent(spec, *, active_when=...)`
+
+Gate the agent's subscription on a condition (ADR-0055). The agent stays in the catalog either way; while the condition is false it is unsubscribed and callers get `not_available`. Composes with `sources` — gated sources deliver nothing while the agent is offline. See [Lifecycle Gates](../concepts/lifecycle.md).
+
+```python
+@mesh.agent(
+    AgentSpec(name="coordinator", description="active-incident work"),
+    active_when=mesh.kv_condition("incident.mode", lambda v: v == b'"active"'),
+)
+async def coordinator(brief: Brief) -> Assignment:
+    ...
+```
+
+#### `mesh.kv_condition(key, predicate, *, initial=False, drain_timeout=30.0)`
+
+Gate on a `mesh-context` KV key. `predicate` receives the key's raw `bytes` value (`None` when absent or deleted). The current value is read and applied when the mesh starts; `initial` is the fallback state if that read fails. On gate close, in-flight handlers get `drain_timeout` seconds to finish.
+
+#### `mesh.subject_condition(subject, predicate, *, initial=False, drain_timeout=30.0)`
+
+Gate on messages arriving on a plain NATS subject. `predicate` receives each message's payload `bytes`; the agent's state follows the most recent verdict. `initial` is the state before the first message.
+
 ## Invocation
 
 Four interaction modes. See [Invocation](../concepts/invocation.md) for patterns and semantics.
@@ -169,10 +190,12 @@ Synchronous request/reply. Blocks until the agent responds or times out.
 
 **Returns:** `dict` with the deserialized response payload.
 
-**Raises:** `NotFound` when nobody serves the agent (immediate, via NATS
-no-responders); `AgentDied` when the agent leaves the mesh while your request
-is in flight (sub-second, via [death notices](../concepts/liveness.md));
-`MeshTimeout` when the deadline expires with the agent still connected.
+**Raises:** `NotFound` when nobody serves the agent and it is not in the
+catalog (immediate, via NATS no-responders); `NotAvailable` when it is in the
+catalog but a [lifecycle gate](../concepts/lifecycle.md) has it offline;
+`AgentDied` when the agent leaves the mesh while your request is in flight
+(sub-second, via [death notices](../concepts/liveness.md)); `MeshTimeout`
+when the deadline expires with the agent still connected.
 
 ### `async for chunk in mesh.stream(name, payload, *, timeout=60.0)`
 

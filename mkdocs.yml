@@ -92,6 +92,7 @@ nav:
       - Shared State: concepts/shared-state.md
       - Error Handling: concepts/errors.md
       - Liveness: concepts/liveness.md
+      - Lifecycle Gates: concepts/lifecycle.md
       - Observability: concepts/observability.md
       - Securing the Mesh: concepts/security.md
       - Usage Attribution: concepts/usage.md
@@ -106,6 +107,7 @@ nav:
       - Error Handling: cookbook/error-handling.md
       - Surviving Agent Failures: cookbook/agent-liveness.md
       - Observing the Mesh: cookbook/observing-the-mesh.md
+      - Lifecycle-Gated Agents: cookbook/lifecycle-gated-agents.md
       - Automatic Load Balancing: cookbook/load-balancing.md
       - Reactive Pipeline: cookbook/reactive-pipeline.md
       - Parallel RAG Indexing: cookbook/parallel-rag-indexing.md

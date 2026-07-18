@@ -179,7 +179,7 @@ Not in Phase 1: middleware hooks, OTel, Docker Compose tier, admin UI, TypeScrip
 
 The contract schema is a superset of the A2A Agent Card format. A2A fields at top level; OAM-specific fields under `x-agentmesh`. Full schema and examples in `docs/api/contract.md`. Key points:
 
-- `capabilities.invocable` and `capabilities.streaming`: inferred from handler shape (ADR-0031). Five patterns: Responder, Streamer, Trigger, Publisher, Watcher.
+- `capabilities.invocable` and `capabilities.streaming`: inferred from handler shape (ADR-0031). Five patterns: Responder, Streamer, Trigger, Publisher, Source-only (the "Watcher" shape was retired by ADR-0055).
 - `capabilities.streaming`: inferred from handler shape (return vs. yield).
 - `url` field is not stored in registry; injected by gateway at federation time. `.to_agent_card(url=None)` is a thin projection.
 - `description` is consumed by LLMs for tool selection: must state what the agent does, what inputs it handles, when NOT to use it.
