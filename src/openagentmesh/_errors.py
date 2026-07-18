@@ -106,6 +106,26 @@ class NotFound(MeshError):
         )
 
 
+class NotAvailable(MeshError):
+    """Agent registered in the catalog but currently offline (ADR-0055).
+
+    Raised when a request gets no responders while the agent is still
+    listed in the catalog: a lifecycle gate has taken it offline (or it is
+    draining). The agent exists; retry when its condition changes. Distinct
+    from `NotFound` (not registered) and `InvocationMismatch` (no RPC
+    surface).
+    """
+
+    code: str = "not_available"
+
+    def __init__(self, *, agent: str, request_id: str = ""):
+        super().__init__(
+            message=f"Agent '{agent}' is registered but currently offline (lifecycle gate)",
+            agent=agent,
+            request_id=request_id,
+        )
+
+
 class ConnectionFailed(MeshError):
     """Initial NATS connect or reconnect failed."""
 
@@ -191,6 +211,7 @@ _CODE_TO_CLASS: dict[str, type[MeshError]] = {
         HandlerError,
         InvocationMismatch,
         NotFound,
+        NotAvailable,
         ConnectionFailed,
         ConnectionDenied,
         AgentDied,
@@ -236,6 +257,9 @@ def from_envelope(payload: dict[str, Any]) -> MeshError:
 
     if klass is NotFound:
         return NotFound(agent=agent, request_id=request_id)
+
+    if klass is NotAvailable:
+        return NotAvailable(agent=agent, request_id=request_id)
 
     if klass is InvocationMismatch:
         return InvocationMismatch(agent=agent, message=message, request_id=request_id)
