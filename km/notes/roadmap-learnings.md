@@ -114,6 +114,43 @@ update that file too and say so here.
   entry and push the branch EARLY (branch created and pushed before the
   first code commit), so a cut-off leaves breadcrumbs instead of claims.
 
+## 2026-07-18 — Stage 3, run 6 (cloud executor): ADR-0016/0040 liveness
+
+- **A default no-auth nats-server cannot serve `$SYS` events at all** —
+  clients land in the global account and there is no system-account user to
+  log in as. The fix that preserves open-by-default DX: an accounts config
+  with `no_auth_user` mapping anonymous clients to an APP account
+  (JetStream enabled per-account) plus a password-protected SYS user for
+  the monitor. Anonymous `AgentMesh()` connections work exactly as before.
+- **Accounts isolate subjects both ways**, so the monitor needs two
+  connections: SYS for advisories, APP for KV cleanup and death notices.
+  One credential cannot do both without export/import plumbing.
+- **Disconnect advisories only carry the connection name**, so correlation
+  must be designed in: connections self-name `oam-host-{instance_id}` and a
+  `mesh-instances` KV bucket maps instance → served agents. That bucket
+  also fixed a latent bug: graceful shutdown of one replica used to remove
+  the shared catalog entry while other replicas still served the agent.
+- **Measured detection latency: 15ms** from SIGKILL to death notice through
+  the real `oam mesh up` + companion monitor (sandbox e2e). The chaos test
+  asserts <10s against a 30s timeout to stay CI-safe; observed ~1s
+  end-to-end in pytest including registration polling.
+- **A cookbook twin had pinned a leaked exception as the contract**
+  (`pytest.raises(NoRespondersError)`) while the recipe prose promised
+  `NotFound`. When docs and tests disagree, the docs were the intent —
+  ADR-0040's no-responders mapping made the recipe true and the test
+  needed the fix, not the SDK behavior preserved.
+- **New wire surfaces must ship with role-template updates in the same
+  change**: the mesh-instances bucket and mesh.death.> subjects broke
+  freshly-minted worker/invoker creds until added to ROLE_TEMPLATES
+  (`$KV.mesh-instances.>` pub/sub for workers, `mesh.death.>` sub for
+  invoker/observer). Old credentials degrade gracefully — instance
+  recording logs a warning instead of failing the host. Lesson repeats run
+  5's: derive permission lists from the wire, and grep ROLE_TEMPLATES
+  whenever adding a subject or bucket.
+- **`asyncio.wait` on {request task, death future} is enough** for the
+  fast-fail race — no per-target subscription sharing needed at current
+  scale; noted in ADR-0040 as future work if callers get hot.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's

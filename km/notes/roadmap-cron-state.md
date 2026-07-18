@@ -7,11 +7,16 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 Stage 3 — Production trust (shaping pass done run 4; prioritized plan in
 km/notes/2026-07-17-stage3-plan.md awaiting sign-off, item 10; executing the
-plan's default order — ADR-0038 auth first — meanwhile).
-ADR-0038 auth: COMPLETE end of run 5 — SDK, full `oam auth` CLI, and docs
-all merged to main (9502f52, --no-ff) with CI green on the branch tip
-(run on fca33cc, conclusion success). Next up per the plan: the
-ADR-0016+0040 liveness pair.
+plan's default order meanwhile).
+ADR-0038 auth: COMPLETE (run 5, merged 9502f52).
+ADR-0016+0040 liveness pair: COMPLETE (run 6) — health monitor, death
+notices, caller fast-fail, docs — merged to main af5a96a (--no-ff), CI
+success on branch tip e3733e6 (run 35). **Both Stage 3 exit criteria are
+now met**: secured-mesh cookbook (run 5) and the chaos kill-mid-request
+test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
+passing — caller gets agent_died in ~1s against a 30s timeout).
+Next per the plan: ADR-0048 observability (shape discussion→spec first),
+then ADR-0055 lifecycle gates; ADR-0056 UI awaits deferral confirmation.
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -177,12 +182,58 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    - Stage exit criterion "cookbook recipe showing a secured multi-node
      mesh" is met. Remaining stage exit criterion: the chaos-style
      kill-mid-request test (belongs to the 0016+0040 liveness pair).
-2. **ADR-0016+0040 liveness pair** — not started.
+2. **ADR-0016+0040 liveness pair** — DONE (run 6). Both ADRs at
+   `documented`; merged to main af5a96a (--no-ff); CI success on branch tip
+   e3733e6; 292 pytest verified locally on the merged tree.
+   - ADR-0016 amended (v1 scope + code sample): monitor lives with the mesh
+     lifecycle owner (`local()` in-process, `oam mesh up` companion process,
+     `oam mesh monitor` for secured meshes); dev servers now run an
+     accounts config (APP+SYS, no_auth_user keeps anonymous DX) so the
+     monitor can read $SYS advisories; ping_interval 10s. Heartbeat/zombie
+     layer explicitly deferred in the amendment.
+   - Correlation: connections named oam-host-{instance_id}; new
+     mesh-instances KV bucket maps instance → served agents; death notices
+     (mesh.death.{name}) fire only on last-instance departure; graceful
+     shutdown publishes its own notice and no longer removes the catalog
+     entry while a replica survives (fixed a latent scale-down bug).
+   - ADR-0040 shaped → documented: call()/stream() race death notices →
+     AgentDied (agent_died); no-responders → NotFound (was a leaked raw
+     nats error the error-handling cookbook test had pinned).
+   - Docs: concepts/liveness.md, cookbook/agent-liveness.md + executable
+     twin, errors/security/API/CLI pages updated; auth role templates
+     gained $KV.mesh-instances.> (worker) and mesh.death.> (invoker/
+     observer); stale credentials degrade gracefully (warning, no crash).
+   - E2E verified in-sandbox beyond pytest: real `oam mesh up` + SIGKILLed
+     host → death notice in 15ms, catalog cleaned, `oam mesh down` stops
+     monitor and removes its pid/config files.
 3. **ADR-0048 observability** — not started.
 4. **ADR-0055 lifecycle gates** — not started.
 5. **ADR-0056 admin UI** — awaiting deferral confirmation (Needs Luca 9).
 
 ## Run log
+
+### 2026-07-17 23:50 – 2026-07-18 ~00:55 UTC — run 6 (Fable 5, cloud)
+
+Verified at start: CI success on the ADR-0038 merge 9502f52 (run 27) and
+main tip 8918e68 (run 28) — closes run 5's open check. No Luca edits (last
+human commit still the 2026-07-16 bootstrap; origin quiet ~13h, no overlap
+risk). Baseline 281 pytest green on main before any work.
+
+Advanced (Stage 3, ADR-0016+0040 pair, on roadmap/stage-3, merged af5a96a):
+- Amended ADR-0016 (v1 scope, monitor placement, code sample) and shaped
+  ADR-0040 discussion→spec; red tests committed first per the pipeline;
+  full details in the Stage 3 item status above.
+- 8 new liveness tests + 3 cookbook-twin tests, all green; 292 pytest on
+  merged main verified locally; ruff/ty clean; CI success on branch tip
+  e3733e6 (run 35). Docs built clean (zensical build).
+- Both Stage 3 exit criteria now met (secured-mesh recipe + chaos test).
+
+Left open: CI on the merge commit af5a96a (pushed at end of run — verify
+next run); all Needs-Luca items still unanswered. Next run: verify CI on
+af5a96a, check Needs-Luca answers, then ADR-0048 observability — shape
+discussion→spec (trimmed v1 per the stage-3 plan: logs subjects, KV level
+control, `oam observe logs`) before any code. ADR-0055 is the parallel
+workstream if 0048 shaping stalls.
 
 ### 2026-07-17 ~19:15–19:50 UTC — run 5 (Fable 5, cloud)
 
