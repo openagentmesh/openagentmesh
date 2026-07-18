@@ -12,8 +12,6 @@ import pytest
 from openagentmesh._local import EmbeddedNats, render_mesh_server_conf
 from openagentmesh.cli.ui import UIAssetsMissing, UIServer, derive_ws_url
 
-pytestmark = pytest.mark.asyncio
-
 
 async def _ws_handshake_status(host: str, port: int) -> str:
     """Raw HTTP upgrade against a NATS websocket listener; return the status line."""
@@ -48,6 +46,7 @@ class TestWebsocketListener:
         conf = render_mesh_server_conf(port=4222, store_dir=tmp_path, sys_password="x")
         assert "websocket" not in conf
 
+    @pytest.mark.asyncio
     async def test_embedded_nats_serves_websocket(self):
         embedded = EmbeddedNats()
         await embedded.start()

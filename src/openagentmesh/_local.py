@@ -104,17 +104,20 @@ def _free_port() -> int:
 
 
 def render_mesh_server_conf(
-    *, port: int, store_dir: Path, sys_password: str
+    *, port: int, store_dir: Path, sys_password: str, ws_port: int | None = None
 ) -> str:
-    """NATS config for a dev mesh (ADR-0016).
+    """NATS config for a dev mesh (ADR-0016, ADR-0056).
 
     Anonymous clients map to the APP account (JetStream enabled) via
     ``no_auth_user``, preserving the open-by-default local DX. The SYS
     account exists so the health monitor can subscribe to ``$SYS.>``
     disconnect advisories. Ping settings follow the liveness spec (§5.2):
     partitions are detected in ~20s instead of NATS's ~4min default.
+    ``ws_port`` adds a websocket listener for browser clients (admin UI);
+    it must differ from ``port`` — nats-server refuses to share the client
+    port with the websocket listener.
     """
-    return textwrap.dedent(f"""
+    conf = textwrap.dedent(f"""
         port: {port}
         jetstream {{ store_dir: "{store_dir}" }}
         accounts {{
@@ -131,6 +134,14 @@ def render_mesh_server_conf(
         ping_interval: "10s"
         ping_max: 2
         """)
+    if ws_port is not None:
+        conf += textwrap.dedent(f"""
+            websocket {{
+              port: {ws_port}
+              no_tls: true
+            }}
+            """)
+    return conf
 
 
 class EmbeddedNats:
@@ -138,7 +149,9 @@ class EmbeddedNats:
 
     def __init__(self, port: int = 0) -> None:
         self.port: int = port
+        self.ws_port: int = 0
         self.url: str = ""
+        self.ws_url: str = ""  # websocket listener for browser clients (ADR-0056)
         self.sys_url: str = ""  # system-account URL for the health monitor
         self._process: subprocess.Popen | None = None
         self._data_dir: Path | None = None
@@ -150,8 +163,11 @@ class EmbeddedNats:
 
         if self.port == 0:
             self.port = _free_port()
+        if self.ws_port == 0:
+            self.ws_port = _free_port()
         sys_password = secrets.token_hex(16)
         self.url = f"nats://127.0.0.1:{self.port}"
+        self.ws_url = f"ws://127.0.0.1:{self.ws_port}"
         self.sys_url = f"nats://oam-sys:{sys_password}@127.0.0.1:{self.port}"
         self._data_dir = AGENTMESH_DIR / "data" / f"embedded-{self.port}"
         self._data_dir.mkdir(parents=True, exist_ok=True)
@@ -159,7 +175,10 @@ class EmbeddedNats:
         conf_path = self._data_dir / "nats.conf"
         conf_path.write_text(
             render_mesh_server_conf(
-                port=self.port, store_dir=self._data_dir, sys_password=sys_password
+                port=self.port,
+                store_dir=self._data_dir,
+                sys_password=sys_password,
+                ws_port=self.ws_port,
             )
         )
         conf_path.chmod(0o600)

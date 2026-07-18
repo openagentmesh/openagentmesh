@@ -10,6 +10,7 @@ from .demo import demo
 from .mcp import mcp_app
 from .mesh import mesh_app
 from .observe import observe_app
+from .ui import ui
 
 app = typer.Typer(
     name="oam",
@@ -24,6 +25,7 @@ app.add_typer(agent_app, name="agent")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(observe_app, name="observe")
 app.command("demo")(demo)
+app.command("ui")(ui)
 
 
 @app.callback()

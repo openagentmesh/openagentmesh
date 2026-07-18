@@ -142,13 +142,15 @@ def up(
     if existing:
         PID_FILE.unlink(missing_ok=True)
 
-    if _port_in_use(port):
-        typer.echo(
-            f"Port {port} is already in use. "
-            f"Another NATS or service may be running. Check: lsof -i :{port}",
-            err=True,
-        )
-        raise typer.Exit(1)
+    ws_port = port + 1
+    for candidate, label in ((port, "Port"), (ws_port, "WebSocket port")):
+        if _port_in_use(candidate):
+            typer.echo(
+                f"{label} {candidate} is already in use. "
+                f"Another NATS or service may be running. Check: lsof -i :{candidate}",
+                err=True,
+            )
+            raise typer.Exit(1)
 
     binary = asyncio.run(_resolve_binary())
     RUN_DIR.mkdir(parents=True, exist_ok=True)
@@ -160,7 +162,9 @@ def up(
     sys_password = secrets.token_hex(16)
     conf_path = RUN_DIR / "nats.conf"
     conf_path.write_text(
-        render_mesh_server_conf(port=port, store_dir=DATA_DIR, sys_password=sys_password)
+        render_mesh_server_conf(
+            port=port, store_dir=DATA_DIR, sys_password=sys_password, ws_port=ws_port
+        )
     )
     conf_path.chmod(0o600)
 
@@ -227,6 +231,7 @@ def up(
     from ._output import banner
     typer.echo(banner())
     typer.echo(f"  NATS listening on {url}")
+    typer.echo(f"  WebSocket listener on ws://127.0.0.1:{ws_port} (browser clients, `oam ui`)")
     typer.echo("  KV buckets ready: mesh-catalog, mesh-registry, mesh-context")
     typer.echo(f"  Health monitor running (pid {monitor_proc.pid})")
     typer.echo(f"  Wrote {OAM_URL_FILE}")

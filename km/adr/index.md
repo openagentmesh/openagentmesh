@@ -63,7 +63,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0053](0053-chat-integration-framework-and-discord-bridge.md) | Chat integration framework + DiscordBridge as first impl | spec | |
 | [ADR-0054](0054-wildfire-incident-response-demo.md) | Wildfire incident response demo (multi-fleet portfolio project) | spec | feature/wildfire-demo |
 | [ADR-0055](0055-agent-lifecycle-gates.md) | Agent lifecycle gates (`active_when`): declarative on/off based on watch conditions | documented | roadmap/stage-3 |
-| [ADR-0056](0056-admin-ui.md) | OAM Admin UI: agent registry browser, invocation sandbox, event feed | spec | roadmap/stage-3 |
+| [ADR-0056](0056-admin-ui.md) | OAM Admin UI: agent registry browser, invocation sandbox, event feed | test (wave 1/5 done: ws listener + `oam ui` server; screens pending) | roadmap/stage-3 |
 | [ADR-0057](0057-error-taxonomy-and-module.md) | Error taxonomy and dedicated `_errors` module (adds `InvalidInput`, `HandlerError`, `NotFound`, `ConnectionFailed`) | documented | feature/error-taxonomy |
 | [ADR-0058](0058-public-mesh-publish.md) | Public `mesh.publish(subject, payload)` for arbitrary-subject emission | documented | feature/mesh-publish |
 | [ADR-0059](0059-mesh-instance-id.md) | `mesh.instance_id` stable per-process identifier + auto-stamped header | documented | feature/instance-id |
