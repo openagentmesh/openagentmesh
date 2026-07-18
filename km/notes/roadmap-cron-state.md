@@ -16,8 +16,12 @@ now met**: secured-mesh cookbook (run 5) and the chaos kill-mid-request
 test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
 passing — caller gets agent_died in ~1s against a 30s timeout).
 ADR-0048 observability v1: COMPLETE (run 7) — merged to main 3e5e486.
-Next per the plan: ADR-0055 lifecycle gates (spec-ready, has code sample);
-ADR-0056 UI awaits deferral confirmation.
+ADR-0055 lifecycle gates: COMPLETE (run 8) — merged to main b7e4093.
+Next: ADR-0056 admin UI — the only remaining planned Stage 3 item. Needs
+Luca 9 said "silence = defer [to Stage 3]" and Luca has stayed silent, so
+the deferral stands and the UI is in Stage 3 scope, after the liveness
+work it depended on (which is done). It is a 4–6 session build; the next
+run should start it unless Luca has said otherwise.
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -230,10 +234,68 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      pre-existing docs gaps (subjects.md missing mesh.death/mesh-instances;
      cookbook index missing three shipped recipes).
    - 16 new tests (12 SDK + 2 CLI + 2 cookbook twin).
-4. **ADR-0055 lifecycle gates** — not started. Next up.
-5. **ADR-0056 admin UI** — awaiting deferral confirmation (Needs Luca 9).
+4. **ADR-0055 lifecycle gates** — DONE (run 8). ADR at `documented`;
+   merged to main b7e4093 (--no-ff); CI success on branch tip 426cde3
+   (run 52); 321 pytest verified locally on the merged tree; 53 vitest
+   verified on the branch (unchanged by this work).
+   - Amended the ADR before code (4 corrections): conditions are mesh
+     factory methods (`mesh.kv_condition`/`mesh.subject_condition`,
+     matching ADR-0052's source factories — the original sample's
+     `openagentmesh.lifecycle` public submodule contradicted the package
+     convention); `not_available` is a caller-side mapping (no-responders
+     + present-in-catalog → NotAvailable, absent → NotFound — an agent
+     that left its queue group cannot reply, so the original "receives
+     not_available during drain" mechanics were self-contradictory);
+     kv_condition watches the mesh-context bucket; startup does a
+     synchronous read (deterministic come-up) with `initial` as fallback.
+   - Shipped: `@mesh.agent(spec, active_when=...)`; `_lifecycle.py` with
+     Condition protocol + KVCondition/SubjectCondition (top-level
+     exports); per-agent activate/deactivate with idempotent transitions;
+     gated handlers run as tracked tasks so deactivation unsubscribes
+     instantly and drains our own in-flight set (nats-py's
+     Subscription.drain() is NOT cancellation-safe — cancelling it
+     mid-flush poisons pong futures and kills the client read loop; found
+     via a real hang, see learnings); `NotAvailable` error;
+     `agent_activated`/`agent_deactivated` observe events; Watcher shape
+     retired (ADR-0031 table + agents.md updated, ADR-0042 already
+     superseded).
+   - Docs: concepts/lifecycle.md, cookbook/lifecycle-gated-agents.md +
+     executable twin, errors/API/observability pages, mkdocs nav.
+   - 13 new tests (11 unit + 2 twin); 5 consecutive green runs of the
+     lifecycle files after fixing two test races (see learnings).
+   - No role-template changes needed: gates ride existing surfaces
+     (mesh-context KV; subject gates share subject_source's constraint).
+5. **ADR-0056 admin UI** — in Stage 3 scope by silence-deferral (Needs
+   Luca 9); not started. Next up (last planned Stage 3 item).
 
 ## Run log
+
+### 2026-07-18 ~12:10–13:15 UTC — run 8 (Fable 5, cloud)
+
+Verified at start: origin quiet since 06:28 (no overlap risk); no Luca
+edits (all commits since bootstrap are the executor's); CI success on main
+tip 9e057bb (run 45) — closes run 7's tail; baseline 308 pytest green on
+main (301+7 skips before installing nsc, 308 with it).
+
+Advanced (Stage 3, ADR-0055 lifecycle gates, on roadmap/stage-3, merged
+b7e4093): amended the ADR against the shipped repo first (4 corrections
+recorded in the ADR amendment), red tests committed first per the
+pipeline, then implementation, docs, and the Watcher-shape retirement.
+Full detail in Stage 3 item status above. One real bug found and fixed
+during the work: the first drain implementation used nats-py's
+Subscription.drain(), whose cancellation mid-flush kills the client read
+loop — diagnosed from an actual test hang via task-dump, replaced with
+task-based dispatch + own drain. Verified this run: 321 pytest + ruff +
+ty clean on the merged tree; 53 vitest on the branch; zensical build
+clean; CI success on branch tip 426cde3 (run 52; run 49's failure was
+the expected red phase).
+
+Left open: CI on the main merge commit b7e4093 and the state-file commit
+(pushed at end of run — verify next run); all Needs-Luca items still
+unanswered. Next run: check Needs-Luca answers, then start ADR-0056
+admin UI (in Stage 3 scope via item 9's silence-deferral; 4–6 session
+estimate — expect it to span several runs; re-read the ADR and the
+Stage-2 shaping notes in this file before building).
 
 ### 2026-07-18 ~05:50–06:35 UTC — run 7 (Fable 5, cloud)
 

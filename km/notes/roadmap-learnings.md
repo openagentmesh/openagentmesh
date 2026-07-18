@@ -151,6 +151,52 @@ update that file too and say so here.
   fast-fail race — no per-target subscription sharing needed at current
   scale; noted in ADR-0040 as future work if callers get hot.
 
+## 2026-07-18 — Stage 3, run 8 (cloud executor): ADR-0055 lifecycle gates
+
+- **nats-py `Subscription.drain()` is not cancellation-safe.** Its flush
+  roundtrip registers a pong future; cancelling the drain mid-flush leaves
+  that future cancelled-but-registered, and the next PONG crashes the
+  client's read loop (`InvalidStateError` in `_process_pong`) — after which
+  every pending request on that connection hangs forever. Symptom was a
+  test-suite hang *at shutdown* (catalog CAS get never returning), two
+  tests apart from the cause. Fix: never wrap `sub.drain()` in
+  `wait_for`; gated agents dispatch handlers as tracked asyncio tasks so
+  deactivation is `unsubscribe()` (instant, safe) + `asyncio.wait` on our
+  own task set. Same applies anywhere a drain might be cancelled (e.g. by
+  `_shutdown` cancelling a background task mid-drain).
+- **`unsubscribe()` kills in-flight inline callbacks.** nats-py awaits the
+  subscription callback inside `_wait_for_msgs`, and `unsubscribe()`
+  cancels that task — so drain-then-complete semantics REQUIRE handlers to
+  run as separate tasks. Worth remembering if ungated agents ever need
+  graceful per-agent teardown.
+- **Debugging a loop-idle hang: dump `asyncio.all_tasks()` from a
+  standalone repro**, not py-spy (py-spy shows the thread parked in
+  `select`, which says nothing). A wrapper script with
+  `asyncio.wait_for(main(), N)` + task-stack dump on timeout found the
+  poisoned-connection chain in one run.
+- **Two test races worth pattern-matching:** (1) a warm-up call that sets
+  the same "handler entered" Event the real assertion waits on — clear the
+  event after warm-up or the test proceeds before the real request is in
+  flight; (2) a request published in the instant a gate closes can be
+  dropped (interest existed at publish, gone at delivery) → the caller
+  gets a timeout, not no-responders. The second is real wire semantics,
+  now documented in concepts/lifecycle.md: treat both `not_available` and
+  a timeout during a gate transition as retryable.
+- **The ADR-as-written had a self-contradictory mechanic** ("drain-phase
+  callers receive not_available" from an agent that just left its queue
+  group and cannot reply). Caller-side mapping (no-responders + still in
+  catalog → `not_available`) implements the intent cleanly and also covers
+  the fully-offline state. Shaping check that caught it: for every
+  proposed error path, ask *which process sends this on the wire?*
+- **`pytest -s` masking a hang is a diagnostic clue, not noise** — the
+  capture-on hang reproduced deterministically, the `-s` run passed;
+  timing shifts from capture plumbing are enough to flip a race. Don't
+  chase the pytest flags; find the race they perturb.
+- Per-agent teardown bookkeeping (dicts keyed by agent name) replaced the
+  flat subscription/source lists; shutdown order now stops gate watchers
+  before the tasks/subscriptions they manage. Ordering rule: kill the
+  thing that *creates* work before the things that *do* it.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's
