@@ -12,6 +12,7 @@ from openagentmesh import (
     AgentMesh,
     AgentSpec,
     KVCondition,
+    MeshTimeout,
     NotAvailable,
     NotFound,
     SubjectCondition,
@@ -107,8 +108,12 @@ class TestKVCondition:
                     return False
                 except NotAvailable:
                     return True
+                except MeshTimeout:
+                    # A request racing the closing gate can be dropped and
+                    # time out; the next probe sees not_available.
+                    return False
 
-            await _wait_for(_down)
+            await _wait_for(_down, timeout=10.0)
 
             # Reopen: the agent comes back.
             await mesh.kv.put("gates.echo", "on")
@@ -213,6 +218,7 @@ class TestKVCondition:
                     return False
 
             await _wait_for(_up)
+            entered.clear()  # the warm-up call set it; track the real request
 
             call_task = asyncio.ensure_future(
                 mesh.call("gated.slow", {"summary": "work"}, timeout=5.0)

@@ -131,6 +131,12 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._gate_state: dict[str, bool] = {}
         self._gate_watch_tasks: dict[str, asyncio.Task] = {}
         self._gate_subscriptions: dict[str, Any] = {}
+        # In-flight handler tasks for gated agents. Gated handlers run as
+        # tasks (not inline in the subscription callback) so deactivation can
+        # unsubscribe immediately and drain them separately — cancelling
+        # nats-py's Subscription.drain() mid-flush corrupts the client's
+        # pong futures and kills its read loop.
+        self._inflight_tasks: dict[str, set[asyncio.Task]] = {}
         # Subjects the server denied us on (ADR-0038): violations arrive
         # asynchronously, so call sites consult this to turn a bare timeout
         # into a ConnectionDenied.
@@ -360,11 +366,19 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
         sub = self._subscriptions.pop(name, None)
         if sub is not None:
-            try:
-                await asyncio.wait_for(sub.drain(), timeout=drain_timeout)
-            except Exception:
-                with suppress(Exception):
-                    await sub.unsubscribe()
+            # Leave the queue group first (new requests stop routing here),
+            # then wait out our own in-flight handler tasks. Never
+            # Subscription.drain(): it is not cancellation-safe (see
+            # _inflight_tasks in __init__).
+            with suppress(Exception):
+                await sub.unsubscribe()
+            pending = {t for t in self._inflight_tasks.get(name, ()) if not t.done()}
+            if pending:
+                _done, still_pending = await asyncio.wait(pending, timeout=drain_timeout)
+                for task in still_pending:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError, Exception):
+                        await task
 
         for tasks_map in (self._publisher_tasks, self._watcher_tasks):
             task = tasks_map.pop(name, None)
@@ -628,6 +642,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     message=f"Agent '{name}' deregistered",
                 )
 
+        # 1d. Stop lifecycle-gate watchers (ADR-0055) before any of the
+        # subscriptions and tasks they manage are torn down, so no gate
+        # transition races the teardown below.
+        for task in self._gate_watch_tasks.values():
+            task.cancel()
+        for task in self._gate_watch_tasks.values():
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        self._gate_watch_tasks.clear()
+        for sub in self._gate_subscriptions.values():
+            with suppress(Exception):
+                await sub.unsubscribe()
+        self._gate_subscriptions.clear()
+
         # 2. Cancel background watcher handlers (ADR-0042). Two-pass so all
         # tasks receive cancel() before we await any one of them, avoiding
         # serialization of their shutdown latency.
@@ -648,20 +676,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await task
         self._publisher_tasks.clear()
 
-        # 3b. Stop lifecycle-gate watchers (ADR-0055) before tearing down the
-        # subscriptions they manage, so no transition races the shutdown.
-        for task in self._gate_watch_tasks.values():
-            task.cancel()
-        for task in self._gate_watch_tasks.values():
-            with suppress(asyncio.CancelledError, Exception):
-                await task
-        self._gate_watch_tasks.clear()
-        for sub in self._gate_subscriptions.values():
-            with suppress(Exception):
-                await sub.unsubscribe()
-        self._gate_subscriptions.clear()
-
-        # 3c. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
+        # 3b. Cancel ADR-0052 source-driven KV watch tasks and unsubscribe
         # source-driven NATS subscriptions.
         all_source_tasks = [t for tasks in self._source_tasks.values() for t in tasks]
         for task in all_source_tasks:
@@ -684,6 +699,16 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await sub.unsubscribe()
         self._subscriptions.clear()
         self._gate_state.clear()
+
+        # 4b. Cancel any in-flight gated-handler tasks (ADR-0055) still
+        # running after their subscriptions are gone.
+        leftover = [t for tasks in self._inflight_tasks.values() for t in tasks if not t.done()]
+        for task in leftover:
+            task.cancel()
+        for task in leftover:
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        self._inflight_tasks.clear()
 
         # 5. Deregister from the cluster (ADR-0016): drop this host's
         # instance record first so the survivor scan below (ours and the
@@ -1107,7 +1132,22 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     }),
                 )
 
-        sub = await self._conn.subscribe(subject, queue=queue, cb=handler)
+        if name in self._agent_gates:
+            # Gated agents (ADR-0055) run each request as a tracked task so
+            # deactivation can unsubscribe instantly and drain the in-flight
+            # set on its own timeout.
+            inflight = self._inflight_tasks.setdefault(name, set())
+
+            async def dispatch(msg: Msg) -> None:
+                task = asyncio.create_task(handler(msg))
+                inflight.add(task)
+                task.add_done_callback(inflight.discard)
+
+            cb = dispatch
+        else:
+            cb = handler
+
+        sub = await self._conn.subscribe(subject, queue=queue, cb=cb)
         self._subscriptions[name] = sub
 
     async def _handle_responder(

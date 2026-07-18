@@ -53,9 +53,11 @@ These two properties combine into five common patterns:
 | Streamer | `async def f(req: In) -> Chunk: yield ...` | Yes (has input) | Yes |
 | Trigger | `async def f() -> Out: return ...` | Yes (has output) | No |
 | Publisher | `async def f() -> Event: yield ...` | No | Yes |
-| Watcher | `async def f(): ...` | No | No |
+| Source-only | any handler with `sources=[...]` and no RPC surface | No | No |
 
 No explicit `type` or capability flags. The handler shape is the source of truth.
+
+The `invocable=False, streaming=False` combination means *source-only*: the agent has no `mesh.call()` surface and is triggered by its [sources](#source-only-agents) instead. (Earlier versions named this shape "Watcher"; ADR-0055 retired the name — sources and [lifecycle gates](../concepts/lifecycle.md) express everything it covered.)
 
 ### Responder
 
@@ -115,25 +117,25 @@ async def monitor_prices() -> PriceEvent:
         await asyncio.sleep(1)
 ```
 
-### Watcher
+### Source-only agents
 
-No input, no output, no yield. Runs as a background task. The handler body typically contains a KV watch loop or other long-running coordination logic.
+An agent triggered by declarative [sources](../concepts/channels.md) (`sources=[mesh.kv_source(...)]` or `mesh.subject_source(...)`) rather than by callers. The handler receives each triggering value; there is no `mesh.call()` surface.
 
 ```python
 spec = AgentSpec(name="pipeline.extract", description="Watches for raw documents and extracts entities.")
 
-@mesh.agent(spec)
-async def extract():
-    async for value in mesh.kv.watch("pipeline.*.raw"):
-        doc = Document.model_validate_json(value)
-        extracted = do_extraction(doc)
-        await mesh.kv.put(f"pipeline.{doc.id}.extracted", extracted.model_dump_json())
+@mesh.agent(spec, sources=[mesh.kv_source("pipeline.*.raw")])
+async def extract(doc: Document) -> None:
+    extracted = do_extraction(doc)
+    await mesh.kv.put(f"pipeline.{doc.id}.extracted", extracted.model_dump_json())
 ```
 
-All agents (including publishers and watchers) are visible in the catalog and participate in liveness tracking. Use `mesh.catalog(invocable=True)` to select only agents that accept calls.
+A bespoke handler-body watch loop (`async for value in mesh.kv.watch(...)`) remains a valid escape hatch when the reaction logic doesn't fit a source binding — the SDK runs a no-input, no-output handler as a background task.
+
+All agents (including publishers and source-only agents) are visible in the catalog and participate in liveness tracking. Use `mesh.catalog(invocable=True)` to select only agents that accept calls.
 
 !!! note "Scaling background agents"
-    Publishers and watchers run as background tasks and do not use queue groups. Every instance receives every KV update or emits its own event stream. For expensive processing in a watcher, delegate to an invocable agent via `mesh.call()`, which scales via queue groups. The watcher becomes a thin routing layer; the processing agent scales independently.
+    Publishers and source-only agents run as background tasks and do not use queue groups (except subject sources with an explicit `queue_group`). Every instance receives every KV update or emits its own event stream. For expensive processing, delegate to an invocable agent via `mesh.call()`, which scales via queue groups. The source-only agent becomes a thin routing layer; the processing agent scales independently.
 
 ## Type Hints
 
@@ -188,9 +190,11 @@ Use `BaseModel` when your payload has multiple fields or when you want named, se
 Agents follow a predictable lifecycle:
 
 1. **Start.** `mesh.run()` (blocking) or `async with mesh:` (non-blocking context manager)
-2. **Register.** Invocable agents subscribe to a NATS request subject. Publishers and watchers launch as background tasks. All agents write their contract to the registry.
-3. **Serve.** Invocable agents handle requests via queue group. Publishers emit events. Watchers react to state changes.
+2. **Register.** Invocable agents subscribe to a NATS request subject. Publishers and source-only agents launch as background tasks. All agents write their contract to the registry.
+3. **Serve.** Invocable agents handle requests via queue group. Publishers emit events. Source-only agents react to their sources.
 4. **Stop.** Exiting the context manager: cancel background tasks, unsubscribe, drain, deregister, disconnect.
+
+An agent can also be gated so it only serves while a condition holds (`active_when=mesh.kv_condition(...)`) — see [Lifecycle Gates](../concepts/lifecycle.md).
 
 ## Queue Groups
 
