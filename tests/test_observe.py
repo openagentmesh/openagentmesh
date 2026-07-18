@@ -36,13 +36,21 @@ async def _raw_tap(mesh: AgentMesh, subject: str) -> list[dict]:
     return received
 
 
-async def _wait_for(received: list, count: int, timeout: float = 5.0) -> None:
+def _of(received: list[dict], *events: str) -> list[dict]:
+    """Events of the given types (lifecycle events share the log subject)."""
+    return [e for e in received if e["event"] in events]
+
+
+async def _wait_for(
+    received: list, count: int, *events: str, timeout: float = 5.0
+) -> list[dict]:
     deadline = asyncio.get_event_loop().time() + timeout
     while asyncio.get_event_loop().time() < deadline:
-        if len(received) >= count:
-            return
+        matched = _of(received, *events) if events else received
+        if len(matched) >= count:
+            return matched
         await asyncio.sleep(0.05)
-    raise AssertionError(f"expected {count} events, got {len(received)}: {received}")
+    raise AssertionError(f"expected {count} of {events or 'any'}, got: {received}")
 
 
 class TestLogPublishing:
@@ -57,14 +65,15 @@ class TestLogPublishing:
 
             # Config propagates via KV watch; poll until the host picks it up.
             deadline = asyncio.get_event_loop().time() + 5.0
-            while asyncio.get_event_loop().time() < deadline and not received:
+            while (
+                asyncio.get_event_loop().time() < deadline
+                and not _of(received, "request_completed")
+            ):
                 await mesh.call("nlp.summarizer", {"text": "hello world"})
                 await asyncio.sleep(0.1)
 
-            await _wait_for(received, 2)
-            events = {e["event"] for e in received}
-            assert "request_received" in events
-            assert "request_completed" in events
+            await _wait_for(received, 1, "request_received")
+            await _wait_for(received, 1, "request_completed")
             completed = next(e for e in received if e["event"] == "request_completed")
             assert completed["level"] == "debug"
             assert completed["agent"] == "nlp.summarizer"
@@ -81,7 +90,8 @@ class TestLogPublishing:
             await mesh.call("quiet.agent", {"text": "hello"})
             await asyncio.sleep(0.3)
             # request_received/request_completed are debug; default level is info.
-            assert received == []
+            # (agent_registered may appear: registration is lazy and info-level.)
+            assert _of(received, "request_received", "request_completed") == []
 
     async def test_request_failed_visible_at_default_level(self):
         async with AgentMesh.local() as mesh:
@@ -93,9 +103,9 @@ class TestLogPublishing:
             with pytest.raises(MeshError, match="boom"):
                 await mesh.call("fail.agent", {"text": "hello"})
 
-            await _wait_for(received, 1)
-            assert received[0]["event"] == "request_failed"
-            assert received[0]["level"] == "warn"
+            failed = await _wait_for(received, 1, "request_failed")
+            assert failed[0]["level"] == "warn"
+            assert failed[0]["data"]["code"] == "handler_error"
 
     async def test_validation_error_visible_at_default_level(self):
         async with AgentMesh.local() as mesh:
@@ -107,9 +117,8 @@ class TestLogPublishing:
             with pytest.raises(InvalidInput):
                 await mesh.call("strict.agent", {"wrong_field": 42})
 
-            await _wait_for(received, 1)
-            assert received[0]["event"] == "validation_error"
-            assert received[0]["level"] == "warn"
+            invalid = await _wait_for(received, 1, "validation_error")
+            assert invalid[0]["level"] == "warn"
 
     async def test_lifecycle_events_published_at_info(self):
         async with AgentMesh.local() as mesh:
@@ -122,14 +131,11 @@ class TestLogPublishing:
                 return Out(summary=req.text)
 
             async with host:
-                await _wait_for(received, 1)
-                assert received[0]["event"] == "agent_registered"
-                assert received[0]["level"] == "info"
-                assert received[0]["agent"] == "cycle.agent"
+                registered = await _wait_for(received, 1, "agent_registered")
+                assert registered[0]["level"] == "info"
+                assert registered[0]["agent"] == "cycle.agent"
 
-            await _wait_for(received, 2)
-            events = [e["event"] for e in received]
-            assert "agent_deregistered" in events
+            await _wait_for(received, 1, "agent_deregistered")
 
 
 class TestObserveConsumer:
@@ -229,18 +235,23 @@ class TestObserveConfig:
 
             received = await _raw_tap(mesh, "mesh.logs.hot.agent")
 
-            # Default level: silent.
+            # Default level: request events silent.
             await mesh.call("hot.agent", {"text": "one"})
             await asyncio.sleep(0.3)
-            assert received == []
+            assert _of(received, "request_received", "request_completed") == []
 
             # Flip to debug at runtime; the host picks it up via KV watch.
             await mesh.observe.set("hot.agent", log_level="debug")
             deadline = asyncio.get_event_loop().time() + 5.0
-            while asyncio.get_event_loop().time() < deadline and not received:
+            while (
+                asyncio.get_event_loop().time() < deadline
+                and not _of(received, "request_completed")
+            ):
                 await mesh.call("hot.agent", {"text": "two"})
                 await asyncio.sleep(0.1)
-            assert received, "runtime level change never took effect"
+            assert _of(received, "request_completed"), (
+                "runtime level change never took effect"
+            )
 
     async def test_off_silences_warn_events(self):
         async with AgentMesh.local() as mesh:
@@ -256,4 +267,4 @@ class TestObserveConfig:
             with pytest.raises(MeshError):
                 await mesh.call("off.agent", {"text": "x"})
             await asyncio.sleep(0.3)
-            assert received == []
+            assert _of(received, "request_failed") == []

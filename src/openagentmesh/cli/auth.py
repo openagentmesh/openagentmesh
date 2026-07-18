@@ -38,6 +38,7 @@ _MESH_BUCKET_SUBJECTS = [
     "$KV.mesh-catalog.>",
     "$KV.mesh-registry.>",
     "$KV.mesh-instances.>",
+    "$KV.mesh-observability.>",
     "$KV.mesh-context.>",
     "$O.mesh-artifacts.>",
 ]
@@ -67,6 +68,8 @@ ROLE_TEMPLATES: dict[str, dict[str, list[str]]] = {
             "mesh.errors.>",
             "mesh.health.>",
             "mesh.death.>",
+            "mesh.logs.>",  # observability tail (ADR-0048)
+            "$KV.mesh-observability.>",
         ],
     },
 }

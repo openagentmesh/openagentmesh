@@ -21,3 +21,7 @@ def compute_event_subject(name: str) -> str:
 
 def compute_death_subject(name: str) -> str:
     return f"mesh.death.{name}"
+
+
+def compute_log_subject(name: str) -> str:
+    return f"mesh.logs.{name}"

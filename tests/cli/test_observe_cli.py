@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import subprocess
@@ -91,10 +92,8 @@ async def test_observe_logs_tails_events():
             await asyncio.sleep(1.5)  # let the tail subscribe
 
             for _ in range(3):
-                try:
+                with contextlib.suppress(Exception):
                     await mesh.call("tail.agent", {"text": "x"})
-                except Exception:
-                    pass
                 await asyncio.sleep(0.2)
 
             await asyncio.sleep(0.5)
