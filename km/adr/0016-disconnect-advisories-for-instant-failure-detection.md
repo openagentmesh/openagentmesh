@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-13
-- **Status:** spec
+- **Status:** documented (v1: advisory path + death notices; heartbeat/zombie layer deferred, see Amendment)
 - **Source:** .specstory/history/2026-04-13_19-32-21Z.md (discussion), km/agentmesh-liveness-and-failure.md (spec)
 
 ## Context

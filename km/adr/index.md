@@ -22,7 +22,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0013](0013-hyphenated-kv-bucket-names.md) | Hyphenated KV bucket names | documented | |
 | [ADR-0014](0014-single-key-denormalized-catalog.md) | Single-key denormalized catalog | documented | |
 | [ADR-0015](0015-prefer-path-nats-server-over-download.md) | Prefer PATH nats-server over download | implemented | |
-| [ADR-0016](0016-disconnect-advisories-for-instant-failure-detection.md) | Disconnect advisories for instant failure detection | spec | roadmap/stage-3 |
+| [ADR-0016](0016-disconnect-advisories-for-instant-failure-detection.md) | Disconnect advisories for instant failure detection | documented | roadmap/stage-3 |
 | [ADR-0017](0017-rebrand-to-openagentmesh.md) | Rebrand to OpenAgentMesh | documented | |
 | [ADR-0018](0018-use-zensical-for-documentation.md) | Use Zensical for documentation | documented | |
 | [ADR-0019](0019-differentiate-oam-from-mcp-on-topology.md) | Differentiate OAM from MCP on topology, not sync/async | documented | |
@@ -47,7 +47,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0037](0037-oam-scope-per-agent-visibility-and-reachability.md) | OAM scope: per-agent visibility and reachability | spec | |
 | [ADR-0038](0038-nats-authentication-and-credential-management.md) | NATS authentication and credential management | documented | roadmap/stage-3 |
 | [ADR-0039](0039-contract-to-llm-tool-conversion.md) | Contract-to-LLM-tool conversion (`to_tool_schema`, `to_openai_tool`, `to_anthropic_tool`) | documented | feature/tool-conversion |
-| [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | spec | roadmap/stage-3 |
+| [ADR-0040](0040-death-notice-fast-fail-for-in-flight-requests.md) | Death-notice triggered fast failure for in-flight requests | documented | roadmap/stage-3 |
 | [ADR-0041](0041-cli-demos-as-canonical-code-samples.md) | CLI demos as canonical code samples (single source for docs, tests, CLI) | superseded by ADR-0045 | feature/cli-demos |
 | [ADR-0042](0042-watcher-agent-pattern.md) | Watcher agent pattern (fourth capability combination) | superseded by ADR-0055 | feature/watcher-agent |
 | [ADR-0043](0043-trigger-handler-pattern.md) | Trigger handler pattern (invocable, no input) | documented | feature/watcher-agent |

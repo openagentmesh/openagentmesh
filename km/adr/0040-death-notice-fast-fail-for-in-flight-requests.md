@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-20
-- **Status:** spec
+- **Status:** documented
 - **Depends on:** ADR-0016 (disconnect advisories)
 - **Source:** conversation on failure modes during mid-request agent death
 
