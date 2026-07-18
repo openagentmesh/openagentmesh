@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -11,7 +13,12 @@ from pathlib import Path
 
 import typer
 
-from .._local import AGENTMESH_DIR, download_nats_server, find_nats_server
+from .._local import (
+    AGENTMESH_DIR,
+    download_nats_server,
+    find_nats_server,
+    render_mesh_server_conf,
+)
 from .._mesh import AgentMesh
 from ._config import OAM_URL_FILE, resolve_url, write_url_file
 from ._output import as_json, table
@@ -24,6 +31,8 @@ mesh_app = typer.Typer(
 
 RUN_DIR = AGENTMESH_DIR / "run"
 PID_FILE = RUN_DIR / "oam-mesh.pid"
+MONITOR_PID_FILE = RUN_DIR / "oam-monitor.pid"
+MONITOR_CONF_FILE = RUN_DIR / "monitor.json"
 LOG_FILE = RUN_DIR / "oam-mesh.log"
 DATA_DIR = RUN_DIR / "data"
 
@@ -145,6 +154,16 @@ def up(
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Accounts config (ADR-0016): anonymous clients keep working via
+    # no_auth_user, and the SYS account lets the health monitor subscribe
+    # to disconnect advisories.
+    sys_password = secrets.token_hex(16)
+    conf_path = RUN_DIR / "nats.conf"
+    conf_path.write_text(
+        render_mesh_server_conf(port=port, store_dir=DATA_DIR, sys_password=sys_password)
+    )
+    conf_path.chmod(0o600)
+
     log_fh = LOG_FILE.open("ab")
     popen_kwargs: dict = {
         "stdin": subprocess.DEVNULL,
@@ -155,7 +174,7 @@ def up(
         popen_kwargs["start_new_session"] = True
 
     proc = subprocess.Popen(
-        [str(binary), "-p", str(port), "-js", "--store_dir", str(DATA_DIR)],
+        [str(binary), "-c", str(conf_path)],
         **popen_kwargs,
     )
 
@@ -192,10 +211,24 @@ def up(
     PID_FILE.write_text(str(proc.pid))
     write_url_file(url)
 
+    # Health monitor (ADR-0016): a companion process next to the server.
+    MONITOR_CONF_FILE.write_text(json.dumps({
+        "url": url,
+        "sys_url": f"nats://oam-sys:{sys_password}@127.0.0.1:{port}",
+    }))
+    MONITOR_CONF_FILE.chmod(0o600)
+    monitor_proc = subprocess.Popen(
+        [sys.executable, "-m", "openagentmesh.cli", "mesh", "monitor",
+         "--config", str(MONITOR_CONF_FILE)],
+        **popen_kwargs,
+    )
+    MONITOR_PID_FILE.write_text(str(monitor_proc.pid))
+
     from ._output import banner
     typer.echo(banner())
     typer.echo(f"  NATS listening on {url}")
     typer.echo("  KV buckets ready: mesh-catalog, mesh-registry, mesh-context")
+    typer.echo(f"  Health monitor running (pid {monitor_proc.pid})")
     typer.echo(f"  Wrote {OAM_URL_FILE}")
 
     if foreground:
@@ -205,13 +238,41 @@ def up(
         signal.signal(signal.SIGINT, _stop)
         signal.signal(signal.SIGTERM, _stop)
         exit_code = proc.wait()
+        monitor_proc.terminate()
+        try:
+            monitor_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            monitor_proc.kill()
         PID_FILE.unlink(missing_ok=True)
+        MONITOR_PID_FILE.unlink(missing_ok=True)
         raise typer.Exit(exit_code if exit_code >= 0 else 0)
+
+
+def _stop_monitor() -> None:
+    """Stop the companion health monitor, if one is recorded."""
+    if not MONITOR_PID_FILE.is_file():
+        return
+    try:
+        pid = int(MONITOR_PID_FILE.read_text().strip())
+    except ValueError:
+        pid = 0
+    if pid > 0 and _process_alive(pid):
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(30):
+            if not _process_alive(pid):
+                break
+            import time
+            time.sleep(0.1)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    MONITOR_PID_FILE.unlink(missing_ok=True)
+    MONITOR_CONF_FILE.unlink(missing_ok=True)
 
 
 @mesh_app.command("down")
 def down() -> None:
     """Stop the local mesh started by `oam mesh up`."""
+    _stop_monitor()
     pid = _read_pid()
     if pid is None:
         typer.echo("No running mesh recorded.", err=True)
@@ -233,6 +294,63 @@ def down() -> None:
 
     PID_FILE.unlink(missing_ok=True)
     typer.echo(f"Stopped mesh (pid {pid}).")
+
+
+@mesh_app.command("monitor")
+def monitor(
+    url_flag: str | None = typer.Option(None, "--url", help="Mesh URL (APP account)."),
+    sys_url: str | None = typer.Option(
+        None, "--sys-url", help="System-account URL for $SYS advisories."
+    ),
+    sys_creds: str | None = typer.Option(
+        None, "--sys-creds", help="System-account credentials file (secured meshes)."
+    ),
+    creds: str | None = typer.Option(
+        None, "--creds", help="Mesh credentials for deregistration/death notices."
+    ),
+    config: str | None = typer.Option(
+        None, "--config", hidden=True, help="JSON config written by `oam mesh up`."
+    ),
+) -> None:
+    """Run the health monitor (ADR-0016) against a mesh, in the foreground.
+
+    `oam mesh up` starts one automatically. Run this yourself on secured
+    meshes: pass system-account credentials via --sys-creds and a worker-role
+    credential via --creds.
+    """
+    from .._monitor import HealthMonitor
+
+    if config:
+        cfg = json.loads(Path(config).read_text())
+        url = cfg["url"]
+        sys_url = cfg.get("sys_url") or sys_url
+    else:
+        url = resolve_url(url_flag)
+
+    async def _run() -> None:
+        mon = HealthMonitor(url, sys_url=sys_url, sys_creds=sys_creds, creds=creds)
+        await mon.start()
+        typer.echo(f"Health monitor watching {url} (Ctrl-C to stop)")
+        stop = asyncio.Event()
+
+        def _halt(*_args) -> None:
+            stop.set()
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGINT, _halt)
+            loop.add_signal_handler(signal.SIGTERM, _halt)
+        except NotImplementedError:
+            pass
+        try:
+            await stop.wait()
+        finally:
+            await mon.stop()
+
+    import contextlib as _contextlib
+
+    with _contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(_run())
 
 
 @mesh_app.command("connect")
