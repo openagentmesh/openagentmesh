@@ -173,3 +173,40 @@ update that file too and say so here.
   liveness indicator wants ADR-0016 disconnect advisories; building the UI before
   the liveness work means shipping a heartbeat stand-in and reworking it. Deferral
   proposed to Luca; if approved, Stage 3's plan should slot the UI after 0016/0040.
+
+## 2026-07-18 — Stage 3, run 7 (cloud executor): ADR-0048 observability v1
+
+- **The ADR's own aggregation wildcard was invalid NATS.** ADR-0048 hung logs
+  off the agent subject (`mesh.agent.{name}.logs`) and claimed
+  `mesh.agent.>.logs` for aggregation — but `>` only matches at the *end* of
+  a subject. The sibling placement defeated the one property it was chosen
+  for. Dedicated roots (`mesh.logs.{name}`, like `mesh.errors.`/`mesh.death.`)
+  are the pattern that composes; check every proposed subject family's
+  wildcard story against NATS matching rules at shaping time.
+- **Shaping caught three stale claims before any code:** the ADR's context
+  said heartbeats exist (deferred in ADR-0016 v1 — so "metrics in
+  heartbeats" had nothing to ride on), used pre-ADR-0049 `{channel}.{name}`
+  naming, and proposed a constructor-level observe config that would have
+  raced the KV control plane (dropped: one control plane, no ambiguity).
+  Discussion-status ADRs rot fastest; re-verify their premises against the
+  repo at shaping time, not implementation time.
+- **Lazy registration bit the tests again** (same trap as Stage 1's
+  gateway): `agent_registered` fires on the first mesh operation after
+  decoration, so log-subject taps see it interleaved with request events.
+  Tests that tap a shared subject must filter by event type, never index
+  positionally. Related nats-py footgun: `subscribe(cb=queue.put_nowait)`
+  fails ("must use coroutine") — wrap in an async closure.
+- **Default-level-zero-cost is a design property worth engineering for:**
+  per-request events at `debug` + default `info` means steady-state adds no
+  publishes at all, which dissolved the ADR's open perf question without
+  benchmarks. Gate-before-build beats measure-after-build when the default
+  can be "off".
+- **Role templates moved in the same commit as the new bucket/subjects**
+  (the run-5/run-6 lesson, applied): `$KV.mesh-observability.>` into the
+  shared bucket list, `mesh.logs.>` + config-bucket read for observers.
+  The 28 auth e2e tests passed unchanged on the first full-suite run.
+- Two pre-existing docs gaps found while writing the reference updates:
+  `subjects.md` never listed `mesh.death`/`mesh-instances` (liveness merge
+  missed it), and the cookbook index table was missing three shipped
+  recipes. Reference tables that duplicate nav structure drift silently;
+  a docs-consistency sweep is a cheap future run item.

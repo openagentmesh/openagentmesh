@@ -15,8 +15,9 @@ success on branch tip e3733e6 (run 35). **Both Stage 3 exit criteria are
 now met**: secured-mesh cookbook (run 5) and the chaos kill-mid-request
 test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
 passing — caller gets agent_died in ~1s against a 30s timeout).
-Next per the plan: ADR-0048 observability (shape discussion→spec first),
-then ADR-0055 lifecycle gates; ADR-0056 UI awaits deferral confirmation.
+ADR-0048 observability v1: COMPLETE (run 7) — merged to main 3e5e486.
+Next per the plan: ADR-0055 lifecycle gates (spec-ready, has code sample);
+ADR-0056 UI awaits deferral confirmation.
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -206,11 +207,56 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    - E2E verified in-sandbox beyond pytest: real `oam mesh up` + SIGKILLed
      host → death notice in 15ms, catalog cleaned, `oam mesh down` stops
      monitor and removes its pid/config files.
-3. **ADR-0048 observability** — not started.
-4. **ADR-0055 lifecycle gates** — not started.
+3. **ADR-0048 observability** — DONE (run 7). ADR at `documented`; merged
+   to main 3e5e486 (--no-ff); CI success on branch tip 630396c (run 42);
+   308 pytest + ruff/ty clean verified locally on that tree.
+   - Shaped discussion→spec first (trimmed v1 per the stage-3 plan), with
+     three corrections recorded in the ADR amendment: the log subject moved
+     to a `mesh.logs.{name}` root (the original sibling placement relied on
+     an invalid mid-subject `>` wildcard), "metrics in heartbeats" deferred
+     because ADR-0016 v1 deferred the heartbeat layer itself, and the
+     `AgentMesh(observe=...)` constructor param dropped (KV is the single
+     control plane). Traces, `$SYS` bridging, custom handler logging: all
+     deferred with reasons in the amendment.
+   - Shipped: SDK auto-publishes six level-gated log events around the
+     invocation path (zero publishes per request at default `info`);
+     `mesh-observability` KV bucket with live KV-watch level control
+     (per-agent > global > default); `mesh.observe` namespace
+     (logs/get/set/set_global, typed LogEvent/ObserveConfig exports);
+     `oam observe logs|config|set` CLI; role templates updated in the same
+     change (observer gains mesh.logs.> + config-bucket read).
+   - Docs: concepts/observability.md, cookbook/observing-the-mesh.md +
+     executable twin, subjects/API/CLI/security pages. Also fixed two
+     pre-existing docs gaps (subjects.md missing mesh.death/mesh-instances;
+     cookbook index missing three shipped recipes).
+   - 16 new tests (12 SDK + 2 CLI + 2 cookbook twin).
+4. **ADR-0055 lifecycle gates** — not started. Next up.
 5. **ADR-0056 admin UI** — awaiting deferral confirmation (Needs Luca 9).
 
 ## Run log
+
+### 2026-07-18 ~05:50–06:35 UTC — run 7 (Fable 5, cloud)
+
+Verified at start: CI success on the run-6 merge af5a96a (run 36) and main
+tip f7fb3c8 (run 37) — closes run 6's open check. No Luca edits (all
+commits since bootstrap are the executor's; origin quiet since 00:37 UTC,
+no overlap risk). No open GitHub issues. Baseline 292 pytest green on main
+before any work.
+
+Advanced (Stage 3, ADR-0048 observability v1, on roadmap/stage-3, merged
+3e5e486): shaped discussion→spec (subject-root correction + stale-context
+fixes recorded in the ADR amendment), red tests committed first per the
+pipeline, then implementation, CLI, role templates, and docs. Full detail
+in the Stage 3 item status above. Verified this run: 308 pytest + ruff +
+ty clean locally on the branch tip; CI success on 630396c (run 42; the
+red-tests commit's CI failure, run 40, was the expected red phase);
+zensical docs build clean.
+
+Left open: CI on the merge commit 3e5e486 (pushed at end of run — verify
+next run); all Needs-Luca items still unanswered. Next run: verify CI on
+3e5e486, check Needs-Luca answers, then ADR-0055 lifecycle gates
+(spec-ready with code sample; last planned Stage 3 item unless Luca
+confirms the ADR-0056 UI deferral, which would slot the UI after it).
 
 ### 2026-07-17 23:50 – 2026-07-18 ~00:55 UTC — run 6 (Fable 5, cloud)
 
