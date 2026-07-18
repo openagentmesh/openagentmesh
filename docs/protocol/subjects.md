@@ -13,6 +13,8 @@ All message subjects follow a consistent hierarchy. The subject scheme is transp
 | `mesh.stream.{request_id}` | Streaming response chunks |
 | `mesh.errors.{name}` | Dead-letter subject for handler errors |
 | `mesh.results.{request_id}` | Async callback reply subject |
+| `mesh.death.{name}` | Death notices when an agent leaves the mesh |
+| `mesh.logs.{name}` | Structured log events (level-gated, ephemeral) |
 
 `{name}` is the agent's dotted identifier (ADR-0049). Names with dots embed the channel hierarchy directly (`nlp.summarizer`, `finance.risk.scorer`); root-level agents have no dots (`echo`).
 
@@ -23,6 +25,8 @@ All message subjects follow a consistent hierarchy. The subject scheme is transp
 | `mesh-catalog` | `catalog` | Lightweight catalog index (JSON array) |
 | `mesh-registry` | `{name}` | Full agent contract |
 | `mesh-context` | Agent-defined | Shared state between agents |
+| `mesh-instances` | `{instance_id}` | Host liveness correlation (agents served) |
+| `mesh-observability` | `global` / `{name}` | Log-level config (per-agent wins) |
 
 ## Wildcards
 
@@ -32,6 +36,8 @@ The subject hierarchy enables wildcard subscriptions:
 mesh.agent.finance.*      # All agents one level deep under finance
 mesh.agent.finance.>      # All agents in finance and sub-channels
 mesh.errors.>             # All dead-letter errors
+mesh.death.>              # All death notices
+mesh.logs.>               # All log events (mesh.logs.nlp.> for one channel)
 ```
 
 ## Channel Mapping
