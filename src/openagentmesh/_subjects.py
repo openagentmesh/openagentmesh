@@ -17,3 +17,7 @@ def compute_error_subject(name: str) -> str:
 
 def compute_event_subject(name: str) -> str:
     return f"mesh.agent.{name}.events"
+
+
+def compute_death_subject(name: str) -> str:
+    return f"mesh.death.{name}"

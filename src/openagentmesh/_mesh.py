@@ -38,8 +38,10 @@ from ._models import (
     AgentContract,
     AgentSpec,
     CatalogEntry,
+    DeathNotice,
 )
 from ._subjects import (
+    compute_death_subject,
     compute_error_subject,
     compute_event_subject,
     compute_subject,
@@ -52,6 +54,7 @@ _CATALOG_BUCKET = "mesh-catalog"
 _REGISTRY_BUCKET = "mesh-registry"
 _CONTEXT_BUCKET = "mesh-context"
 _ARTIFACTS_BUCKET = "mesh-artifacts"
+_INSTANCES_BUCKET = "mesh-instances"
 _CATALOG_KEY = "catalog"
 
 X_MESH_INSTANCE_ID = "X-Mesh-Instance-Id"
@@ -97,6 +100,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._js: JetStreamContext | None = None
         self._catalog_kv: KeyValue | None = None
         self._registry_kv: KeyValue | None = None
+        self._instances_kv: KeyValue | None = None
         self._context_kv: KeyValue | None = None
         self._artifacts_os: Any | None = None
         self._kv: KVStore | None = None
@@ -119,6 +123,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         # asynchronously, so call sites consult this to turn a bare timeout
         # into a ConnectionDenied.
         self._denied_subjects: set[str] = set()
+        # Agent names last written to the mesh-instances record (ADR-0016).
+        self._instance_record: list[str] = []
 
     @property
     def url(self) -> str:
@@ -197,6 +203,9 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         try:
             self._nc = await nats.connect(
                 self._url,
+                # The connection name lets the health monitor correlate
+                # disconnect advisories back to this host (ADR-0016).
+                name=f"oam-host-{self.instance_id}",
                 allow_reconnect=False,
                 max_reconnect_attempts=5,
                 reconnect_time_wait=1,
@@ -236,6 +245,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         specs = [
             ("_catalog_kv",   _CATALOG_BUCKET,   self._js.key_value,    self._js.create_key_value),
             ("_registry_kv",  _REGISTRY_BUCKET,  self._js.key_value,    self._js.create_key_value),
+            ("_instances_kv", _INSTANCES_BUCKET, self._js.key_value,    self._js.create_key_value),
             ("_context_kv",   _CONTEXT_BUCKET,   self._js.key_value,    self._js.create_key_value),
             ("_artifacts_os", _ARTIFACTS_BUCKET, self._js.object_store, self._js.create_object_store),
         ]
@@ -279,6 +289,33 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
                 self._subscribed.add(name)
+
+        await self._record_instance()
+
+    async def _record_instance(self) -> None:
+        """Write this host's instance → agents mapping (ADR-0016).
+
+        The health monitor uses it to correlate a disconnect advisory with
+        the agents the dead host was serving. Idempotent; only writes when
+        the served set changed.
+        """
+        if not self._subscribed or self._instances_kv is None:
+            return
+        record = sorted(self._subscribed)
+        if record == self._instance_record:
+            return
+        try:
+            await self._instances_kv.put(
+                self.instance_id, json.dumps({"agents": record}).encode()
+            )
+        except Exception as e:
+            # Credentials minted before mesh-instances existed can't write it.
+            # Degrade: the mesh works, but the monitor can't correlate this
+            # host's death (no advisory-driven cleanup for its agents).
+            _log.warning(
+                "could not record instance liveness (stale credentials?): %s", e
+            )
+        self._instance_record = record
 
     async def _seed_catalog_cache(self) -> None:
         """Populate catalog cache from current KV snapshot (ADR-0047)."""
@@ -375,20 +412,37 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 await sub.unsubscribe()
         self._subscriptions.clear()
 
-        # 5. Deregister from the cluster: remove each owned agent from the
-        # shared catalog (CAS retry inside _update_catalog) and delete its
-        # per-agent registry key. Skipped when buckets were never created
-        # (connection failed before _ensure_buckets completed).
+        # 5. Deregister from the cluster (ADR-0016): drop this host's
+        # instance record first so the survivor scan below (ours and the
+        # health monitor's) no longer counts us, then remove each owned agent
+        # that no other live instance serves — removing it while a replica
+        # lives would blind discovery to a healthy agent. Fully-departed
+        # agents get a graceful death notice. Skipped when buckets were never
+        # created (connection failed before _ensure_buckets completed).
         if self._catalog_kv and self._registry_kv:
+            if self._instances_kv is not None and self._instance_record:
+                with suppress(Exception):
+                    await self._instances_kv.delete(self.instance_id)
+            survivors: set[str] = set()
+            with suppress(Exception):
+                survivors = await self._agents_served_by_live_instances()
             for name in self._subscribed:
-                if name in self._agents:
-                    _, _, contract = self._agents[name]
+                if name in self._agents and name not in survivors:
                     with suppress(Exception):
-                        await self._update_catalog(contract, add=False)
+                        await self._deregister_agent_record(name)
                     with suppress(Exception):
-                        await self._registry_kv.delete(name)
+                        notice = DeathNotice(
+                            agent=name,
+                            reason="graceful_shutdown",
+                            instance_id=self.instance_id,
+                        )
+                        await self._conn.publish(
+                            compute_death_subject(name),
+                            notice.model_dump_json().encode(),
+                        )
 
         self._subscribed.clear()
+        self._instance_record = []
 
         # 6. Drain the NATS connection so in-flight publishes (including the
         # deregistration writes above) flush before the socket closes. Fall
@@ -405,13 +459,30 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
 
     @staticmethod
     @asynccontextmanager
+    async def _local_monitor(embedded: EmbeddedNats) -> AsyncIterator[None]:
+        """Run the ADR-0016 health monitor beside an embedded server."""
+        from ._monitor import HealthMonitor
+
+        monitor = HealthMonitor(embedded.url, sys_url=embedded.sys_url)
+        # Like the local mesh itself, the monitor's app connection must not
+        # pick up ambient OAM_CREDS/.oam-url against an embedded server
+        # (ADR-0038 §2).
+        monitor._mesh._embedded = embedded
+        await monitor.start()
+        try:
+            yield
+        finally:
+            await monitor.stop()
+
+    @staticmethod
+    @asynccontextmanager
     async def _new_local() -> AsyncIterator[AgentMesh]:
         embedded = EmbeddedNats()
         await embedded.start()
         mesh = AgentMesh(url=embedded.url)
         mesh._embedded = embedded
         try:
-            async with mesh:
+            async with AgentMesh._local_monitor(embedded), mesh:
                 yield mesh
         finally:
             await embedded.stop()
@@ -424,7 +495,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         self._url = embedded.url
         self._embedded = embedded
         try:
-            async with self:
+            async with AgentMesh._local_monitor(embedded), self:
                 yield self
         finally:
             self._embedded = None
@@ -1032,9 +1103,40 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         assert self._registry_kv is not None
         await self._registry_kv.put(contract.name, contract.to_registry_json().encode())
 
+    # --- Liveness helpers (ADR-0016) ---
+
+    async def _agents_served_by_live_instances(self) -> set[str]:
+        """Union of agent names across all current mesh-instances records."""
+        served: set[str] = set()
+        if self._instances_kv is None:
+            return served
+        try:
+            keys = await self._instances_kv.keys()
+        except Exception:
+            return served  # empty bucket raises NoKeysError
+        for key in keys:
+            try:
+                entry = await self._instances_kv.get(key)
+                served.update(json.loads(entry.value or b"{}").get("agents", []))
+            except Exception:
+                continue
+        return served
+
+    async def _deregister_agent_record(self, name: str) -> None:
+        """Remove an agent from the catalog and registry."""
+        assert self._registry_kv is not None
+        await self._catalog_cas(name, None)
+        with suppress(Exception):
+            await self._registry_kv.delete(name)
+
     async def _update_catalog(self, contract: AgentContract, *, add: bool) -> None:
+        entry_dict = contract.to_catalog_entry().model_dump() if add else None
+        await self._catalog_cas(contract.name, entry_dict)
+
+    async def _catalog_cas(self, name: str, entry_dict: dict | None) -> None:
+        """CAS-update the catalog: replace `name`'s entry, or remove it when
+        `entry_dict` is None."""
         assert self._catalog_kv is not None
-        entry_dict = contract.to_catalog_entry().model_dump()
 
         from nats.js.errors import KeyNotFoundError
 
@@ -1047,8 +1149,8 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                 current = []
                 revision = 0
 
-            current = [e for e in current if e.get("name") != contract.name]
-            if add:
+            current = [e for e in current if e.get("name") != name]
+            if entry_dict is not None:
                 current.append(entry_dict)
 
             new_data = json.dumps(current).encode()
