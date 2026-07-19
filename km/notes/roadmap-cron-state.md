@@ -25,9 +25,12 @@ screens, `ui` CI job — e2e verified in a real browser); wave 3 of 5
 merged to main 968f4f5 (built by run 11 which was cut off before
 merging/logging; verified and merged by run 12: invocation sandbox — rjsf
 form from input schema, Call + Stream from the browser, error envelope
-rendering — plus sdk-ts NotAvailable mapping for ADR-0055 parity). Build
-waves tracked in km/notes/2026-07-18-adr0056-ui-plan.md; next is wave 4
-(event feed + liveness dots).
+rendering — plus sdk-ts NotAvailable mapping for ADR-0055 parity); wave 4
+of 5 merged to main 48b9f3b (run 12: event feed screen + registry
+liveness dots, powered by new sdk-ts `tap()` + `instancesWatch()`
+primitives — e2e verified with a real SIGKILL). Build waves tracked in
+km/notes/2026-07-18-adr0056-ui-plan.md; next is wave 5 (wheel packaging,
+Playwright smoke e2e, docs, ADR → documented, CHANGELOG closeout).
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -325,7 +328,29 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      with status line, and a kv_condition-gated agent produced the
      not_available error box (badge + gate hint + request_id), zero page
      errors.
-   - Remaining: waves 4–5 (event feed + liveness dots, packaging/e2e/docs).
+   - Shipped wave 4 (run 12, merged 48b9f3b): sdk-ts `mesh.tap(pattern)`
+     (wiretap yielding {subject, payload, isError}: JSON decode with raw-
+     text fallback, error envelopes yielded not thrown, stream-end
+     ignored) and `mesh.instancesWatch()` (mesh-instances KV watch,
+     replay coalesced into one initial snapshot via delta + status();
+     completes silently when the bucket is absent). UI: Events screen
+     (pattern input default `mesh.>` — deliberately narrower than the
+     ADR's `>`, which taps the UI's own JS-API/inbox chatter; subscribe/
+     unsubscribe, pause-buffers/resume-flushes, clear, 500-row cap,
+     error highlighting) and registry status dots (useLiveness =
+     instancesWatch ∪ mesh.death.> tap). 7 new sdk-ts tests (62 total),
+     11 new ui tests (30 total).
+   - Wave 4 verification (run 12): red suite committed first (dc96151,
+     CI failure = expected red); CI success on green tip c1bc714 (run 83)
+     and docs tip d2c7168 (run 84); locally 3 consecutive ui runs 30/30,
+     2 sdk-ts runs 62/62, builds clean; chromium e2e against a real
+     3-host mesh: all dots live, SIGKILL → mesh.death.mortal in the live
+     feed, pause/clear correct, dead agent's row removed from the
+     registry (health-monitor deregistration — the gray dot only covers
+     the pre-cleanup race and monitor-less meshes), survivors live, zero
+     page errors.
+   - Remaining: wave 5 (packaging into the wheel, Playwright smoke e2e,
+     cookbook/CLI docs, ADR + index → documented, CHANGELOG).
 
 ## Run log
 
@@ -345,8 +370,19 @@ main as 968f4f5. CHANGELOG entry for the sdk-ts NotAvailable change and
 the plan-note wave-3 closeout added on the branch (2c45dd2, CI run 79
 success) before merging.
 
-Continuing this run: ADR-0056 wave 4 (event feed + liveness dots) on
-roadmap/stage-3. Left open: all Needs-Luca items still unanswered.
+Continued this run: ADR-0056 wave 4 built end-to-end on roadmap/stage-3
+per the pipeline (red dc96151 → green c1bc714 → docs d2c7168) and merged
+--no-ff to main as 48b9f3b after CI success on the tip (run 84) plus the
+local + browser verification recorded in the Stage 3 item status. Two
+waves landed in one run because run 11 had already built wave 3.
+
+Left open: all Needs-Luca items still unanswered; CI on main tip after
+the wave-4 merge verified before run end (see addendum). Next run:
+check Needs-Luca answers, then ADR-0056 wave 5 (packaging: build ui into
+_ui_assets in the release workflow; Playwright smoke e2e in CI or as a
+script; cookbook/admin-ui.md + CLI reference docs; amend the ADR with
+the `mesh.>` default-pattern deviation and the monitor-deregistration
+note; ADR + index → documented; CHANGELOG admin-UI entry rewrite).
 
 ### 2026-07-19 ~00:10–00:30 UTC — run 10 (Fable 5, cloud)
 

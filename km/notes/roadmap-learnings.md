@@ -263,6 +263,39 @@ update that file too and say so here.
   Wave 5's Playwright test is therefore not optional polish; it is the only
   automated coverage of connect/config.json/KV-watch in the UI.
 
+## 2026-07-19 — Stage 3, run 12 (cloud executor): wave-3 recovery + wave 4
+
+- **The early-push protocol paid for itself.** Run 11 died leaving zero
+  trace in km/ — no run log, no state-file update — but the whole wave-3
+  increment sat on origin/roadmap/stage-3 with green CI on the tip.
+  Recovery was verify-and-merge (~30 min incl. a fresh browser e2e), not
+  redo. Corollary: treat "state file says X is next" as a hypothesis —
+  `git log origin/main..origin/roadmap/*` is the first thing to check,
+  and it's what caught the finished-but-unmerged wave.
+- **`Kvm.open()` in @nats-io/kv is lazy** — opening a nonexistent bucket
+  succeeds; the StreamNotFoundError surfaces on the first real API call
+  (`status()`, `get()`...). A bucket-absent guard must wrap the first
+  *use*, not the open.
+- **KV-watch replay needs explicit coalescing**: `watch()` replays
+  current values entry-by-entry (`delta` = entries remaining), so a
+  naive per-entry yield emits N partial snapshots before the true one.
+  Coalesce until `delta === 0`; and since an empty bucket replays
+  nothing, take `status().values === 0` as the replay-done signal there.
+- **A bare `>` wiretap taps yourself**: the browser client's own
+  JetStream API requests and inbox replies arrive in the feed, flooding
+  it with noise. The event feed defaults to `mesh.>` instead of the
+  ADR's `>` — record as an ADR amendment at wave-5 docs time.
+- **With the health monitor running, a dead agent's registry row
+  disappears** (ADR-0016 deregisters it) — so an e2e asserting a gray
+  "offline" dot after SIGKILL waits forever. The gray dot exists only
+  for the notice-to-cleanup race and monitor-less meshes; assert row
+  removal in e2e, and say this in the docs so users don't expect dead
+  agents to linger gray.
+- **Wave-sized increments compose well with cut-off runs**: two UI waves
+  landed in one run because each wave is independently mergeable with
+  its own red→green→docs arc. Keeping increments at "one CI-green merge
+  per wave" is what made the recovery cheap.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's
