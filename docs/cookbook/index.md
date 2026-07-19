@@ -36,6 +36,7 @@ async with AgentMesh() as mesh:     # connects to nats://localhost:4222
 | [Error Handling](error-handling.md) | Retry, fallback, monitoring |
 | [Surviving Agent Failures](agent-liveness.md) | Death notices and fast failover |
 | [Observing the Mesh](observing-the-mesh.md) | Live log tailing and level control |
+| [Admin UI](admin-ui.md) | Browse, invoke, and watch from the browser |
 | [Lifecycle-Gated Agents](lifecycle-gated-agents.md) | Condition-driven agent on/off |
 | [Automatic Load Balancing](load-balancing.md) | Queue group scaling |
 | [Reactive Pipeline](reactive-pipeline.md) | KV watch coordination |

@@ -107,6 +107,7 @@ nav:
       - Error Handling: cookbook/error-handling.md
       - Surviving Agent Failures: cookbook/agent-liveness.md
       - Observing the Mesh: cookbook/observing-the-mesh.md
+      - Admin UI: cookbook/admin-ui.md
       - Lifecycle-Gated Agents: cookbook/lifecycle-gated-agents.md
       - Automatic Load Balancing: cookbook/load-balancing.md
       - Reactive Pipeline: cookbook/reactive-pipeline.md

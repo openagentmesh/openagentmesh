@@ -35,6 +35,7 @@ oam mesh up
 
 ```text
 NATS listening on nats://127.0.0.1:4222
+WebSocket listener on ws://127.0.0.1:4223 (browser clients, `oam ui`)
 KV buckets ready: mesh-catalog, mesh-registry, mesh-context
 Health monitor running (pid 12345)
 Wrote .oam-url
@@ -247,6 +248,33 @@ oam observe set --global --log-level warn
 ```
 
 Levels: `debug`, `info`, `warn`, `error`, `off`.
+
+## `oam ui`
+
+Serve the [admin UI](../cookbook/admin-ui.md): agent registry, invocation
+sandbox, and live event feed in the browser. The mesh must already be
+running; the browser connects to the mesh's WebSocket listener directly.
+
+```bash
+oam ui                               # serve on http://127.0.0.1:4224
+oam ui --port 8080                   # custom port (falls back if taken)
+oam ui --nats-ws-url ws://host:4223  # WebSocket URL handed to the browser
+oam ui --check                       # print resolved config and exit
+```
+
+```text
+Admin UI running at http://127.0.0.1:4224
+Browser will connect to ws://localhost:4223 (NATS WebSocket)
+```
+
+The mesh URL resolves like every other command (`.oam-url` → `OAM_URL` →
+default); the browser's WebSocket URL defaults to the same host on mesh
+port + 1, overridable with `--nats-ws-url` or `OAM_NATS_WS_URL`. Binds to
+localhost by default — the UI carries mesh write access, so prefer an SSH
+tunnel over `--host 0.0.0.0` (or `OAM_UI_HOST`) for remote use.
+
+Release wheels bundle the compiled UI assets; in a source checkout run the
+Vite dev server instead (`cd ui/ && pnpm dev`).
 
 ## Output conventions
 
