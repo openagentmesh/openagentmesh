@@ -296,6 +296,39 @@ update that file too and say so here.
   its own red→green→docs arc. Keeping increments at "one CI-green merge
   per wave" is what made the recovery cheap.
 
+## 2026-07-19 — Stage 3, run 13 (cloud executor): ADR-0056 wave 5, stage close
+
+- **uv_build ignores .gitignore for packaging**: files placed under
+  `src/openagentmesh/` land in both the wheel and the sdist even when
+  gitignored — exactly what CI-built `_ui_assets/` needs, and worth knowing
+  the other way round (a stray local file would ship too; `uv build` from a
+  clean checkout in CI is the guard). Verified by building and inspecting
+  both artifacts, then installing the wheel in a clean venv.
+- **The publish workflow's test job had rotted silently.** It predates the
+  auth work and never got the nats-server/nsc install steps ci.yml gained
+  in run 5 — the next `v*` tag push would have failed its gate. Lesson:
+  when CI setup steps change, grep ALL workflows for the same pattern
+  (`publish.yml` duplicated the old assumptions, and nothing exercises a
+  tag-triggered workflow until release day).
+- **`playwright install --with-deps chromium` + a stdlib-spawned mesh works
+  first try on GitHub runners** (~23s install, 7s e2e). The smoke script
+  pattern that made it portable: every process spawned with a
+  wait-for-stdout-marker helper, `OAM_E2E_CHROMIUM` env override for the
+  sandbox's preinstalled chromium, ports off the 4222 default so a stray
+  dev mesh can't collide.
+- **An e2e agent host that self-calls once a second doubles as feed
+  traffic**: the event-feed assertion needs *something* flowing on
+  `mesh.>`, and the host's own `mesh.call` loop provides it without any
+  extra publisher machinery. Also the READY marker should come *after* the
+  first successful self-call — registration is lazy (the run-2 lesson,
+  still earning its keep).
+- **Stage 3 ran start-to-finish without a single Luca answer**: six ADRs
+  (auth, liveness pair, observability, lifecycle gates, admin UI) shipped
+  through the pipeline across runs 4–13 on default priorities alone. The
+  sign-off pause the stage prompt asked for became a standing FYI item —
+  for a solo-maintainer roadmap, "proceed on the default order, record the
+  question" beats idling; worth writing into future stage prompts directly.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's

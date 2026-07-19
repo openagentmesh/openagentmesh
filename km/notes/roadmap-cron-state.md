@@ -5,9 +5,21 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 3 — Production trust (shaping pass done run 4; prioritized plan in
-km/notes/2026-07-17-stage3-plan.md awaiting sign-off, item 10; executing the
-plan's default order meanwhile).
+Stage 4 — Frontier (started run 13 by closing Stage 3; next run begins the
+Stage 4 shaping read: km/notes/2026-05-25-persona-team-on-oam.md, ADR-0023
+usage attribution first per the stage prompt's own suggestion — it needs no
+LLM key. The persona experiment's measured runs need OPENROUTER_API_KEY
+→ Needs Luca item 11).
+
+**STAGE 3 COMPLETE (run 13).** All three exit criteria verified against the
+repo this run: (1) every shipped ADR at `documented` in km/adr/index.md —
+0038, 0016, 0040, 0048, 0055, 0056 all checked via grep this run; (2)
+secured multi-node mesh cookbook recipe (docs/cookbook/secured-mesh.md +
+executable twin, since run 5); (3) chaos kill-mid-request test
+(tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
+in the 335-test suite that passed this run). The stage-3 plan sign-off
+(Needs Luca 10) was never answered; the executor ran the plan's default
+order to completion — reordering is moot now, the item stands only as FYI.
 ADR-0038 auth: COMPLETE (run 5, merged 9502f52).
 ADR-0016+0040 liveness pair: COMPLETE (run 6) — health monitor, death
 notices, caller fast-fail, docs — merged to main af5a96a (--no-ff), CI
@@ -40,8 +52,8 @@ Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 - [ ] Stage 0 — Consolidate (blocked on Needs-Luca items below; everything else done)
 - [ ] Stage 1 — Interop (core done: MCP bridge, to_agent_card, docs; npm publish blocked)
 - [ ] Stage 2 — Launch (drafts + README fold done; demo/URL/publishing need Luca)
-- [ ] Stage 3 — Production trust
-- [ ] Stage 4 — Frontier
+- [x] Stage 3 — Production trust (COMPLETE run 13; exit criteria verified — see Current stage)
+- [ ] Stage 4 — Frontier (current; experiment runs blocked on OPENROUTER_API_KEY, item 11)
 
 ## Stage 0 item status (verified 2026-07-17)
 
@@ -166,6 +178,12 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    on 0038 (the prompt's own default priority) rather than idle; items are
    independent, so reordering on your answer loses nothing. Edit the plan file
    or leave notes here to reorder/veto.
+11. **OPENROUTER_API_KEY for the Stage 4 persona experiment.** Stage 4's
+   deliverable is a measured comparison (standing team vs. hierarchical
+   spawn) with real LLM runs through OpenRouter. Without the key the
+   executor will build the blackboard/turn-taking machinery and ADR-0023
+   usage attribution, but cannot produce the experiment's numbers (and will
+   never fake them). Same key as item 6; providing it once covers both.
 9. **ADR-0056 admin UI: OK to defer to Stage 3?** Shaping estimate 4–6 sessions
    (details in Stage 2 item status above). The stage prompt says propose deferral if
    over ~2 sessions — this is the proposal. Silence = defer; say "build it in Stage 2"
@@ -349,10 +367,55 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      registry (health-monitor deregistration — the gray dot only covers
      the pre-cleanup race and monitor-less meshes), survivors live, zero
      page errors.
-   - Remaining: wave 5 (packaging into the wheel, Playwright smoke e2e,
-     cookbook/CLI docs, ADR + index → documented, CHANGELOG).
+   - Shipped wave 5 (run 13, merged a4b667b) — ADR-0056 COMPLETE, at
+     `documented`: publish.yml builds sdk-ts + ui and copies ui/dist into
+     src/openagentmesh/_ui_assets/ before `uv build` (verified locally:
+     assets present in wheel AND sdist; `oam ui --check` works from a
+     clean-venv wheel install; no `[ui]` extra — stdlib server, assets are
+     data files in the base wheel). publish.yml's test job also gained the
+     nats-server/nsc installs ci.yml had (it would have failed the next tag
+     push without them). ui/e2e/smoke.mjs + `ui-e2e` CI job (playwright):
+     registry live dot, rjsf Call round-trip, event feed on mesh.> — the
+     only automated coverage of the real websocket path; passed locally
+     (preinstalled chromium) AND in real CI (run 90 job "Smoke e2e against
+     a real mesh", success, verified at step level). Docs:
+     cookbook/admin-ui.md + twin, `oam ui` in cli.md, mesh-up output fix,
+     index/nav. ADR amended (mesh.> default, monitor-deregistration,
+     no-[ui]-extra, e2e-as-only-real-transport-coverage) → documented.
+     CHANGELOG admin-UI entry rewritten as shipped.
 
 ## Run log
+
+### 2026-07-19 ~18:00–18:35 UTC — run 13 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits since bootstrap are the
+executor's; state file untouched since a4864ec); all four roadmap/stage-*
+branches fully merged (0 unmerged commits each); CI success on main tip
+a4864ec (run 87) — closes run 12's tail.
+
+Advanced (Stage 3, ADR-0056 wave 5, on roadmap/stage-3, merged a4b667b):
+wheel packaging in publish.yml (verified by actually building: assets in
+wheel + sdist, `oam ui --check` green from a clean-venv wheel install),
+playwright smoke e2e (ui/e2e/smoke.mjs + ui-e2e CI job — passed locally
+and in real CI), admin-UI docs (cookbook + twin + CLI reference), ADR
+amendments → documented. Full detail in Stage 3 item status. Verified
+this run: 335 pytest, ruff/ty clean, sdk-ts 62/62 vitest, ui 30/30 vitest
++ typecheck + build, zensical build clean, CI run 90 on branch tip
+d1bf25b all four jobs success (ui-e2e step-level verified; run 88 on the
+packaging commit also success; run 89 cancelled by the same-branch push,
+the known pattern).
+
+**Stage 3 closed** — all three exit criteria checked against the repo
+(see Current stage). Advanced the tracker to Stage 4. CI on the main
+merge commit a4b667b: pending at state-file write, checked before run
+end (see addendum or next run's log if cut off).
+
+Left open: all Needs-Luca items, plus new item 11 (OPENROUTER_API_KEY
+for Stage 4's measured experiment). Next run: begin Stage 4 per its
+prompt — read km/notes/2026-05-25-persona-team-on-oam.md and the
+learnings, then start with ADR-0023 usage attribution (the stage prompt
+itself suggests it first, and it needs no LLM key), recording the
+experiment-blocker under Needs Luca 11.
 
 ### 2026-07-19 ~12:40 UTC — run 12 addendum
 
