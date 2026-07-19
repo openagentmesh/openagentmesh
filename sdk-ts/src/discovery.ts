@@ -3,6 +3,7 @@ import { NotFound } from "./errors.js";
 import type { AgentContract, CatalogEntry, CatalogFilter } from "./types.js";
 
 export const CATALOG_BUCKET = "mesh-catalog";
+export const INSTANCES_BUCKET = "mesh-instances";
 export const CATALOG_KEY = "catalog";
 export const REGISTRY_BUCKET = "mesh-registry";
 

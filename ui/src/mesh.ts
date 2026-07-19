@@ -1,5 +1,14 @@
 import { AgentMesh } from "@openagentmesh/sdk";
-import type { AgentContract, CatalogEntry, Json, StreamOptions } from "@openagentmesh/sdk";
+import type {
+  AgentContract,
+  CatalogEntry,
+  InstancesSnapshot,
+  InstancesWatchOptions,
+  Json,
+  StreamOptions,
+  TapEvent,
+  TapOptions,
+} from "@openagentmesh/sdk";
 
 /**
  * The slice of the SDK surface the UI consumes. Production wraps a connected
@@ -11,6 +20,8 @@ export interface MeshClient {
   contract(name: string): Promise<AgentContract>;
   call(name: string, payload?: unknown): Promise<Json>;
   stream(name: string, payload?: unknown, opts?: StreamOptions): AsyncIterable<Json>;
+  tap(subject: string, opts?: TapOptions): AsyncIterable<TapEvent>;
+  instancesWatch(opts?: InstancesWatchOptions): AsyncIterable<InstancesSnapshot>;
   close(): Promise<void>;
 }
 

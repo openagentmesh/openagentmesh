@@ -1,10 +1,11 @@
 import { Kvm } from "@nats-io/kv";
 import type { Msg, NatsConnection, Subscription } from "@nats-io/nats-core";
-import { decodeJSON, encodeJSON, encodeText } from "./codec.js";
+import { decodeJSON, decodeText, encodeJSON, encodeText } from "./codec.js";
 import { openConnection } from "./connection.js";
 import {
   CATALOG_BUCKET,
   Discovery,
+  INSTANCES_BUCKET,
   REGISTRY_BUCKET,
 } from "./discovery.js";
 import {
@@ -35,11 +36,15 @@ import type {
   CatalogEntry,
   CatalogFilter,
   ConnectOptions,
+  InstancesSnapshot,
+  InstancesWatchOptions,
   Json,
   PublishOptions,
   SendOptions,
   StreamOptions,
   SubscribeOptions,
+  TapEvent,
+  TapOptions,
 } from "./types.js";
 import { isNoRespondersError, isTimeoutError, withAbort, withDeadline } from "./util.js";
 
@@ -336,6 +341,94 @@ export class AgentMesh {
       }
     } finally {
       sub.unsubscribe();
+    }
+  }
+
+  // ── tap ───────────────────────────────────────────────────────────────────
+  /**
+   * Wiretap on a subject pattern (admin/observability surface): yields every
+   * message with its subject, decoding JSON payloads (raw text otherwise).
+   * Unlike `subscribe()`, error envelopes are yielded (`isError`) rather than
+   * thrown, and `X-Mesh-Stream-End` does not terminate the feed.
+   */
+  async *tap(subject: string, opts: TapOptions = {}): AsyncIterable<TapEvent> {
+    const sub = this.nc.subscribe(subject);
+    try {
+      const it = sub[Symbol.asyncIterator]();
+      while (true) {
+        const res = await withAbort(it.next(), opts.signal);
+        if (res.done) break;
+        const m = res.value;
+        let payload: Json | string;
+        try {
+          payload = decodeJSON(m.data);
+        } catch {
+          payload = decodeText(m.data);
+        }
+        yield {
+          subject: m.subject,
+          payload,
+          isError: readHeader(m.headers, H.status) === STATUS_ERROR,
+        };
+      }
+    } finally {
+      sub.unsubscribe();
+    }
+  }
+
+  // ── instances ─────────────────────────────────────────────────────────────
+  /**
+   * Live view of the `mesh-instances` bucket (ADR-0016): yields the full
+   * instance → served-agents map after the initial replay, then again on
+   * every change. Completes without yielding when the bucket does not exist
+   * (pre-liveness mesh); ends when the signal aborts.
+   */
+  async *instancesWatch(opts: InstancesWatchOptions = {}): AsyncIterable<InstancesSnapshot> {
+    let kv;
+    let status;
+    try {
+      // `open()` is lazy — a missing bucket only surfaces on the first API call.
+      kv = await new Kvm(this.nc).open(INSTANCES_BUCKET);
+      status = await kv.status();
+    } catch {
+      return;
+    }
+    const iter = await kv.watch();
+    const stop = () => iter.stop();
+    opts.signal?.addEventListener("abort", stop, { once: true });
+    if (opts.signal?.aborted) stop();
+
+    const current = new Map<string, string[]>();
+    const snap = (): InstancesSnapshot => Object.fromEntries(current);
+    // The watch replays current values first (`delta` counts what remains);
+    // coalesce the replay into one initial snapshot. An empty bucket replays
+    // nothing, so its initial snapshot is emitted up front.
+    let replayDone = status.values === 0;
+    try {
+      if (replayDone) yield snap();
+      for await (const e of iter) {
+        if (e.operation === "PUT" && e.value.length > 0) {
+          try {
+            const record = JSON.parse(e.string()) as { agents?: string[] };
+            current.set(e.key, record.agents ?? []);
+          } catch {
+            current.set(e.key, []);
+          }
+        } else {
+          current.delete(e.key);
+        }
+        if (!replayDone) {
+          if ((e.delta ?? 0) === 0) {
+            replayDone = true;
+            yield snap();
+          }
+        } else {
+          yield snap();
+        }
+      }
+    } finally {
+      opts.signal?.removeEventListener("abort", stop);
+      iter.stop();
     }
   }
 
