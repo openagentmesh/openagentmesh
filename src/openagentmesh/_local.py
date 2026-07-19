@@ -161,10 +161,30 @@ class EmbeddedNats:
         if not binary:
             binary = await download_nats_server()
 
-        if self.port == 0:
-            self.port = _free_port()
-        if self.ws_port == 0:
-            self.ws_port = _free_port()
+        # _free_port() is a check-then-use race: the port can be taken between
+        # probing and nats-server binding it. Re-pick auto-selected ports and
+        # retry; pinned ports fail immediately (the caller chose them).
+        auto_port = self.port == 0
+        auto_ws_port = self.ws_port == 0
+        attempts = 3 if auto_port or auto_ws_port else 1
+        for attempt in range(1, attempts + 1):
+            if auto_port:
+                self.port = _free_port()
+            if auto_ws_port:
+                self.ws_port = _free_port()
+            try:
+                await self._boot(binary)
+                return
+            except RuntimeError as exc:
+                if attempt < attempts and "address already in use" in str(exc):
+                    if auto_port:
+                        self.port = 0
+                    if auto_ws_port:
+                        self.ws_port = 0
+                    continue
+                raise
+
+    async def _boot(self, binary: Path) -> None:
         sys_password = secrets.token_hex(16)
         self.url = f"nats://127.0.0.1:{self.port}"
         self.ws_url = f"ws://127.0.0.1:{self.ws_port}"
