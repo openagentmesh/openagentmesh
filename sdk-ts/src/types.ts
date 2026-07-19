@@ -88,6 +88,26 @@ export interface SubscribeOptions {
   signal?: AbortSignal;
 }
 
+/** One message seen by `mesh.tap()`: a wiretap on a subject pattern. */
+export interface TapEvent {
+  subject: string;
+  /** Decoded JSON payload, or the raw text when the payload is not JSON. */
+  payload: Json | string;
+  /** True when the message carried `X-Mesh-Status: error` (the payload is the error envelope). */
+  isError: boolean;
+}
+
+export interface TapOptions {
+  signal?: AbortSignal;
+}
+
+/** `mesh-instances` bucket contents: instance id → agent names it serves (ADR-0016). */
+export type InstancesSnapshot = Record<string, string[]>;
+
+export interface InstancesWatchOptions {
+  signal?: AbortSignal;
+}
+
 export interface CatalogFilter {
   channel?: string;
   tags?: string[];

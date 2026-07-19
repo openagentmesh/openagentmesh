@@ -21,6 +21,8 @@ export type {
   CatalogFilter,
   CallOptions,
   ConnectOptions,
+  InstancesSnapshot,
+  InstancesWatchOptions,
   Json,
   KvSnapshotEntry,
   KvWatchEntry,
@@ -28,5 +30,7 @@ export type {
   SendOptions,
   StreamOptions,
   SubscribeOptions,
+  TapEvent,
+  TapOptions,
   Validator,
 } from "./types.js";
