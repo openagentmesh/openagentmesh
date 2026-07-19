@@ -68,3 +68,30 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: npx tsc --noEmit
       - run: pnpm vitest run
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            sdk-ts/pnpm-lock.yaml
+            ui/pnpm-lock.yaml
+      - name: Build the SDK (link: target of ui/)
+        working-directory: sdk-ts
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - run: pnpm install --frozen-lockfile
+        working-directory: ui
+      - run: pnpm run typecheck
+        working-directory: ui
+      - run: pnpm run test
+        working-directory: ui
+      - run: pnpm run build
+        working-directory: ui
