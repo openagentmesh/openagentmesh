@@ -354,6 +354,13 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-19 ~12:40 UTC — run 12 addendum
+
+CI on main verified before run end: run 86 on tip 2047923 success (the
+wave-4 merge commit's own run 85 was superseded/cancelled by the
+same-ref km push — the known pattern, not a failure; the code tree it
+carries is what run 86 tested). No open verifications.
+
 ### 2026-07-19 ~12:05 UTC — run 12 (Fable 5, cloud)
 
 **Run 11 reconciliation:** run 11 (~06:15 UTC, per branch CI timestamps)
