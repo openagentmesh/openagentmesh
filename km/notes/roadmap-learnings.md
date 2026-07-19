@@ -226,6 +226,43 @@ update that file too and say so here.
   handler class directly in `finish_request` instead of going through
   `RequestHandlerClass`.
 
+## 2026-07-19 — Stage 3, run 10 (cloud executor): ADR-0056 wave 2
+
+- **An unquoted `:` inside a GitHub Actions step name is fatal to the whole
+  workflow** — `name: Build the SDK (link: target of ui/)` made the YAML
+  unparseable, the run reports conclusion=failure with **zero jobs**, and
+  `get_job_logs` has nothing to show. "Failure with 0 jobs" = workflow parse
+  error; validate ci.yml with a YAML load locally before pushing.
+- **`pkill -f <pattern>` can kill the shell running it** when the wrapper
+  command line itself contains the pattern (the sandbox shell embeds the
+  whole command in its argv). Symptom: exit code 144 and later chained
+  commands never ran. Match on something not present in your own command
+  line, or use pgrep first.
+- **The `link:` protocol beats a pnpm workspace here**: a root
+  pnpm-workspace.yaml would have moved sdk-ts's lockfile/install root and
+  broken the existing sdk-ts CI job. `"@openagentmesh/sdk": "link:../sdk-ts"`
+  keeps both packages standalone; the only cost is building the SDK
+  (tsc → dist/) before ui typecheck/build — encoded as the first step of
+  the ui CI job.
+- **Injecting a fake client via React context beats vi.mock for SDK-consuming
+  components**: `<MeshProvider client={fakeMesh()}>` keeps tests
+  transport-free and type-checked against the real `MeshClient` interface —
+  no module-mock drift when the SDK surface changes.
+- **pnpm 10 blocks dependency build scripts by default** (esbuild's
+  postinstall was skipped with only a warning). Declare
+  `pnpm.onlyBuiltDependencies: ["esbuild"]` in package.json so local and CI
+  installs behave identically instead of relying on the optional-dep binary
+  path happening to exist.
+- **The preinstalled Playwright chromium makes real-browser e2e cheap in the
+  sandbox**: `npm i playwright` (module only, no browser download) +
+  `executablePath: /opt/pw-browsers/chromium` drove the production UI against
+  a real `oam mesh up` in one run — caught nothing this time, but it's the
+  wave-5 smoke-test pattern, proven early.
+- **jsdom + wsconnect never actually connect** — all UI tests go through the
+  injected fake; the real websocket path is covered only by the browser e2e.
+  Wave 5's Playwright test is therefore not optional polish; it is the only
+  automated coverage of connect/config.json/KV-watch in the UI.
+
 ## 2026-07-17 — Stage 2, run 3 (cloud executor)
 
 - **The docs URL split is an active bug, not future polish.** mkdocs.yml's

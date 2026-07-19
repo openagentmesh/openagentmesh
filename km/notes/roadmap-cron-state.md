@@ -17,12 +17,14 @@ test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
 passing — caller gets agent_died in ~1s against a 30s timeout).
 ADR-0048 observability v1: COMPLETE (run 7) — merged to main 3e5e486.
 ADR-0055 lifecycle gates: COMPLETE (run 8) — merged to main b7e4093.
-ADR-0056 admin UI: IN PROGRESS (started run 9) — wave 1 of 5 merged to
-main 7b48e99 (websocket listener on dev meshes, `oam ui` static server +
-config.json, ADR amended against the shipped repo). Build waves tracked in
-km/notes/2026-07-18-adr0056-ui-plan.md; next run continues with wave 2
-(ui/ frontend scaffold; the browser client is `@openagentmesh/sdk` via
-workspace link — see the plan note and the 2026-07-18 ADR amendment).
+ADR-0056 admin UI: IN PROGRESS — wave 1 of 5 merged to main 7b48e99
+(run 9: websocket listener on dev meshes, `oam ui` static server +
+config.json, ADR amended against the shipped repo); wave 2 of 5 merged to
+main efae05e (run 10: ui/ frontend scaffold, registry + contract viewer
+screens, `ui` CI job — e2e verified in a real browser). Build waves
+tracked in km/notes/2026-07-18-adr0056-ui-plan.md; next run continues
+with wave 3 (invocation sandbox: @rjsf form from input schema, Call +
+Stream from the browser).
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -266,8 +268,9 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      lifecycle files after fixing two test races (see learnings).
    - No role-template changes needed: gates ride existing surfaces
      (mesh-context KV; subject gates share subject_source's constraint).
-5. **ADR-0056 admin UI** — IN PROGRESS (run 9). Wave 1/5 merged to main
-   7b48e99; ADR index at `test`. Waves in km/notes/2026-07-18-adr0056-ui-plan.md.
+5. **ADR-0056 admin UI** — IN PROGRESS (runs 9–10). Waves 1–2 of 5 merged
+   to main (7b48e99, efae05e); ADR index at `test`. Waves in
+   km/notes/2026-07-18-adr0056-ui-plan.md.
    - ADR amended twice this run against reality: (a) the websocket listener
      cannot share the NATS client port (verified fatal bind error on
      2.10.24) — defaults are now ws = mesh port + 1, `oam ui` on 4224;
@@ -285,10 +288,51 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    - E2E verified in-sandbox: real `oam mesh up` → ws handshake 101 on
      port+1; `oam ui` served config.json and SPA-fallback routes; derived
      ws URL from .oam-url correctly.
-   - Remaining: waves 2–5 (frontend scaffold + registry screen, sandbox,
-     event feed + liveness dots, packaging/e2e/docs).
+   - Shipped wave 2 (run 10, merged efae05e): `ui/` scaffold (Vite +
+     React 18 + TS + Tailwind 4, pnpm; `@openagentmesh/sdk` via
+     link:../sdk-ts per the ADR's SDK-reuse amendment); MeshProvider
+     context bootstrapping via /config.json (dev server serves it too);
+     registry table (capability badges per ADR-0031 shapes, first-sentence
+     descriptions, 2s poll of the SDK's KV-watch-warmed cache) and agent
+     detail contract viewer (human/JSON toggle, input/output/chunk
+     schemas); events-screen stub until wave 4. 11 vitest tests against a
+     fake MeshClient injected via context (no module mocking); new `ui`
+     CI job (sdk-ts build → typecheck, vitest, production build);
+     `src/openagentmesh/_ui_assets/` now gitignored per the ADR's
+     CI-built-assets decision.
+   - E2E verified in-sandbox (run 10): headless chromium (preinstalled
+     Playwright browser) against a real `oam mesh up` + registered agent +
+     `oam ui` serving the production build — connected badge, live catalog
+     row, detail screen with real Pydantic schemas, JSON toggle, deep-link
+     via SPA fallback; zero page errors.
+   - Remaining: waves 3–5 (invocation sandbox, event feed + liveness
+     dots, packaging/e2e/docs).
 
 ## Run log
+
+### 2026-07-19 ~00:10–00:30 UTC — run 10 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits since bootstrap are the
+executor's; origin quiet since 18:32, no overlap risk); all four
+roadmap/stage-* branches fully merged (0 unmerged commits each); CI
+success on main tip 1f5e959 (run 63) — closes run 9's tail.
+
+Advanced (Stage 3, ADR-0056 wave 2, on roadmap/stage-3, merged efae05e):
+scaffold → red tests (10 red / 1 green) → implementation → CI job, per
+the pipeline. Full detail in Stage 3 item status above. Verified this
+run: ui typecheck + 11/11 vitest (3 consecutive runs) + production build
+green locally; 53/53 sdk-ts vitest locally; CI success on branch tip
+e266d8b (run 70 — all three jobs incl. the new `ui` job; run 68's
+failure was an invalid-yaml step name in the new job, fixed in 16b935c;
+runs 65/66/69 cancelled by same-branch pushes, the known pattern);
+headless-chromium e2e against a real mesh passed (details above).
+
+CI on the main merge commit efae05e: pushed at end of run — verify next
+run. Left open: all Needs-Luca items still unanswered. Next run: check
+Needs-Luca answers, verify CI on efae05e, then ADR-0056 wave 3 per the
+plan note (invocation sandbox: @rjsf/core form from input schema, Call
+request/reply + Stream reassembly in the browser, error-envelope
+rendering incl. not_available).
 
 ### 2026-07-18 ~18:05–19:00 UTC — run 9 (Fable 5, cloud)
 
