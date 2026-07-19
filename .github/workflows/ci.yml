@@ -82,7 +82,7 @@ jobs:
           cache-dependency-path: |
             sdk-ts/pnpm-lock.yaml
             ui/pnpm-lock.yaml
-      - name: Build the SDK (link: target of ui/)
+      - name: Build the SDK (the ui/ link target)
         working-directory: sdk-ts
         run: |
           pnpm install --frozen-lockfile
