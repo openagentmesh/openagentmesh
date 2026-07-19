@@ -2,7 +2,7 @@
 
 ## Status
 
-spec (amended 2026-05-09, 2026-07-18)
+documented (amended 2026-05-09, 2026-07-18, 2026-07-19; shipped in five waves, see `km/notes/2026-07-18-adr0056-ui-plan.md`)
 
 ## Context
 
@@ -22,6 +22,13 @@ Existing NATS tooling (Surveyor, nats-top, NATS CLI) covers the NATS layer but i
 > 6. **Auth exists now** (ADR-0038). v1 of the UI stays a dev-mesh tool: anonymous connection, localhost-only serving. Against a secured mesh the browser would need a credential the static server would have to hand out via `config.json` — deliberately out of scope; recorded under Open items.
 > 7. **Asset shipping contradiction resolved:** the Frontend section said assets are both "checked into the repo" and "built by CI only". CI-built is the decision (as the 2026-05-09 amendment intended): `src/openagentmesh/_ui_assets/` is gitignored, populated by the wheel-build workflow; `oam ui` without assets prints a clear error pointing at `pnpm dev` for source checkouts.
 > 8. **Build waves** for the multi-session implementation are tracked in `km/notes/2026-07-18-adr0056-ui-plan.md`.
+
+> **Amendment 2026-07-19** — deviations recorded at ship time (waves 3–5):
+>
+> 1. **Event feed default pattern is `mesh.>`, not `>`.** The browser is itself a mesh client, so a bare `>` wiretap receives the UI's own JetStream API requests and inbox replies and floods the feed with its own chatter. Users can still type `>` explicitly.
+> 2. **Dead agents don't linger gray.** With the ADR-0016 health monitor running (the `oam mesh up` default), a crashed agent is deregistered from the catalog, so its registry row is removed. The gray "offline" dot appears only in the notice-to-cleanup window or on monitor-less meshes. Documented in the cookbook so users don't expect a graveyard view.
+> 3. **No `[ui]` extra.** The static server is stdlib and already in the core CLI; the compiled assets are data files. They ship in the base wheel (built by the publish workflow into `src/openagentmesh/_ui_assets/` before `uv build` — verified present in both wheel and sdist). `pip install "openagentmesh[ui]"` in this ADR reads as plain `pip install openagentmesh`.
+> 4. **Real-transport coverage lives in `ui/e2e/smoke.mjs`** (playwright, `pnpm run e2e`, `ui-e2e` CI job): jsdom unit tests inject a fake mesh client, so the config.json bootstrap, websocket connect, KV watch, and browser request/reply are exercised only by the smoke e2e against a real `oam mesh up` + `oam ui`.
 
 ### Scope
 
