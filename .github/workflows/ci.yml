@@ -95,3 +95,46 @@ jobs:
         working-directory: ui
       - run: pnpm run build
         working-directory: ui
+  ui-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            sdk-ts/pnpm-lock.yaml
+            ui/pnpm-lock.yaml
+      - name: Cache embedded NATS binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.agentmesh/bin
+          key: nats-server-${{ runner.os }}-2.10.24
+      - name: Install nats-server
+        run: |
+          if [ ! -x ~/.agentmesh/bin/nats-server ]; then
+            mkdir -p ~/.agentmesh/bin
+            curl -fsSL https://github.com/nats-io/nats-server/releases/download/v2.10.24/nats-server-v2.10.24-linux-amd64.tar.gz \
+              | tar xz --strip-components=1 -C ~/.agentmesh/bin nats-server-v2.10.24-linux-amd64/nats-server
+          fi
+      - name: Build the TS SDK (the ui/ link target)
+        working-directory: sdk-ts
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Build the UI
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Install playwright chromium
+        working-directory: ui
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Smoke e2e against a real mesh
+        working-directory: ui
+        run: pnpm run e2e
