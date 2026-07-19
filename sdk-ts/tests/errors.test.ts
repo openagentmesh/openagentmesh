@@ -6,6 +6,7 @@ import {
   KVKeyExists,
   MeshError,
   MeshTimeout,
+  NotAvailable,
   NotFound,
 } from "../src/index.js";
 
@@ -14,6 +15,13 @@ describe("error taxonomy", () => {
     expect(fromEnvelope({ code: "not_found", message: "x", agent: "a" })).toBeInstanceOf(NotFound);
     expect(fromEnvelope({ code: "invocation_mismatch", message: "x" })).toBeInstanceOf(InvocationMismatch);
     expect(fromEnvelope({ code: "invalid_input", message: "x" }).code).toBe("invalid_input");
+  });
+
+  it("maps not_available to NotAvailable (ADR-0055 gated agents)", () => {
+    const e = fromEnvelope({ code: "not_available", message: "gate closed", agent: "gated" });
+    expect(e).toBeInstanceOf(NotAvailable);
+    expect(e.code).toBe("not_available");
+    expect(e.agent).toBe("gated");
   });
 
   it("falls back to MeshError preserving an unknown code", () => {
