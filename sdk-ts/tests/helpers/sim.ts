@@ -187,6 +187,14 @@ export class Sim {
     await this.nc.flush();
   }
 
+  /** Publish an error-envelope message (X-Mesh-Status: error) to a subject. */
+  async emitError(subject: string, envelope: Record<string, unknown>): Promise<void> {
+    const h = headers();
+    h.set("X-Mesh-Status", "error");
+    this.nc.publish(subject, enc(envelope), { headers: h });
+    await this.nc.flush();
+  }
+
   async drain(): Promise<void> {
     for (const s of this.subs) s.unsubscribe();
   }

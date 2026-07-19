@@ -2,6 +2,18 @@ import { AbortError, NotFound } from "@openagentmesh/sdk";
 import type { AgentContract, CatalogEntry, Json } from "@openagentmesh/sdk";
 import type { MeshClient } from "../src/mesh";
 
+/** An async iterable that never yields; ends only when the signal aborts. */
+function silent<T>(signal?: AbortSignal): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator]: () => ({
+      next: () =>
+        new Promise<IteratorResult<T>>((resolve) => {
+          signal?.addEventListener("abort", () => resolve({ value: undefined, done: true }), { once: true });
+        }),
+    }),
+  };
+}
+
 export const TRANSLATOR: AgentContract = {
   name: "translator",
   description: "Translate text between languages. Uses an LLM under the hood.",
@@ -107,6 +119,8 @@ export function fakeMesh(
       throw new Error(`fakeMesh.stream('${name}') not stubbed — pass overrides.stream`);
     },
     close: async () => {},
+    tap: (_subject, opts) => silent(opts?.signal),
+    instancesWatch: (opts) => silent(opts?.signal),
     ...overrides,
   };
 }
@@ -116,14 +130,14 @@ export function fakeMesh(
  * time, `end`/`fail` to terminate. `iterate(signal)` mirrors the SDK stream's
  * abort semantics (pending next() rejects with AbortError on abort).
  */
-export function pushableQueue() {
-  const buffered: Json[] = [];
+export function pushableQueue<T = Json>() {
+  const buffered: T[] = [];
   let ended = false;
   let failure: unknown;
-  let pending: { resolve: (r: IteratorResult<Json, undefined>) => void; reject: (e: unknown) => void } | null = null;
+  let pending: { resolve: (r: IteratorResult<T, undefined>) => void; reject: (e: unknown) => void } | null = null;
 
   return {
-    push(chunk: Json) {
+    push(chunk: T) {
       if (pending) {
         pending.resolve({ value: chunk, done: false });
         pending = null;
@@ -143,9 +157,9 @@ export function pushableQueue() {
         pending = null;
       }
     },
-    iterate(signal?: AbortSignal): AsyncIterable<Json> {
-      const next = (): Promise<IteratorResult<Json, undefined>> => {
-        if (buffered.length > 0) return Promise.resolve({ value: buffered.shift() as Json, done: false });
+    iterate(signal?: AbortSignal): AsyncIterable<T> {
+      const next = (): Promise<IteratorResult<T, undefined>> => {
+        if (buffered.length > 0) return Promise.resolve({ value: buffered.shift() as T, done: false });
         if (failure !== undefined) return Promise.reject(failure);
         if (ended) return Promise.resolve({ value: undefined, done: true });
         if (signal?.aborted) return Promise.reject(new AbortError());
