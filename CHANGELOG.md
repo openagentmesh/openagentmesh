@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Calling an agent nobody serves now raises `NotFound` immediately (NATS no-responders) instead of leaking the raw `nats.errors.NoRespondersError` — the error-handling cookbook's retry pattern now works as documented.
+- TypeScript SDK: calling an agent that is still in the catalog but currently offline (lifecycle-gated or between instances) now raises `NotAvailable` (code `not_available`) instead of `NotFound`, matching the Python SDK's ADR-0055 semantics — callers know the agent exists and a retry is reasonable.
 - The dev NATS servers started by `oam mesh up` and `AgentMesh.local()` now run with a small accounts config (anonymous clients still connect exactly as before) and a 10s ping interval, so network partitions are detected in ~20s instead of NATS's ~4-minute default.
 - `mesh.kv` and `mesh.workspace` accessed before connecting now raise `ConnectionFailed` with a clear message instead of surfacing as `AttributeError: 'NoneType' object has no attribute ...` at the first call site.
 
