@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import CapabilityBadges from "../components/CapabilityBadges";
+import InvokePanel from "../components/InvokePanel";
 import { useContract } from "../hooks";
 import { prettyJson } from "../lib/format";
 
@@ -93,6 +94,8 @@ export default function AgentDetail() {
           <SchemaBlock title="Chunk schema" schema={contract.chunkSchema} />
         </div>
       )}
+
+      <InvokePanel contract={contract} />
     </div>
   );
 }

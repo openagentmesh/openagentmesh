@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Msg, NatsConnection } from "@nats-io/nats-core";
-import { AgentMesh, HandlerError, MeshTimeout, NotFound } from "../src/index.js";
+import { AgentMesh, HandlerError, MeshTimeout, NotAvailable, NotFound } from "../src/index.js";
 import { startNatsServer, type NatsServer } from "./helpers/server.js";
-import { ensureBuckets, errorResult, rawConnect, Sim } from "./helpers/sim.js";
+import { ensureBuckets, errorResult, rawConnect, seedCatalog, Sim } from "./helpers/sim.js";
 
 let server: NatsServer;
 let raw: NatsConnection;
@@ -53,6 +53,23 @@ describe("call", () => {
 
   it("throws NotFound when no agent serves the subject", async () => {
     await expect(mesh.call("nobody.home", {})).rejects.toBeInstanceOf(NotFound);
+  });
+
+  it("throws NotAvailable when the agent is cataloged but nothing serves it (ADR-0055)", async () => {
+    // A lifecycle-gated agent stays in the catalog while its gate is closed;
+    // no-responders then means "offline", not "missing".
+    await seedCatalog(raw, [
+      { name: "gated", description: "gated agent", version: "1.0.0", invocable: true, streaming: false },
+    ]);
+    for (let i = 0; i < 100; i++) {
+      const rows = await mesh.catalog();
+      if (rows.some((e) => e.name === "gated")) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const err = await mesh.call("gated", {}).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NotAvailable);
+    expect((err as NotAvailable).code).toBe("not_available");
+    expect((err as NotAvailable).agent).toBe("gated");
   });
 
   it("throws MeshTimeout when the agent never replies", async () => {
