@@ -61,3 +61,5 @@ site/
 
 # CLI per-project mesh URL
 .oam-url
+# Admin UI compiled assets (built by CI at publish time, ADR-0056)
+src/openagentmesh/_ui_assets/
