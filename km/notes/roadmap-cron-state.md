@@ -406,9 +406,21 @@ packaging commit also success; run 89 cancelled by the same-branch push,
 the known pattern).
 
 **Stage 3 closed** — all three exit criteria checked against the repo
-(see Current stage). Advanced the tracker to Stage 4. CI on the main
-merge commit a4b667b: pending at state-file write, checked before run
-end (see addendum or next run's log if cut off).
+(see Current stage). Advanced the tracker to Stage 4.
+
+Addendum (same run, later): CI on main after the wave-5 merge — run 92
+on tip e236e03 success; run 91 on the merge commit a4b667b itself
+FAILED on a single pytest flake (test_sources
+test_handler_with_pydantic_model: embedded NATS ws port 36467 was
+grabbed between the _free_port probe and nats-server binding it —
+"bind: address already in use"; same code tree green in runs 90 and
+92, so not a regression). Root-caused and fixed the race the same run:
+EmbeddedNats.start() now re-picks auto-selected ports and retries (3
+attempts), with two deterministic tests forcing the collision
+(tests/test_embedded_nats.py). Merged --no-ff to main 40737cf after CI
+run 94 success on branch tip 949619a; 337 pytest + ruff/ty clean
+locally on the fixed tree. CI on main tip 40737cf verified before run
+end — see below.
 
 Left open: all Needs-Luca items, plus new item 11 (OPENROUTER_API_KEY
 for Stage 4's measured experiment). Next run: begin Stage 4 per its

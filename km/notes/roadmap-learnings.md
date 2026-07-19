@@ -322,6 +322,13 @@ update that file too and say so here.
   extra publisher machinery. Also the READY marker should come *after* the
   first successful self-call — registration is lazy (the run-2 lesson,
   still earning its keep).
+- **`_free_port()` probing is a TOCTOU race that eventually fires in CI**:
+  the wave-5 merge commit's own CI run lost a port between the probe and
+  nats-server's bind (1 failure in ~90 runs since the ws listener doubled
+  the picks per boot). Retry-on-bind-failure with re-picked ports is the
+  remedy; the deterministic test monkeypatches _free_port to hand out an
+  occupied port once. Any "find a free port, then use it" helper should
+  ship with that retry from day one.
 - **Stage 3 ran start-to-finish without a single Luca answer**: six ADRs
   (auth, liveness pair, observability, lifecycle gates, admin UI) shipped
   through the pipeline across runs 4–13 on default priorities alone. The
