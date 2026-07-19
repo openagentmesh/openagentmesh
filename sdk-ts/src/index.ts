@@ -5,6 +5,7 @@ export {
   InvalidInput,
   HandlerError,
   InvocationMismatch,
+  NotAvailable,
   NotFound,
   ConnectionFailed,
   MeshTimeout,

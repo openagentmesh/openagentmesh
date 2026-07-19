@@ -15,6 +15,7 @@ import {
   InvocationMismatch,
   MeshError,
   MeshTimeout,
+  NotAvailable,
   NotFound,
 } from "./errors.js";
 import { buildHeaders, H, readHeader, STATUS_ERROR } from "./headers.js";
@@ -135,6 +136,14 @@ export class AgentMesh {
     } catch (err) {
       if (err instanceof MeshError) throw err;
       if (isNoRespondersError(err)) {
+        // ADR-0055: an agent still in the catalog with no responders is gated
+        // offline (or draining), not missing.
+        if (this.discovery?.cachedEntry(name)) {
+          throw new NotAvailable(`Agent '${name}' is registered but currently offline (lifecycle gate)`, {
+            agent: name,
+            requestId,
+          });
+        }
         throw new NotFound(`No agent serving '${name}'`, { agent: name, requestId });
       }
       if (isTimeoutError(err)) {

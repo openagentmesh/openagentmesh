@@ -43,6 +43,14 @@ export class InvocationMismatch extends MeshError {
 export class NotFound extends MeshError {
   static code = "not_found";
 }
+/**
+ * Agent registered in the catalog but currently offline (ADR-0055): a
+ * lifecycle gate has taken it off its queue group (or it is draining).
+ * The agent exists; retry when its condition changes.
+ */
+export class NotAvailable extends MeshError {
+  static code = "not_available";
+}
 export class ConnectionFailed extends MeshError {
   static code = "connection_failed";
 }
@@ -101,6 +109,7 @@ const CODE_TO_CLASS: Record<string, BaseErrorCtor> = {
   [HandlerError.code]: HandlerError,
   [InvocationMismatch.code]: InvocationMismatch,
   [NotFound.code]: NotFound,
+  [NotAvailable.code]: NotAvailable,
   [ConnectionFailed.code]: ConnectionFailed,
 };
 
