@@ -327,12 +327,13 @@ failure was an invalid-yaml step name in the new job, fixed in 16b935c;
 runs 65/66/69 cancelled by same-branch pushes, the known pattern);
 headless-chromium e2e against a real mesh passed (details above).
 
-CI on the main merge commit efae05e: pushed at end of run — verify next
-run. Left open: all Needs-Luca items still unanswered. Next run: check
-Needs-Luca answers, verify CI on efae05e, then ADR-0056 wave 3 per the
-plan note (invocation sandbox: @rjsf/core form from input schema, Call
-request/reply + Stream reassembly in the browser, error-envelope
-rendering incl. not_available).
+CI on main verified before run end: run 72 on tip c61fd00 success (the
+merge commit's own run 71 was superseded/cancelled by the same-tree km
+push — the known pattern, not a failure). No open verifications.
+Left open: all Needs-Luca items still unanswered. Next run: check
+Needs-Luca answers, then ADR-0056 wave 3 per the plan note (invocation
+sandbox: @rjsf/core form from input schema, Call request/reply + Stream
+reassembly in the browser, error-envelope rendering incl. not_available).
 
 ### 2026-07-18 ~18:05–19:00 UTC — run 9 (Fable 5, cloud)
 
