@@ -21,10 +21,13 @@ ADR-0056 admin UI: IN PROGRESS — wave 1 of 5 merged to main 7b48e99
 (run 9: websocket listener on dev meshes, `oam ui` static server +
 config.json, ADR amended against the shipped repo); wave 2 of 5 merged to
 main efae05e (run 10: ui/ frontend scaffold, registry + contract viewer
-screens, `ui` CI job — e2e verified in a real browser). Build waves
-tracked in km/notes/2026-07-18-adr0056-ui-plan.md; next run continues
-with wave 3 (invocation sandbox: @rjsf form from input schema, Call +
-Stream from the browser).
+screens, `ui` CI job — e2e verified in a real browser); wave 3 of 5
+merged to main 968f4f5 (built by run 11 which was cut off before
+merging/logging; verified and merged by run 12: invocation sandbox — rjsf
+form from input schema, Call + Stream from the browser, error envelope
+rendering — plus sdk-ts NotAvailable mapping for ADR-0055 parity). Build
+waves tracked in km/notes/2026-07-18-adr0056-ui-plan.md; next is wave 4
+(event feed + liveness dots).
 Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
 publishing). Stage 1 open only on npm publish. Stage 0 open only on its
 Needs-Luca items (wildfire merge, worktrees, v0.3.0).
@@ -305,10 +308,45 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      `oam ui` serving the production build — connected badge, live catalog
      row, detail screen with real Pydantic schemas, JSON toggle, deep-link
      via SPA fallback; zero page errors.
-   - Remaining: waves 3–5 (invocation sandbox, event feed + liveness
-     dots, packaging/e2e/docs).
+   - Shipped wave 3 (built by run 11 — cut off after pushing, before
+     merge/log — verified and merged 968f4f5 by run 12): `InvokePanel` on
+     agent detail — rjsf form from input schema (bare button when no
+     schema), Call round-trip, Stream via SDK async iterator with Stop
+     (AbortController), error box with taxonomy code badge + request_id +
+     per-code hints; source-only agents render no panel. sdk-ts gained
+     `NotAvailable` (no-responders + present in cached catalog →
+     not_available, ADR-0055 parity). 8 new ui tests (19 total), 2 new
+     sdk-ts tests (55 total).
+   - Wave 3 verification (run 12): CI success on branch tips 297850e
+     (run 78) and 2c45dd2 (run 79); locally ui typecheck + 19/19 vitest +
+     production build, sdk-ts 55/55 vitest, 333/333 pytest; headless-
+     chromium e2e against a real `oam mesh up` + `oam ui`: form from a
+     real Pydantic schema, call reply rendered, 4-chunk stream reassembled
+     with status line, and a kv_condition-gated agent produced the
+     not_available error box (badge + gate hint + request_id), zero page
+     errors.
+   - Remaining: waves 4–5 (event feed + liveness dots, packaging/e2e/docs).
 
 ## Run log
+
+### 2026-07-19 ~12:05 UTC — run 12 (Fable 5, cloud)
+
+**Run 11 reconciliation:** run 11 (~06:15 UTC, per branch CI timestamps)
+pushed all four wave-3 commits to roadmap/stage-3 with green CI on the tip
+(297850e, run 78) but was cut off before merging, logging, or updating
+this file. The early-push protocol did its job: nothing was lost, and
+this run's work started as verify-and-merge, not redo.
+
+Verified at start: no Luca edits (state file untouched since d098273; all
+commits are the executor's); stage-0/1/2 branches still fully merged;
+stage-3 carried exactly the four wave-3 commits. Verified the wave-3 work
+against reality (see Wave 3 verification above) and merged --no-ff to
+main as 968f4f5. CHANGELOG entry for the sdk-ts NotAvailable change and
+the plan-note wave-3 closeout added on the branch (2c45dd2, CI run 79
+success) before merging.
+
+Continuing this run: ADR-0056 wave 4 (event feed + liveness dots) on
+roadmap/stage-3. Left open: all Needs-Luca items still unanswered.
 
 ### 2026-07-19 ~00:10–00:30 UTC — run 10 (Fable 5, cloud)
 
