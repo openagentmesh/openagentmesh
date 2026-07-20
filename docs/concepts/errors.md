@@ -55,9 +55,11 @@ Every error code maps to a dedicated `MeshError` subclass (ADR-0057). The class 
 | `not_found` | `NotFound` | Agent missing from registry/catalog, or nobody serving the subject | Check the name; verify the agent is running |
 | `not_available` | `NotAvailable` | Agent in the catalog but offline — a [lifecycle gate](lifecycle.md) closed it (or it is draining) | Retry when its condition changes |
 | `connection_failed` | `ConnectionFailed` | Initial NATS connect or reconnect failed | Check transport / URL |
+| `connection_denied` | `ConnectionDenied` | Connection or operation rejected by mesh permissions ([security](security.md)) | Check credentials and role grants |
 | `timeout` | `MeshTimeout` | No reply within the deadline | Retry with backoff or raise SLA |
 | `agent_died` | `AgentDied` | The agent left the mesh during your in-flight request | Retry against a replacement; see [Liveness](liveness.md) |
 | `chunk_sequence_error` | `ChunkSequenceError` | Stream chunks arrived out of order | Treat as transport bug |
+| `kv_key_exists` | `KVKeyExists` | `mesh.kv.create()` (put-if-absent) collided with an existing key | Normal outcome when losing a claim race; catch and move on |
 
 All subclasses inherit from `MeshError`. `except MeshError:` still catches everything when you don't want to discriminate.
 
@@ -103,7 +105,7 @@ except InvocationMismatch as e:
 | Verb | Target shape | Message |
 |------|-------------|---------|
 | `call()` on Publisher | invocable=false, streaming=true | "is a publisher and cannot be called. Subscribe to its events instead" |
-| `call()` on Watcher | invocable=false, streaming=false | "is a background task and cannot be called" |
+| `call()` on Source-only | invocable=false, streaming=false | "is a background task and cannot be called" |
 | `call()` on Streamer | invocable=true, streaming=true | "is streaming-only. Use stream() instead" |
 | `stream()` on Responder | invocable=true, streaming=false | "does not support streaming. Use call() instead" |
 | `stream()` on Publisher | invocable=false, streaming=true | "is a publisher and cannot be streamed. Subscribe to its events instead" |

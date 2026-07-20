@@ -15,6 +15,7 @@ All message subjects follow a consistent hierarchy. The subject scheme is transp
 | `mesh.results.{request_id}` | Async callback reply subject |
 | `mesh.death.{name}` | Death notices when an agent leaves the mesh |
 | `mesh.logs.{name}` | Structured log events (level-gated, ephemeral) |
+| `mesh.health.{name}` | *Reserved* for the heartbeat layer deferred by ADR-0016 v1 — no producer yet; the observer role is already granted subscribe access for forward compatibility |
 
 `{name}` is the agent's dotted identifier (ADR-0049). Names with dots embed the channel hierarchy directly (`nlp.summarizer`, `finance.risk.scorer`); root-level agents have no dots (`echo`).
 
@@ -27,6 +28,12 @@ All message subjects follow a consistent hierarchy. The subject scheme is transp
 | `mesh-context` | Agent-defined | Shared state between agents |
 | `mesh-instances` | `{instance_id}` | Host liveness correlation (agents served) |
 | `mesh-observability` | `global` / `{name}` | Log-level config (per-agent wins) |
+
+### Object Store Buckets
+
+| Bucket | Purpose |
+|--------|---------|
+| `mesh-artifacts` | Binary artifact storage (`mesh.workspace`) — files, images, embeddings, anything that doesn't fit a KV string ([shared state](../concepts/shared-state.md)) |
 
 ## Wildcards
 

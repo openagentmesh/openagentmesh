@@ -51,6 +51,8 @@ The payload:
 
 `reason` is `"disconnect"` when the health monitor detected a dropped
 connection, `"graceful_shutdown"` when the agent's host deregistered itself.
+The `DeathNotice` model (exported from `openagentmesh`) parses the payload
+into a typed object: `DeathNotice.model_validate(notice)`.
 
 **Replicas don't produce false alarms.** When an agent runs as multiple
 queue-group instances, scaling one replica down (or losing it) is not a
