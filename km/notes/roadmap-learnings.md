@@ -396,6 +396,36 @@ update that file too and say so here.
   recipes. Reference tables that duplicate nav structure drift silently;
   a docs-consistency sweep is a cheap future run item.
 
+## 2026-07-20 — Stage 4, run 15 (cloud executor): persona-team machinery
+
+- **KV `*` wildcards don't survive dotted identifiers.** Persona agent names
+  ("persona.dx") are two subject tokens, so `debate.{id}.position.*` silently
+  matches nothing — the listing needs `>`. Any KV key scheme that embeds
+  agent names must use `>` for prefix listing (or ban dots in the embedded
+  segment). Caught at design time only because the wave-7 subject-wildcard
+  lesson (ADR-0048) made wildcard semantics a standing checklist item.
+- **The experiment consumed only shipped primitives — zero SDK changes.**
+  Blackboard = mesh-context KV + CAS `update()`, turn dispatch = plain
+  `mesh.call`, metering = ADR-0023 usage events tailed via
+  `mesh.observe.logs()` + a raw wiretap counting `mesh.agent.>`. The
+  Stage 3/4 investment paid out exactly as the roadmap hoped: a
+  research-grade multi-agent harness is ~700 lines of demo code.
+- **Design the synthetic/real boundary into the data model.** RunReport
+  carries a `synthetic: bool` stamped from the model type, and StubModel's
+  docstring + CLI banner say the numbers are fake. With an unattended
+  executor and a later human reader of results.jsonl, "never fake a result"
+  needs to be machine-visible in the artifact, not just discipline.
+- **A mechanical dispatcher keeps the topology honest.** The round-robin
+  turn granter carries no task content — personas read everything from the
+  blackboard — so the standing team stays genuinely lateral (the "changed"
+  bit in TurnResult is coordination metadata, not content). The one place
+  content flows through a call is the hierarchical baseline's
+  orchestrator, which is the point of the comparison.
+- **Registering closures per persona needs the factory-function idiom**
+  (`_make(p)`) or every handler closes over the loop's last persona — the
+  classic Python late-binding trap, worth restating because @mesh.agent
+  in a loop looks innocent.
+
 ## 2026-07-20 — Stage 4, run 14 (cloud executor): ADR-0023 usage attribution
 
 - **ADR-0023's return-value convention was quietly impossible under Pydantic

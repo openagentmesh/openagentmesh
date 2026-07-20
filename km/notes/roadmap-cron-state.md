@@ -7,13 +7,17 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 Stage 4 — Frontier. Item 2 (ADR-0023 usage attribution) COMPLETE run 14:
 merged to main bf00b88 (--no-ff), ADR at `documented`. Item 1 (persona
-experiment) shaped run 14: km/notes/2026-07-20-persona-experiment-plan.md
-records the task proposal, blackboard/turn-taking decisions, and measurement
-plan. Next run: build the experiment machinery per that note (blackboard
-records + round-robin harness + hierarchical baseline, stub model, in
-demos/persona_team/ on roadmap/stage-4). Measured runs stay blocked on
-OPENROUTER_API_KEY (Needs Luca 11); item 3 (ADR-0036 decision) comes after
-the experiment.
+experiment): machinery BUILT run 15 — merged to main 46b4224 (--no-ff),
+`src/openagentmesh/demos/persona_team/` + 10 tests; both topologies run
+the full protocol dry with the stub model (details in the plan note's
+execution-order section). The item's remaining work — measured runs and
+the comparison note — is BLOCKED on OPENROUTER_API_KEY (Needs Luca 11);
+the executor will not fake numbers. Item 3 (ADR-0036 decision) comes
+after the measured experiment. Next run: check for the key/answers; if
+still absent, Stage 4 has no unblocked build work left — options: run
+the docs-consistency sweep flagged in learnings (run 7), or draft the
+"H1 2027 candidates" skeleton the stage prompt asks for at exit
+(clearly marked pending-experiment).
 
 **STAGE 3 COMPLETE (run 13).** All three exit criteria verified against the
 repo this run: (1) every shipped ADR at `documented` in km/adr/index.md —
@@ -61,7 +65,21 @@ Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 
 ## Stage 4 item status (updated 2026-07-20, run 14)
 
-1. **Persona experiment** — SHAPED (run 14). Design note
+1. **Persona experiment** — MACHINERY BUILT (run 15), measured runs BLOCKED
+   on OPENROUTER_API_KEY (item 11). Shipped on roadmap/stage-4, merged to
+   main 46b4224: `demos/persona_team/` — structured blackboard records on
+   mesh-context KV (Position/RoundState/Decision; `>`-wildcard listing since
+   persona names contain dots), StubModel (deterministic, synthetic-flagged)
+   + OpenRouterModel (lazy openai import, no new dependency), standing-team
+   harness (randomized round-robin dispatch, Delphi rounds, early-convergence
+   detection, random-scribe synthesis), hierarchical baseline (orchestrator +
+   3 sequential workers), metered run_experiment() (usage_reported tail +
+   mesh.agent.> wiretap + wall time → RunReport with a `synthetic` flag),
+   CLI `python -m openagentmesh.demos.persona_team`. Verified run 15:
+   10/10 new tests ×5 consecutive, full suite 357 (347 baseline + 10),
+   ruff/ty zero, CLI stub dry run e2e (standing = 10 mesh calls, hier = 4,
+   usage attributed per agent), CI success on branch tip 9612c83 (run 106;
+   run 105 was the expected red phase). Shaped run 14. Design note
    km/notes/2026-07-20-persona-experiment-plan.md: proposed task = the
    eager-registration DX question from this repo's backlog (lateral-
    disagreement-shaped, self-contained, judgeable); blackboard = mesh-context
@@ -429,6 +447,34 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      CHANGELOG admin-UI entry rewritten as shipped.
 
 ## Run log
+
+### 2026-07-20 ~06:00–06:30 UTC — run 15 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits are the executor's; state
+file untouched since 23337c1); all four prior roadmap/stage-* branches
+fully merged (0 unmerged commits each, checked this run); stage-4 branch
+tip 4453424 fully contained in main; baseline 347 pytest green on main
+tip 23337c1 before any work (matches run 14's claim).
+
+Advanced (Stage 4 item 1 machinery, on roadmap/stage-4, merged 46b4224):
+built the persona-team experiment machinery per the plan note through the
+pipeline — red tests first (4a8b740, CI run 105 the expected red), then
+demos/persona_team/ implementation (f6c461e), CHANGELOG + plan-note
+closeout (9612c83). Verified this run: 10/10 new tests, 5 consecutive
+green runs; full suite 357 passed on the branch; ruff + ty zero; CLI
+stub dry run exercised end-to-end (both topologies, per-agent usage
+attribution visible in the JSONL report); CI success on branch tip
+9612c83 (run 106). Merged --no-ff to main and pushed.
+
+Not done, and why: measured experiment runs (no OPENROUTER_API_KEY —
+Needs Luca 11; stub numbers are synthetic and flagged as such in
+RunReport, never reportable); comparison note (depends on measured
+runs); ADR-0036 decision (stage prompt orders it after the experiment).
+CI on the main merge 46b4224 superseded-or-running at run end — the km
+state push lands on the same tree; verify next run per the known
+pattern. Left open: all prior Needs-Luca items (5, 1–4, 6–12).
+Next run: check Needs-Luca answers first (the key unblocks everything);
+otherwise docs-consistency sweep or H1-2027 skeleton per Current stage.
 
 ### 2026-07-20 ~00:05–00:35 UTC — run 14 (Fable 5, cloud)
 
