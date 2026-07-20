@@ -79,8 +79,21 @@ task exists from his real work. Default proceeds.
 
 ## Execution order (next runs)
 
-1. Build blackboard records + round-robin harness + hierarchical baseline harness
-   with a stubbed model; tests prove both topologies run the full protocol dry.
-2. When OPENROUTER_API_KEY lands: real runs (3× per topology), collect usage/tap
-   recordings, write the dated comparison note with real numbers.
+1. ~~Build blackboard records + round-robin harness + hierarchical baseline harness
+   with a stubbed model; tests prove both topologies run the full protocol dry.~~
+   **DONE (run 15):** `src/openagentmesh/demos/persona_team/` — records,
+   blackboard (mesh-context KV, `>`-wildcard listing because persona names
+   contain dots), StubModel/OpenRouterModel, standing-team Delphi harness
+   with mechanical randomized round-robin dispatch + early-convergence
+   check + random-scribe synthesis, hierarchical baseline, metered
+   `run_experiment()` (usage_reported tail + mesh.agent.> wiretap count +
+   wall time → RunReport JSON), CLI (`python -m openagentmesh.demos.persona_team`).
+   10 tests in tests/test_persona_team.py; stub dry run: standing = 10 mesh
+   calls (3 position + 6 revise + 1 synthesize at rounds=2), hierarchical =
+   4 (1 orchestrator + 3 workers), usage attributed per agent. Stub numbers
+   are synthetic; RunReport carries a `synthetic` flag.
+2. When OPENROUTER_API_KEY lands (Needs Luca 11): real runs — `python -m
+   openagentmesh.demos.persona_team --runs 3 --rounds 3 --out results.jsonl`
+   (3× per topology), then write the dated comparison note with real numbers
+   plus a blind rubric scoring pass.
 3. Then ADR-0036 decision (build/defer/reject) from what the experiment showed.
