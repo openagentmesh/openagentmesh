@@ -455,6 +455,29 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-20 ~18:10–18:20 UTC — run 17 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip still 166d8c9 = run 16's
+addendum; every commit is the executor's; state file untouched since
+d6bd351); no OPENROUTER_API_KEY or npm credential in the environment; all
+five roadmap/stage-* branches fully merged (0 unmerged commits each); the
+stale feature/error-taxonomy + feature/tool-conversion pair unchanged
+(Needs Luca 4); zero open GitHub issues; CI success on main tip 166d8c9
+(run 115; run 113 on the merge commit d2d8d74 was cancelled by the
+same-tree km push — the known supersede pattern, runs 114/115 cover that
+tree). Regression suite green on main: 357/357 pytest (78s) and sdk-ts
+62/62 vitest, both matching run 16's baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (run 16's
+conclusion re-verified). Sent Luca a push notification this run that the
+roadmap is fully blocked on the Needs-Luca items (highest-leverage
+unblock: OPENROUTER_API_KEY, item 11). Future idle runs should stay
+silent unless the blocked/healthy state changes — the notification is
+recorded here precisely so it isn't repeated every 6 hours.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on any new main tip, regression-check, log, end.
+
 ### 2026-07-20 ~13:05 UTC — run 16 addendum
 
 CI on main verified before run end: run 114 on tip d6bd351 success
