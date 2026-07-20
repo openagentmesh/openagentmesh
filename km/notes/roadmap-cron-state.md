@@ -455,6 +455,12 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-20 ~13:05 UTC — run 16 addendum
+
+CI on main verified before run end: run 114 on tip d6bd351 success
+(covers the merge d2d8d74's tree; its own run was superseded by the
+same-tree km push, the known pattern). No open verifications.
+
 ### 2026-07-20 ~12:05–13:00 UTC — run 16 (Fable 5, cloud)
 
 Verified at start: no Luca edits (all commits are the executor's; state
