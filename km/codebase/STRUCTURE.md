@@ -78,7 +78,7 @@ openagentmesh/
 │   │   └── test_config.py          # Config loading tests
 │   └── cookbook/                   # Executable doc examples
 │       ├── test_hello_world.py         # Cookbook: hello_world demo
-│       ├── test_multi_agent.py         # Cookbook: multi_agent demo
+│       ├── test_multi_process.py       # Cookbook: multi-process recipe (demos/multi_agent)
 │       ├── test_llm_tool_selection.py  # Cookbook: tool selection
 │       ├── test_load_balancing.py      # Cookbook: load balancing
 │       ├── test_shared_plan.py         # Cookbook: shared state
