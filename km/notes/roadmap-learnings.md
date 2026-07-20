@@ -395,3 +395,31 @@ update that file too and say so here.
   missed it), and the cookbook index table was missing three shipped
   recipes. Reference tables that duplicate nav structure drift silently;
   a docs-consistency sweep is a cheap future run item.
+
+## 2026-07-20 — Stage 4, run 14 (cloud executor): ADR-0023 usage attribution
+
+- **ADR-0023's return-value convention was quietly impossible under Pydantic
+  v2**: `Output(..., usage=Usage(...))` needs the output model to declare the
+  field (undeclared → ValidationError at construction), and declaring it
+  leaks `usage` into the contract's output schema — the exact thing the ADR
+  promised wouldn't happen. Two-year-old spec ADRs can contain designs that
+  were never buildable; the shaping check that catches it: *construct the
+  sample's objects mentally against the validation library, not just the
+  wire*.
+- **Contextvar-with-mutable-slot is the right per-request capture shape**:
+  the host sets a fresh `list` in a ContextVar around the handler call and
+  merges after. Direct awaits share the context (reports visible to the
+  host); spawned tasks copy the context but share the *mutable list*, so
+  usage reported from a handler's sub-tasks is captured too. And
+  `report_usage()` outside a request raises RuntimeError — silent no-op
+  would eat data.
+- **A feature that adds zero wire surfaces is dramatically cheaper end to
+  end**: usage rides existing reply headers plus `mesh.logs.>`, so no role-
+  template changes, no subjects.md additions beyond the header tables, no
+  auth e2e churn — first ADR since 0038 where ROLE_TEMPLATES needed no grep.
+  Full pipeline (amend → red → green → docs → documented) fit in one run
+  alongside the Stage-4 experiment shaping.
+- **ADR-0048's observe machinery is becoming the default answer to "where
+  does per-request metadata go"** — lifecycle events (0055), and now usage
+  (0023) both landed as new event types with no new infrastructure. Worth
+  remembering before inventing any new subject family.

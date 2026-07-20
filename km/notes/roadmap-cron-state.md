@@ -5,11 +5,15 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 4 — Frontier (started run 13 by closing Stage 3; next run begins the
-Stage 4 shaping read: km/notes/2026-05-25-persona-team-on-oam.md, ADR-0023
-usage attribution first per the stage prompt's own suggestion — it needs no
-LLM key. The persona experiment's measured runs need OPENROUTER_API_KEY
-→ Needs Luca item 11).
+Stage 4 — Frontier. Item 2 (ADR-0023 usage attribution) COMPLETE run 14:
+merged to main bf00b88 (--no-ff), ADR at `documented`. Item 1 (persona
+experiment) shaped run 14: km/notes/2026-07-20-persona-experiment-plan.md
+records the task proposal, blackboard/turn-taking decisions, and measurement
+plan. Next run: build the experiment machinery per that note (blackboard
+records + round-robin harness + hierarchical baseline, stub model, in
+demos/persona_team/ on roadmap/stage-4). Measured runs stay blocked on
+OPENROUTER_API_KEY (Needs Luca 11); item 3 (ADR-0036 decision) comes after
+the experiment.
 
 **STAGE 3 COMPLETE (run 13).** All three exit criteria verified against the
 repo this run: (1) every shipped ADR at `documented` in km/adr/index.md —
@@ -53,7 +57,41 @@ Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 - [ ] Stage 1 — Interop (core done: MCP bridge, to_agent_card, docs; npm publish blocked)
 - [ ] Stage 2 — Launch (drafts + README fold done; demo/URL/publishing need Luca)
 - [x] Stage 3 — Production trust (COMPLETE run 13; exit criteria verified — see Current stage)
-- [ ] Stage 4 — Frontier (current; experiment runs blocked on OPENROUTER_API_KEY, item 11)
+- [ ] Stage 4 — Frontier (current; ADR-0023 done run 14; experiment machinery next; measured runs blocked on OPENROUTER_API_KEY, item 11)
+
+## Stage 4 item status (updated 2026-07-20, run 14)
+
+1. **Persona experiment** — SHAPED (run 14). Design note
+   km/notes/2026-07-20-persona-experiment-plan.md: proposed task = the
+   eager-registration DX question from this repo's backlog (lateral-
+   disagreement-shaped, self-contained, judgeable); blackboard = mesh-context
+   KV with structured Pydantic records + CAS (JetStream and SQLite-on-
+   ObjectStore rejected for v1, reasons in the note); turn-taking =
+   randomized round-robin with fixed turn count, Delphi-style rounds (LLM
+   chair rejected as a confound); personas = 3–4 fixed role lenses, no
+   self-improvement in v1; code home = demos/persona_team/ with a stub
+   model for tests. Machinery is buildable without the key; measured runs
+   are not (item 11). Task-selection veto offered to Luca (item 12).
+2. **ADR-0023 usage attribution** — DONE (run 14). Merged to main bf00b88
+   (--no-ff); ADR + index at `documented`; CI success on branch tip 4453424
+   (run 101). Amended the ADR against reality first (4 corrections recorded
+   in the ADR): the original return-value convention was impossible under
+   Pydantic v2 (undeclared field = ValidationError; declared field leaks
+   into the contract schema) → contextvar-based `report_usage(Usage(...))`
+   callable anywhere in the handler; attribution rides ADR-0048 observe
+   (`usage_reported` event at info on mesh.logs.{name} — only reporting
+   agents emit, zero-cost default preserved); streamers stamp the
+   stream-end frame; caller-side accessor + OTel + sdk-ts write parity
+   explicitly deferred in the amendment. Shipped: `_usage.py` (Usage model,
+   report_usage, capture helpers), host stamping in responder+streamer
+   paths, X-Mesh-Usage header, 9 unit tests + cookbook twin. Docs:
+   concepts/usage.md rewritten as shipped (vaporware warning gone),
+   cookbook/tracking-llm-usage.md + executable twin, envelope header
+   tables, API reference section, observability event table, CHANGELOG.
+   No new subjects/buckets → no role-template changes (verified: usage
+   rides reply headers + existing mesh.logs.> grants).
+3. **ADR-0036 decision** — NOT STARTED (after the experiment, per the
+   stage prompt).
 
 ## Stage 0 item status (verified 2026-07-17)
 
@@ -184,6 +222,12 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    executor will build the blackboard/turn-taking machinery and ADR-0023
    usage attribution, but cannot produce the experiment's numbers (and will
    never fake them). Same key as item 6; providing it once covers both.
+12. **Persona-experiment task selection (non-blocking).** The executor
+   proposes deliberating a real backlog question — "should OAM adopt an
+   eager-registration mode?" (the run-2 DX finding) — as the experiment
+   task; rationale in km/notes/2026-07-20-persona-experiment-plan.md.
+   Silence = proceed with it; name a different lateral-disagreement task
+   here to override before the measured runs happen.
 9. **ADR-0056 admin UI: OK to defer to Stage 3?** Shaping estimate 4–6 sessions
    (details in Stage 2 item status above). The stage prompt says propose deferral if
    over ~2 sessions — this is the proposal. Silence = defer; say "build it in Stage 2"
@@ -385,6 +429,38 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      CHANGELOG admin-UI entry rewritten as shipped.
 
 ## Run log
+
+### 2026-07-20 ~00:05–00:35 UTC — run 14 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits are the executor's; state
+file untouched since 06f694e); all four roadmap/stage-* branches fully
+merged (0 unmerged commits each; feature/error-taxonomy and
+feature/tool-conversion remain the known stale pair, Needs Luca 4); CI on
+main tip 40737cf/06f694e closed by run 13's addendum; no open GitHub
+issues (checked this run); baseline 337 pytest green on main before any
+work.
+
+Advanced (Stage 4 item 2, ADR-0023, on roadmap/stage-4, merged bf00b88):
+amended the ADR against the shipped repo first (the return-value
+convention was unimplementable under Pydantic v2 — full corrections in
+the ADR amendment), red tests committed first per the pipeline (9 tests,
+collection-error red), then implementation (_usage.py + responder/
+streamer stamping + usage_reported observe event), then docs (concepts
+page de-vaporwared, cookbook recipe + twin, envelope/API/observability
+references, CHANGELOG) with ADR + index → documented. Verified this run:
+347 pytest on the merged tree (337 baseline + 9 usage + 1 twin), ruff/ty
+zero, zensical build clean, CI success on branch tip 4453424 (run 101;
+run 100 superseded by the same-branch km push, the known pattern; the
+red-commit failure run was the expected red phase).
+
+Also advanced Stage 4 item 1 to shaped: the persona-experiment design
+note (km/notes/2026-07-20-persona-experiment-plan.md) fixes task,
+blackboard, turn-taking, personas, measurement, and execution order —
+next run builds it. New Needs Luca 12 (task veto, non-blocking).
+
+Left open: all prior Needs-Luca items; CI on main tip after the merge
+(pushed this run — verified before run end, see below or next run's
+reconciliation if this line survives unamended).
 
 ### 2026-07-19 ~18:00–18:35 UTC — run 13 (Fable 5, cloud)
 
