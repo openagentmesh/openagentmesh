@@ -29,7 +29,7 @@ Status values follow the [Documentation Driven Development pipeline](../../CLAUD
 | [ADR-0020](0020-distinguish-catalog-filtering-from-nats-wildcards.md) | Distinguish SDK catalog filtering from NATS subject wildcards | documented | |
 | [ADR-0021](0021-consolidate-jetstream-bucket-specification.md) | Consolidate JetStream bucket specification | documented | |
 | [ADR-0022](0022-local-as-async-context-manager.md) | Make `AgentMesh.local()` an async context manager for tests and demos | documented | feature/core-sdk |
-| [ADR-0023](0023-llm-cost-model-and-usage-attribution.md) | LLM cost model and usage attribution | spec | roadmap/stage-4 |
+| [ADR-0023](0023-llm-cost-model-and-usage-attribution.md) | LLM cost model and usage attribution | test | roadmap/stage-4 |
 | [ADR-0023b](0023-single-decorator-with-type-taxonomy.md) | Single `@mesh.agent` decorator with type taxonomy | superseded by ADR-0031 | |
 | [ADR-0024](0024-streaming-or-buffered-handler-contract.md) | Streaming or buffered as a per-agent handler choice, both typed | documented | feature/core-sdk |
 | [ADR-0025](0025-public-api-for-shared-context-kv.md) | Public API for shared context KV (`mesh-context` bucket) | documented | |
