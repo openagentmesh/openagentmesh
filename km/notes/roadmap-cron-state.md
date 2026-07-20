@@ -458,9 +458,12 @@ note (km/notes/2026-07-20-persona-experiment-plan.md) fixes task,
 blackboard, turn-taking, personas, measurement, and execution order —
 next run builds it. New Needs Luca 12 (task veto, non-blocking).
 
-Left open: all prior Needs-Luca items; CI on main tip after the merge
-(pushed this run — verified before run end, see below or next run's
-reconciliation if this line survives unamended).
+CI on main verified before run end: run 29709474809 on tip d503e01
+success (the merge commit bf00b88's own run was superseded/cancelled by
+the same-tree km push — the known pattern, not a failure). No open
+verifications. Left open: all prior Needs-Luca items plus new item 12.
+Next run: build the persona-experiment machinery per
+km/notes/2026-07-20-persona-experiment-plan.md on roadmap/stage-4.
 
 ### 2026-07-19 ~18:00–18:35 UTC — run 13 (Fable 5, cloud)
 
