@@ -13,11 +13,18 @@ the full protocol dry with the stub model (details in the plan note's
 execution-order section). The item's remaining work — measured runs and
 the comparison note — is BLOCKED on OPENROUTER_API_KEY (Needs Luca 11);
 the executor will not fake numbers. Item 3 (ADR-0036 decision) comes
-after the measured experiment. Next run: check for the key/answers; if
-still absent, Stage 4 has no unblocked build work left — options: run
-the docs-consistency sweep flagged in learnings (run 7), or draft the
-"H1 2027 candidates" skeleton the stage prompt asks for at exit
-(clearly marked pending-experiment).
+after the measured experiment.
+
+Run 16 exhausted the unblocked backlog: the docs-consistency sweep is
+done (merged d2d8d74 — see run log) and the "H1 2027 candidates"
+skeleton exists (km/notes/2026-07-20-h1-2027-candidates.md, 33906ca,
+experiment-derived sections deliberately empty). **Stage 4 — and the
+whole roadmap — now has NO unblocked build work left.** Every remaining
+item across all stages waits on a Needs-Luca answer; the single
+highest-leverage unblock is OPENROUTER_API_KEY (item 11), which
+reactivates Stage 4's measured experiment → comparison note → ADR-0036
+decision → stage exit. Next runs: verify CI on main, check for answers,
+run the regression suite, end. Nothing else to build until Luca acts.
 
 **STAGE 3 COMPLETE (run 13).** All three exit criteria verified against the
 repo this run: (1) every shipped ADR at `documented` in km/adr/index.md —
@@ -447,6 +454,49 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      CHANGELOG admin-UI entry rewritten as shipped.
 
 ## Run log
+
+### 2026-07-20 ~12:05–13:00 UTC — run 16 (Fable 5, cloud)
+
+Verified at start: no Luca edits (all commits are the executor's; state
+file untouched since e038d4a); no OPENROUTER_API_KEY or npm credential
+in the environment; all five roadmap/stage-* branches fully merged
+(0 unmerged commits each, checked this run); CI success on main tip
+00666d0 (run 109); zero open GitHub issues; baseline 357 pytest green
+on main before any work.
+
+Advanced (docs-consistency sweep, on roadmap/stage-4, merged d2d8d74):
+three parallel read-only audit agents swept cookbook twins, protocol/
+reference tables, and CLI/API/nav against the source; every finding
+re-verified against code before fixing. Fixed (commit 09a1b1e):
+envelope.md documented a nonexistent `validation_error` code (real code
+is `invalid_input`), its error table missed 5 shipped codes and
+mis-attributed validation failures to handler_error; X-Mesh-Instance-Id
+and X-Mesh-Content-Type headers were undocumented; mesh-artifacts
+bucket missing from subjects.md; mesh.health.> grant documented as
+reserved (ADR-0016 deferral); errors.md taxonomy missed
+connection_denied + kv_key_exists; last retired-"Watcher" references
+fixed incl. a broken #watcher anchor in reactive-pipeline.md (its code
+sample re-verified to still register); cli.md gained missing `oam mcp
+serve` + `oam demo` sections; agentmesh.md call/stream/catalog/discover
+signatures de-keyword-only'd to match code; DeathNotice/KVSource/
+SubjectSource exports now named in docs. Twin test renamed
+test_multi_agent.py → test_multi_process.py to match its recipe slug
+(c6038f5). Clean at sweep end: nav, internal links, cookbook
+index/twins, role templates, observability event table.
+
+Verified this run: 357 pytest green on the branch post-change (and 37
+cookbook tests re-run after the rename), ruff/ty zero, zensical build
+clean, CI success on branch tip c6038f5 (run 111). Merged --no-ff to
+main d2d8d74. Also landed on main directly: H1-2027 candidates skeleton
+(33906ca) and this km update. Reviewed-and-accepted (no action): errors
+documented in concepts/errors.md are not duplicated under docs/api/
+(canonical page exists and is linked — by design, not drift).
+
+Left open: all Needs-Luca items (1–12). CI on main after the merge not
+yet observed at run end (the km push lands on the same tree; verify
+next run per the known pattern). **The roadmap is now fully blocked on
+Luca**: no unblocked build work remains in any stage. Next run: verify
+CI on main, check for answers/key, regression-check, end.
 
 ### 2026-07-20 ~06:35 UTC — run 15 addendum
 

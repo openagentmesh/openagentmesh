@@ -426,6 +426,39 @@ update that file too and say so here.
   classic Python late-binding trap, worth restating because @mesh.agent
   in a loop looks innocent.
 
+## 2026-07-20 — Stage 4, run 16 (cloud executor): docs-consistency sweep
+
+- **Reference tables drift in one direction: code ships, tables don't move.**
+  The sweep found five shipped surfaces missing from the protocol pages
+  (`X-Mesh-Instance-Id`, `X-Mesh-Content-Type`, the `mesh-artifacts` bucket,
+  `connection_denied`, `kv_key_exists`) and zero documented-but-unshipped
+  ones. The run-6 lesson ("role templates move in the same commit as the new
+  surface") generalizes: any change that adds a header, bucket, subject, or
+  error code should grep `docs/protocol/` and the errors taxonomy in the
+  same change. A future hardening: generate the error-code table from
+  `_errors.py` at docs build time so it cannot drift.
+- **Duplicated tables rot; canonical ones don't.** envelope.md carried a
+  nonexistent `validation_error` code and a 6-row error table while
+  errors.md (the canonical taxonomy) was almost right. The fix keeps the
+  envelope table but points at errors.md as canonical. When two pages both
+  claim authority over the same list, pick one and make the other defer.
+- **Docs promised keyword-only signatures (`*,` in call/stream/catalog/
+  discover) that the code never enforced.** Harmless today (docs-style
+  callers work), but it means positional callers exist in the wild that a
+  later "make it keyword-only like the docs say" change would break. Docs
+  now match code; if Luca wants keyword-only enforcement it's an API change
+  to decide deliberately, not a docs fix.
+- **Three parallel read-only sweep agents (cookbook / reference-tables /
+  CLI+API+nav) covered all 43 docs pages in ~4 min** and every finding
+  verified against source on first check. Nav and internal links were fully
+  clean — the drift concentrates in hand-maintained tables, which is where
+  future sweeps should start.
+- **`mesh.health.>` was granted to observers but produced by nothing** — an
+  artifact of ADR-0016 v1 deferring the heartbeat layer after ADR-0038 had
+  already templated the grant. Documented as reserved rather than revoking:
+  removing a grant invalidates minted creds for no benefit, and the
+  heartbeat layer will want it back.
+
 ## 2026-07-20 — Stage 4, run 14 (cloud executor): ADR-0023 usage attribution
 
 - **ADR-0023's return-value convention was quietly impossible under Pydantic
