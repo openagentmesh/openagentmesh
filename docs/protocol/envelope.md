@@ -17,6 +17,7 @@ All messages use headers for metadata and a JSON body for payload.
 | `X-Mesh-Request-Id` | Echoed from request |
 | `X-Mesh-Source` | Name of the responding agent |
 | `X-Mesh-Status` | `ok` or `error` |
+| `X-Mesh-Usage` | Optional self-reported LLM usage as JSON ([usage attribution](../concepts/usage.md)) |
 
 ## Streaming Headers
 
@@ -28,6 +29,7 @@ Used on `mesh.stream.{request_id}` subjects for streaming responses, and on `mes
 | `X-Mesh-Stream-End` | `true` on the terminal message, `false` on data chunks |
 | `X-Mesh-Request-Id` | Echoed from request (streaming responses only) |
 | `X-Mesh-Status` | Set to `error` when the stream terminates due to an error |
+| `X-Mesh-Usage` | Optional self-reported LLM usage as JSON, on the stream-end frame only ([usage attribution](../concepts/usage.md)) |
 
 ## Success Response
 

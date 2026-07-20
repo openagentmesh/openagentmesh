@@ -492,3 +492,40 @@ await mesh.observe.set("nlp.summarizer", log_level="debug")
 async for event in mesh.observe.logs("nlp.summarizer"):
     print(event.event, event.data)
 ```
+
+## Usage Attribution
+
+Opt-in LLM usage reporting (ADR-0023). See
+[Usage Attribution](../concepts/usage.md) for the model.
+
+### `report_usage(usage)`
+
+Module-level function (`from openagentmesh import report_usage`). Report LLM
+usage from inside a handler while a `call()`/`stream()` request is in flight.
+May be called multiple times per request: token and cost fields accumulate,
+`model` keeps the last reported value. Raises `RuntimeError` outside a
+request context.
+
+The host stamps the merged result on the `X-Mesh-Usage` reply header (the
+stream-end frame for streamers) and publishes a `usage_reported` observe
+event at `info` level.
+
+### `Usage`
+
+Pydantic model carrying self-reported usage. All fields optional:
+`input_tokens`, `output_tokens`, `total_tokens` (`int`), `model` (`str`),
+`estimated_cost_usd` (`float`).
+
+```python
+from openagentmesh import Usage, report_usage
+
+@mesh.agent
+async def summarize(req: SummarizeInput) -> SummarizeOutput:
+    result = await call_llm(req.text)
+    report_usage(Usage(
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        model="claude-sonnet-4-20250514",
+    ))
+    return SummarizeOutput(summary=result.text)
+```

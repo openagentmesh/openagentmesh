@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-14
-- **Status:** spec
+- **Status:** documented
 - **Source:** conversation (discussion on who pays for LLM tokens in the mesh)
 
 ## Context

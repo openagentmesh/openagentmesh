@@ -21,6 +21,7 @@ Handler code needs no changes.
 | `request_completed` | debug | Invocation completed (carries `duration_ms`) |
 | `request_failed` | warn | Invocation raised an error (carries the error `code`) |
 | `validation_error` | warn | Input failed Pydantic validation |
+| `usage_reported` | info | Handler reported LLM usage via [`report_usage()`](usage.md) (carries the usage fields) |
 
 Events are published on `mesh.logs.{name}` — a sibling root to
 `mesh.errors.{name}` and `mesh.death.{name}`, so wildcards aggregate
