@@ -2,7 +2,7 @@
 
 - **Type:** architecture
 - **Date:** 2026-04-14
-- **Status:** spec
+- **Status:** documented
 - **Source:** conversation (discussion on who pays for LLM tokens in the mesh)
 
 ## Context
@@ -95,4 +95,60 @@ The `Usage` object is not part of the output schema — the SDK intercepts it an
 - Usage data is agent-reported and unverified. A malicious or buggy agent could report incorrect values. This is acceptable for the within-company use case. Cross-org cost attribution (if ever needed) would require a trusted metering layer, which is out of scope.
 - The `Usage` return-value convention requires SDK support for intercepting the object before serialization. This is a small addition to the decorator machinery.
 - External monitoring integration (OTel → dashboards) is the user's responsibility. The mesh provides the data; visualization is out of scope.
+
+## Amendment (2026-07-20, implementation)
+
+Shaped against the shipped repo before implementation. Four corrections:
+
+1. **The return-value convention (Convention 3 as originally written) cannot work
+   under Pydantic v2.** `SummarizeOutput(summary=..., usage=Usage(...))` requires the
+   output model to *declare* a `usage` field — which then appears in the contract's
+   output schema, contradicting "the `Usage` object is not part of the output schema"
+   (and an undeclared field is a `ValidationError` at construction). Replaced with a
+   context-local reporting call, usable from any point inside the handler and
+   requiring no output-model changes:
+
+   ```python
+   from openagentmesh import AgentMesh, Usage, report_usage
+
+   mesh = AgentMesh()
+
+   @mesh.agent
+   async def summarize(req: SummarizeInput) -> SummarizeOutput:
+       result = await call_llm(req.text)
+       report_usage(Usage(
+           input_tokens=result.input_tokens,
+           output_tokens=result.output_tokens,
+           model="claude-sonnet-4-20250514",
+       ))
+       return SummarizeOutput(summary=result.text)
+   ```
+
+   `report_usage()` outside a request context raises `RuntimeError` (silent data
+   loss would be worse). Multiple calls within one request **accumulate**: token
+   and cost fields sum, `model` keeps the last reported value — a handler making
+   three LLM calls reports each one as it happens. Usage capture applies to the
+   invocable shapes (Responder, Streamer); Publisher/Source handlers have no
+   request to attribute usage to.
+
+2. **Attribution rides ADR-0048 observability, which did not exist when this ADR
+   was written.** Alongside the `X-Mesh-Usage` reply header, the host publishes a
+   `usage_reported` log event on `mesh.logs.{name}` at `info` level carrying the
+   usage payload (plus `request_id`). This is the aggregation path — tail
+   `mesh.observe.logs()` (or `oam observe logs`) and sum. The zero-publishes-at-
+   default-level property of ADR-0048 is preserved in spirit: only agents whose
+   handlers actually call `report_usage()` emit the event, and reporting is the
+   agent author's explicit opt-in. No new subjects or role-template changes:
+   usage rides reply headers and the existing `mesh.logs.>` grants.
+
+3. **Streaming agents stamp usage on the stream-end frame** — usage is only known
+   once the generator finishes, and the end frame is the one message every
+   consumer reads to completion.
+
+4. **Deferred, recorded here so the docs don't promise them:** a caller-side
+   accessor (e.g. `call()` returning usage alongside the payload — aggregate via
+   the observe event or read the raw header until a real need appears); OTel span
+   attributes (Convention 2, still Phase 2 — no OTel middleware exists);
+   sdk-ts write-side parity (TS agents are read-mostly today; the header format
+   is language-neutral JSON either way).
 
