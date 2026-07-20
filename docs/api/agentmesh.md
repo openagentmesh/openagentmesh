@@ -139,11 +139,11 @@ async def react(entry: KVEntry[DetectionRecord]) -> None:
 
 #### `mesh.subject_source(subject, *, queue_group=None)`
 
-NATS subject source. Wildcards (`*`, `>`) are supported. `queue_group` enables at-most-one-of-N delivery across replicas.
+NATS subject source. Wildcards (`*`, `>`) are supported. `queue_group` enables at-most-one-of-N delivery across replicas. Returns a `SubjectSource` (exported from `openagentmesh` for type annotations).
 
 #### `mesh.kv_source(pattern, *, queue_group=None, on_init="replay")`
 
-KV-watch source on the `mesh-context` bucket. `on_init="replay"` (default) fires the handler for every existing entry under the pattern at agent startup, then continues with live updates. `on_init="skip"` waits for the initial snapshot to drain and then triggers only on subsequent changes. `queue_group` is reserved for JetStream-backed consumers (raises `NotImplementedError` in v1).
+KV-watch source on the `mesh-context` bucket. `on_init="replay"` (default) fires the handler for every existing entry under the pattern at agent startup, then continues with live updates. `on_init="skip"` waits for the initial snapshot to drain and then triggers only on subsequent changes. `queue_group` is reserved for JetStream-backed consumers (raises `NotImplementedError` in v1). Returns a `KVSource` (exported from `openagentmesh` for type annotations).
 
 | Handler shape | `invocable` | `streaming` | Consumer API |
 |---------------|-------------|-------------|--------------|
@@ -178,7 +178,7 @@ Gate on messages arriving on a plain NATS subject. `predicate` receives each mes
 
 Four interaction modes. See [Invocation](../concepts/invocation.md) for patterns and semantics.
 
-### `await mesh.call(name, payload, *, timeout=30.0)`
+### `await mesh.call(name, payload=None, timeout=30.0)`
 
 Synchronous request/reply. Blocks until the agent responds or times out.
 
@@ -197,7 +197,7 @@ catalog but a [lifecycle gate](../concepts/lifecycle.md) has it offline;
 (sub-second, via [death notices](../concepts/liveness.md)); `MeshTimeout`
 when the deadline expires with the agent still connected.
 
-### `async for chunk in mesh.stream(name, payload, *, timeout=60.0)`
+### `async for chunk in mesh.stream(name, payload=None, timeout=60.0)`
 
 Streaming request. Yields response chunks as dicts. Raises `AgentDied` from
 the generator if the agent leaves the mesh mid-stream.
@@ -292,7 +292,7 @@ async for msg in mesh.subscribe(subject="mesh.results.abc123", timeout=30.0):
 
 ## Discovery
 
-### `await mesh.catalog(*, channel=None, tags=None, streaming=None, invocable=None)`
+### `await mesh.catalog(channel=None, tags=None, streaming=None, invocable=None)`
 
 Lightweight listing of registered agents. Returns typed `CatalogEntry` objects.
 
@@ -313,7 +313,7 @@ for entry in catalog:
     # entry.invocable, entry.streaming, entry.version, entry.tags also available
 ```
 
-### `await mesh.discover(*, channel=None)`
+### `await mesh.discover(channel=None)`
 
 Full `AgentContract` objects for all matching agents.
 

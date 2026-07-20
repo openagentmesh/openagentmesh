@@ -276,6 +276,42 @@ tunnel over `--host 0.0.0.0` (or `OAM_UI_HOST`) for remote use.
 Release wheels bundle the compiled UI assets; in a source checkout run the
 Vite dev server instead (`cd ui/ && pnpm dev`).
 
+## `oam mcp`
+
+Bridge the mesh to the [Model Context Protocol](../welcome/oam-and-mcp.md).
+Requires the `mcp` extra: `pip install 'openagentmesh[mcp]'`.
+
+### `oam mcp serve`
+
+Serve mesh agents to an MCP client over stdio. See the
+[MCP bridge recipe](../cookbook/mcp-bridge.md).
+
+```bash
+oam mcp serve                        # export the active local mesh
+oam mcp serve --url nats://host:4222 # a specific mesh
+oam mcp serve --no-default-export    # only agents registered with mcp=True
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--url` | active local mesh | NATS URL of the mesh to export |
+| `--default-export` / `--no-default-export` | `--default-export` | Whether agents without an explicit `mcp` flag are exported |
+
+Register with an MCP client, e.g.:
+
+```bash
+claude mcp add mesh -- oam mcp serve
+```
+
+## `oam demo`
+
+Start an embedded local mesh with sample agents for interactive exploration
+(no separate `oam mesh up` needed; Ctrl+C to stop).
+
+```bash
+oam demo
+```
+
 ## Output conventions
 
 All commands that produce structured output default to a human-readable format

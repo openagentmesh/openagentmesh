@@ -147,13 +147,13 @@ Key properties:
 - **Stage independence.** Kill the summarize stage midway. Ingest and extract continue producing. Restart summarize and it picks up the unprocessed extracted results.
 - **Parallel pipelines.** Submit ten documents. Each flows through the pipeline independently. Stages process whichever document update arrives next.
 - **Observable state.** Every intermediate result is a KV entry. Debugging is reading keys, not tracing RPC chains.
-- **Mixed participation.** The ingest stage is a registered agent (visible in `mesh.catalog()`, callable via `mesh.call()`). The extract and summarize stages are plain async functions coordinating through KV watch. To make all stages visible in the catalog, register them as [watcher agents](../concepts/agents.md#watcher).
+- **Mixed participation.** The ingest stage is a registered agent (visible in `mesh.catalog()`, callable via `mesh.call()`). The extract and summarize stages are plain async functions coordinating through KV watch. To make all stages visible in the catalog, register them as [source-only agents](../concepts/agents.md#source-only-agents).
 
 !!! tip "Dot-separated keys for wildcard watching"
     KV keys use `.` as the hierarchy separator (not `/`) because NATS subject matching treats `.` as a token delimiter. This enables `watch("pipeline.*.raw")` to match any document ID in the middle.
 
 !!! tip "Scaling expensive processing"
-    Watcher agents run as a single instance; every replica receives every KV update. If the processing step is expensive, split the watcher into a thin routing layer that calls an invocable agent via `mesh.call()`. The invocable agent scales via queue groups:
+    Source-only agents run as a single instance; every replica receives every KV update. If the processing step is expensive, split the watching stage into a thin routing layer that calls an invocable agent via `mesh.call()`. The invocable agent scales via queue groups:
 
     ```python
     @mesh.agent(AgentSpec(name="pipeline.extract-watcher",

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reference-docs consistency sweep: the protocol pages now document every shipped surface — the `X-Mesh-Instance-Id` and `X-Mesh-Content-Type` headers, the `mesh-artifacts` workspace bucket, and the full error-code table (the envelope page previously showed a nonexistent `validation_error` code and omitted five real codes; `connection_denied` and `kv_key_exists` were missing from the taxonomy). The CLI reference gained the missing `oam mcp serve` and `oam demo` sections, the API reference signatures for `call`/`stream`/`catalog`/`discover` match the code again (their parameters were never keyword-only), and the last references to the retired "Watcher" shape were updated.
 - `mesh.call()` timeouts now raise `MeshTimeout` (part of the `MeshError` taxonomy) instead of leaking the raw `nats.errors.TimeoutError`. When the timeout was actually caused by the server denying the publish (missing permissions), the call raises `ConnectionDenied` explaining which permission is missing.
 - `@openagentmesh/sdk` package metadata declared Apache-2.0; the project license is MIT. Corrected before first npm publish.
 - `mesh.contract()` now restores `input_schema`/`output_schema` from the registry document; contracts fetched from the registry previously lost their schemas (breaking tool projection for remote agents).

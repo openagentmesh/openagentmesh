@@ -56,7 +56,7 @@ tests/
 │   └── test_config.py     # CLI config/URL resolution
 └── cookbook/
     ├── __init__.py
-    ├── test_multi_agent.py      # Multi-agent provider/consumer recipe
+    ├── test_multi_process.py    # Multi-process provider/consumer recipe
     ├── test_llm_tool_selection.py # LLM discovers and calls agents
     ├── test_error_handling.py    # Error handling patterns
     ├── test_load_balancing.py    # Queue group load balancing
@@ -257,7 +257,7 @@ pytest --cov=openagentmesh --cov-report=html tests/  # HTML report in htmlcov/
 **E2E Tests:**
 - Framework: None (not in scope for Phase 1)
 - Alternative: Cookbook tests in `tests/cookbook/` exercise realistic multi-agent workflows
-- Example from `tests/cookbook/test_multi_agent.py`:
+- Example from `tests/cookbook/test_multi_process.py`:
   ```python
   class TestMultiAgentRecipe:
       async def test_main_completes(self):
