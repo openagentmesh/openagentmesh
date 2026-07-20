@@ -50,6 +50,12 @@ from ._subjects import (
     compute_log_subject,
     compute_subject,
 )
+from ._usage import (
+    X_MESH_USAGE,
+    Usage,
+    begin_usage_capture,
+    end_usage_capture,
+)
 from ._workspace import Workspace
 
 _log = logging.getLogger("openagentmesh")
@@ -603,6 +609,23 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             )
         except Exception as e:
             _log.debug("could not publish log event: %s", e)
+
+    async def _publish_usage(
+        self, agent: str, request_id: str, usage: Usage | None
+    ) -> None:
+        """Publish the ``usage_reported`` observe event (ADR-0023).
+
+        Only agents whose handlers actually called ``report_usage()`` emit
+        it, so the default-level zero-cost property of ADR-0048 holds for
+        everyone else.
+        """
+        if usage is None:
+            return
+        await self._publish_log(
+            agent, "info", "usage_reported",
+            request_id=request_id,
+            data=usage.model_dump(exclude_none=True),
+        )
 
     async def _shutdown(self) -> None:
         # Shutdown ordering: stop inbound watchers first so the catalog cache
@@ -1158,10 +1181,14 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         request_id: str,
         payload: Any,
     ) -> None:
-        if payload is not None:
-            result = await info.func(payload)
-        else:
-            result = await info.func()
+        usage_token = begin_usage_capture()
+        try:
+            if payload is not None:
+                result = await info.func(payload)
+            else:
+                result = await info.func()
+        finally:
+            usage = end_usage_capture(usage_token)
 
         if info.output_adapter and result is not None:
             response_data = info.output_adapter.dump_json(result)
@@ -1169,15 +1196,19 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
             response_data = json.dumps(result).encode() if result is not None else b"{}"
 
         if msg.reply:
+            headers = {
+                "X-Mesh-Status": "ok",
+                "X-Mesh-Source": agent_name,
+                "X-Mesh-Request-Id": request_id,
+            }
+            if usage is not None:
+                headers[X_MESH_USAGE] = usage.model_dump_json(exclude_none=True)
             await self._conn.publish(
                 msg.reply,
                 response_data,
-                headers=self._with_instance_id({
-                    "X-Mesh-Status": "ok",
-                    "X-Mesh-Source": agent_name,
-                    "X-Mesh-Request-Id": request_id,
-                }),
+                headers=self._with_instance_id(headers),
             )
+        await self._publish_usage(agent_name, request_id, usage)
 
     async def _handle_streaming(
         self,
@@ -1189,36 +1220,47 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
     ) -> None:
         stream_subject = f"mesh.stream.{request_id}"
 
-        gen = info.func(payload) if payload is not None else info.func()
-        seq = 0
-        async for chunk in gen:
-            if info.output_adapter:
-                chunk_data = info.output_adapter.dump_json(chunk)
-            else:
-                chunk_data = json.dumps(chunk).encode()
+        usage_token = begin_usage_capture()
+        try:
+            gen = info.func(payload) if payload is not None else info.func()
+            seq = 0
+            async for chunk in gen:
+                if info.output_adapter:
+                    chunk_data = info.output_adapter.dump_json(chunk)
+                else:
+                    chunk_data = json.dumps(chunk).encode()
 
-            await self._conn.publish(
-                stream_subject,
-                chunk_data,
-                headers=self._with_instance_id({
-                    "X-Mesh-Stream-Seq": str(seq),
-                    "X-Mesh-Stream-End": "false",
-                    "X-Mesh-Request-Id": request_id,
-                }),
-            )
-            await self._conn.flush()
-            seq += 1
+                await self._conn.publish(
+                    stream_subject,
+                    chunk_data,
+                    headers=self._with_instance_id({
+                        "X-Mesh-Stream-Seq": str(seq),
+                        "X-Mesh-Stream-End": "false",
+                        "X-Mesh-Request-Id": request_id,
+                    }),
+                )
+                await self._conn.flush()
+                seq += 1
+        finally:
+            usage = end_usage_capture(usage_token)
 
+        # Usage rides the end frame: it is only known once the generator
+        # finishes, and the end frame is the one message every consumer
+        # reads to completion (ADR-0023).
+        end_headers = {
+            "X-Mesh-Stream-Seq": str(seq),
+            "X-Mesh-Stream-End": "true",
+            "X-Mesh-Request-Id": request_id,
+        }
+        if usage is not None:
+            end_headers[X_MESH_USAGE] = usage.model_dump_json(exclude_none=True)
         await self._conn.publish(
             stream_subject,
             b"",
-            headers=self._with_instance_id({
-                "X-Mesh-Stream-Seq": str(seq),
-                "X-Mesh-Stream-End": "true",
-                "X-Mesh-Request-Id": request_id,
-            }),
+            headers=self._with_instance_id(end_headers),
         )
         await self._conn.flush()
+        await self._publish_usage(agent_name, request_id, usage)
 
     # --- Watcher execution (ADR-0042) ---
 

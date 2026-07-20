@@ -26,6 +26,7 @@ from ._models import (
     ObserveConfig,
 )
 from ._sources import KVSource, MeshMessage, SubjectSource
+from ._usage import Usage, report_usage
 
 __all__ = [
     "AgentDied",
@@ -54,4 +55,6 @@ __all__ = [
     "SubjectCondition",
     "ObserveConfig",
     "SubjectSource",
+    "Usage",
+    "report_usage",
 ]
