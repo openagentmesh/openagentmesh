@@ -455,6 +455,31 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-21 ~18:05–18:15 UTC — run 21 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip bf83bfe = run 20's
+commit; zero new commits since; state file untouched); no
+OPENROUTER_API_KEY or npm credential in the environment; all five
+roadmap/stage-* branches at 0 unmerged commits each (rev-list against
+ls-remote heads); the stale feature/error-taxonomy +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open GitHub
+issues and zero open PRs; CI success on main tip bf83bfe (run 119).
+Regression suite green on main: 357/357 pytest (69s, after installing
+nsc — first pass without it was 350+7 skips, the known nsc-gated auth
+tests) and sdk-ts 62/62 vitest, both matching the run-16 through run-20
+baselines. Container-clone note: this run's checkout was a stale shallow
+snapshot from bootstrap time; the fetch reported a "forced update" and
+an empty merge-base, which looked like a history rewrite but was a
+shallow-clone artifact — `git fetch --unshallow` confirmed the bootstrap
+commit is an ancestor of main (history intact, 309 commits).
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on any new main tip, regression-check, log, end silently.
+
 ### 2026-07-21 ~12:10–12:20 UTC — run 20 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 0ab25de = run 19's
