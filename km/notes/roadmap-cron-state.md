@@ -455,6 +455,27 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-21 ~00:05–00:20 UTC — run 18 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip still c470f64 = run 17's
+commit; state file last touched by the executor; every commit is the
+executor's); no OPENROUTER_API_KEY or npm credential in the environment;
+all five roadmap/stage-* branches at 0 unmerged commits each; the stale
+feature/error-taxonomy + feature/tool-conversion pair unchanged (Needs
+Luca 4); zero open GitHub issues; CI success on main tip c470f64 (run
+116). Regression suite green on main: 357/357 pytest (74s) and sdk-ts
+62/62 vitest, both matching the run-16/17 baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state is unchanged since run 17's
+one-time notification, per that run's stay-silent note. Executor note:
+sdk-ts installs with `corepack pnpm@10 install` (pnpm-lock.yaml, no
+package-lock) — an `npm ci` attempt this run failed before the learnings
+reminder was heeded; harmless, but the learnings entry stands.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on any new main tip, regression-check, log, end silently.
+
 ### 2026-07-20 ~18:10–18:20 UTC — run 17 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip still 166d8c9 = run 16's
