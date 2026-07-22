@@ -455,6 +455,37 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-22 ~00:05–00:20 UTC — run 22 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 5f18183 = run 21's
+commit; zero commits since; the only non-Claude author since bootstrap
+is run 21's own "OAM Roadmap Executor" identity); no OPENROUTER_API_KEY
+or npm credential in the environment; all five roadmap/stage-* branches
+at 0 unmerged commits each; stale feature/error-taxonomy +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open GitHub
+issues and zero open PRs; CI success on main tip 5f18183 (run 120).
+Regression suite green on main: 357/357 pytest (73s, nats-server + nsc
+installed via the Go-proxy workaround first) and sdk-ts 62/62 vitest,
+matching the run-16 through run-21 baselines.
+
+Shallow-clone scare, resolved: before unshallowing, rev-list reported
+70 unmerged commits on roadmap/stage-0 and the fetch showed a "forced
+update" on main — both artifacts of the shallow bootstrap snapshot, not
+real. `git fetch --unshallow` → history intact (310 commits, bootstrap
+116e1bc an ancestor of main), all branches fully merged. Lesson
+appended to roadmap-learnings.md: unshallow before any rev-list/
+merge-base verification. The v0.1.5/v0.1.6/v0.2.0 tags that appeared on
+fetch are historical April releases newly visible to this clone, not
+new pushes.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check,
+log, end silently.
+
 ### 2026-07-21 ~18:05–18:15 UTC — run 21 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip bf83bfe = run 20's

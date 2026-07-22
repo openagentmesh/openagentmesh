@@ -486,3 +486,18 @@ update that file too and say so here.
   does per-request metadata go"** — lifecycle events (0055), and now usage
   (0023) both landed as new event types with no new infrastructure. Worth
   remembering before inventing any new subject family.
+
+## 2026-07-22 — idle run 22 (cloud executor)
+
+- **Never trust `git rev-list` / merge-base results on a shallow bootstrap
+  clone — `git fetch --unshallow` before any verification.** Run 21 saw the
+  mild form (spurious "forced update" + empty merge-base on fetch). Run 22
+  hit the dangerous form: `rev-list --count origin/main..origin/roadmap/stage-0`
+  reported **70 unmerged commits** on a branch that is fully merged, because
+  the shallow history was missing the merge path. That number looked exactly
+  like "someone force-pushed main" or "a cut-off run left work stranded" —
+  both of which would have triggered recovery work that would have been
+  wrong. After unshallowing: 0 unmerged on all five stage branches, history
+  intact (310 commits). Protocol addition honored this run and recommended
+  for all future runs: check for `.git/shallow` right after the initial
+  fetch and unshallow before reconciling state.
