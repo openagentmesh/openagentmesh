@@ -455,6 +455,30 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-07-26 ~06:05–06:15 UTC — run 39 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 7dd2cfc = run 38's
+commit; the only commits since the container snapshot are runs 30–38's
+own log entries, all touching only this state file; last Luca-authored
+commit remains the 2026-07-16 bootstrap 116e1bc); no OPENROUTER_API_KEY
+or npm credential in the environment; unshallowed first per the run-22
+lesson (history intact, 327 commits, bootstrap 116e1bc an ancestor);
+all five roadmap/stage-* branches at 0 unmerged commits each; stale
+feature/error-taxonomy (4 unmerged) + feature/tool-conversion pair
+unchanged (Needs Luca 4); zero open GitHub issues and zero open PRs;
+CI success on main tip 7dd2cfc (run 137). Regression suite green on
+main: 357/357 pytest (74s, nats-server + nsc via the Go-proxy
+workaround first) and sdk-ts 62/62 vitest (pnpm frozen-lockfile),
+matching the run-16 through run-38 baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check,
+log, end silently.
+
 ### 2026-07-26 ~00:05–00:15 UTC — run 38 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 16f18d6 = run 37's
