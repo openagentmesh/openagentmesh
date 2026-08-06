@@ -455,6 +455,34 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-06 ~12:25–12:40 UTC — run 84 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 2928382 = run 83's
+commit; zero commits since; state file untouched; author counts since
+bootstrap are all executor identities — 188 Claude + 7 OAM Roadmap
+Executor; last Luca-authored commit remains the 2026-07-16 bootstrap
+116e1bc); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed first per the run-22 lesson (history intact, 372 commits,
+bootstrap 116e1bc an ancestor); all five roadmap/stage-* branches at
+0 unmerged commits each; stale feature/error-taxonomy (4 unmerged) +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open
+GitHub issues and zero open PRs; CI success on main tip 2928382
+(run 182). Regression suite green on main: 357/357 pytest (71s,
+nats-server + nsc via the Go-proxy workaround first, with the
+~/.agentmesh/bin/nats-server copy applied up front per the run-46
+lesson; uv sync with UV_HTTP_TIMEOUT=120 per run 49) and sdk-ts 62/62
+vitest (pnpm frozen-lockfile); ruff and ty both clean (run from the
+repo root, avoiding the run-75 cwd trap). All matching the run-16
+through run-83 baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check,
+log, end silently.
+
 ### 2026-08-06 ~06:20–06:30 UTC — run 83 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip e2ccd47 = run 82's
