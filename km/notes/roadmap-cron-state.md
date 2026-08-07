@@ -455,6 +455,45 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-07 ~00:15–00:30 UTC — run 86 (Fable 5, cloud) — idle verification + CI-trigger anomaly
+
+Verified this run: no Luca edits (origin/main tip 2dee0fe = run 85's
+commit; zero commits since; state file untouched; last Luca-authored
+commit remains the 2026-07-16 bootstrap 116e1bc); no OPENROUTER_API_KEY
+or npm credential in the environment; unshallowed first per the run-22
+lesson (history intact, 374 commits, bootstrap 116e1bc an ancestor);
+all five roadmap/stage-* branches at 0 unmerged commits each; stale
+feature/error-taxonomy (4 unmerged) + feature/tool-conversion pair
+unchanged (Needs Luca 4); zero open GitHub issues and zero open PRs.
+Regression suite green on main: 357/357 pytest (75s, nats-server + nsc
+via the Go-proxy workaround first, ~/.agentmesh/bin copy up front per
+run 46; uv sync UV_HTTP_TIMEOUT=120 per run 49) and sdk-ts 62/62
+vitest (pnpm frozen-lockfile, nats-server installed before vitest per
+the run-85 lesson); ruff and ty both clean (repo root, run-75 trap
+avoided). All matching the run-16 through run-85 baselines.
+
+**ANOMALY — CI did not trigger on the run-85 push.** Main tip 2dee0fe
+was pushed 2026-08-06 18:16 UTC, but NO workflow run of any kind was
+created for it (verified via the Actions API 18h later: latest CI run
+is 183 on 79835e1, from run 84's push; zero runs with head_sha
+2dee0fe across all 219 runs listed). Every prior run-log push
+(runs 178–183 checked) triggered CI within a minute. All four
+workflows report state "active", ci.yml has no paths filter, and the
+commit message contains no skip token — so the cause is outside the
+repo: either a dropped push event on GitHub's side (transient) or an
+org-level Actions/billing block (systemic). No code risk: 2dee0fe is
+km/-only, its tree is code-identical to CI-green 79835e1, and this
+run's local suite is fully green on the same tree. This run's own log
+push is the discriminating experiment — see the addendum below for
+the outcome; if the new push also creates no run, the CI gate is
+systemically dead and Luca is notified.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; verify the CI-trigger anomaly outcome (a healthy state is
+a CI run on this run's commits); regression-check, log, end.
+
 ### 2026-08-06 ~18:10–18:20 UTC — run 85 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 79835e1 = run 84's
