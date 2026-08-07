@@ -455,6 +455,38 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-07 ~06:25–06:35 UTC — run 87 (Fable 5, cloud) — idle verification; CI-anomaly closure confirmed
+
+Verified this run: no Luca edits (origin/main tip 114791f = run 86's
+addendum commit; zero commits since; state file untouched; author counts
+since bootstrap are all executor identities — 192 Claude + 7 OAM Roadmap
+Executor at 376 total commits; last Luca-authored commit remains the
+2026-07-16 bootstrap 116e1bc); no OPENROUTER_API_KEY or npm credential
+in the environment; unshallowed first per the run-22 lesson (history
+intact, 376 commits, bootstrap 116e1bc an ancestor — the pre-unshallow
+branch counts were garbage, as usual); all five roadmap/stage-* branches
+at 0 unmerged commits each; stale feature/error-taxonomy (4 unmerged) +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open GitHub
+issues and zero open PRs. **CI-anomaly closure confirmed:** run 86's
+addendum push 114791f got its own CI run (185, success) — the run-85
+dropped event was a one-off exactly as the addendum concluded; gate
+healthy, runs 183/184/185 all success. Regression suite green on main:
+357/357 pytest (78s, nats-server + nsc via the Go-proxy workaround
+first, ~/.agentmesh/bin copy up front per run 46; uv sync
+UV_HTTP_TIMEOUT=120 per run 49) and sdk-ts 62/62 vitest (pnpm
+frozen-lockfile, nats-server installed before vitest per the run-85
+lesson); ruff and ty both clean (repo root, run-75 trap avoided). All
+matching the run-16 through run-86 baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note; the CI anomaly closed
+itself and needs nothing from Luca.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check,
+log, end silently.
+
 ### 2026-08-07 ~00:15–00:30 UTC — run 86 (Fable 5, cloud) — idle verification + CI-trigger anomaly
 
 Verified this run: no Luca edits (origin/main tip 2dee0fe = run 85's
