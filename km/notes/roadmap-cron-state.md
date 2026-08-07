@@ -488,6 +488,14 @@ push is the discriminating experiment — see the addendum below for
 the outcome; if the new push also creates no run, the CI gate is
 systemically dead and Luca is notified.
 
+**Addendum (same run): anomaly was TRANSIENT.** The run-86 push
+(a64f4b3, 00:23 UTC) triggered CI run 184 within a minute, completed
+success. Conclusion: GitHub dropped the run-85 push event (one-off);
+the CI gate is functioning. 2dee0fe simply has no CI run and never
+will — harmless (km/-only, code-identical to green 79835e1). No
+notification sent: transient, self-resolved, no action needed from
+Luca. Next run should see CI on this addendum's own commit as normal.
+
 Advanced: nothing — no unblocked work exists in any stage (re-verified).
 
 Next run: unshallow first; check for Needs-Luca answers and
