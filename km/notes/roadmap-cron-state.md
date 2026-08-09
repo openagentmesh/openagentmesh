@@ -455,6 +455,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-09 ~06:10–06:25 UTC — run 95 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 8c69b05 = run 94's
+commit; zero commits since; state file untouched; author counts since
+bootstrap are all executor identities — 200 Claude + 7 OAM Roadmap
+Executor; last Luca-authored commit remains the 2026-07-16 bootstrap
+116e1bc); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed first per the run-22 lesson (history intact, 384 commits,
+bootstrap 116e1bc an ancestor); all five roadmap/stage-* branches at
+0 unmerged commits each; stale feature/error-taxonomy (4 unmerged) +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open
+GitHub issues and zero open PRs; CI success on main tip 8c69b05
+(run 193). Regression suite green on main: 357/357 pytest (72s,
+nats-server via the Go-proxy workaround, ~/.agentmesh/bin copy up
+front per run 46; uv sync UV_HTTP_TIMEOUT=120 per run 49) and sdk-ts
+62/62 vitest (pnpm frozen-lockfile, nats-server installed before
+vitest per the run-85 lesson); ruff and ty both clean (repo root,
+run-75 trap avoided). All matching the run-16 through run-94 baselines.
+
+Environment change handled: `nsc/v2@latest` no longer installs (nsc
+v2.15.0 requires Go ≥1.25; sandbox has go1.24.7 and the toolchain
+auto-download TLS-times-out through the proxy). Pinned
+`nsc/v2@v2.11.0` instead — builds on go1.24, full suite green with it.
+Lesson recorded in km/notes/roadmap-learnings.md; future runs must
+use the pin, not `@latest`.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note; the nsc pin is an
+internal workaround needing nothing from Luca.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check
+(nsc pinned at v2.11.0), log, end silently.
+
 ### 2026-08-09 ~00:10–00:25 UTC — run 94 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 89b8074 = run 93's

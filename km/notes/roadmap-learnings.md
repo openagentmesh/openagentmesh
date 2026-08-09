@@ -27,6 +27,11 @@ update that file too and say so here.
   `AgentMesh.local()`'s embedded-NATS download fails. Workaround that works:
   `go install github.com/nats-io/nats-server/v2@v2.10.24` (proxy.golang.org is allowed),
   copy to `~/.agentmesh/bin/`. Every future cloud run needs this before pytest/vitest.
+- **`nsc/v2@latest` broke in the cloud env (run 95, 2026-08-09):** nsc v2.15.0 now
+  requires Go ≥1.25 while the sandbox has go1.24.7, and Go's automatic toolchain
+  download TLS-times-out through the proxy. Fix: pin
+  `go install github.com/nats-io/nsc/v2@v2.11.0` (builds fine on go1.24, all 357
+  tests pass with it). Future runs should use the pinned version, not `@latest`.
 - **The sdk-ts flake was a missing flush**, as suspected: sim helpers subscribed but never
   flushed before tests invoked agents on a second connection. Making the registration
   helpers async (flush inside) fixed it; 5 consecutive full runs green. Related JS footgun
