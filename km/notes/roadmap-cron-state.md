@@ -455,6 +455,35 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-15 ~12:15–12:30 UTC — run 120 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip b1faf4b = run 119's
+commit; zero commits since; state file untouched — last edit is
+run 119's own commit; author counts since the 2026-07-16 bootstrap
+116e1bc are all executor identities — 225 Claude + 7 OAM Roadmap
+Executor; total history 409 commits after unshallow); no
+OPENROUTER_API_KEY or npm credential in the environment; unshallowed
+first per the run-22 lesson (history intact, bootstrap 116e1bc an
+ancestor); all five roadmap/stage-* branches at 0 unmerged commits
+each; stale feature/error-taxonomy (4 unmerged) +
+feature/tool-conversion pair unchanged (Needs Luca 4); zero open
+GitHub issues and zero open PRs; CI success on main tip b1faf4b
+(run 218). Regression suite green on main: 357/357 pytest (69s,
+nats-server via the Go-proxy workaround, nsc pinned at v2.11.0 per
+the run-95 lesson, ~/.agentmesh/bin copy up front per run 46; uv sync
+UV_HTTP_TIMEOUT=120 per run 49) and sdk-ts 62/62 vitest (pnpm
+frozen-lockfile, nats-server on PATH before vitest per the run-85
+lesson); ruff and ty both clean (repo root, run-75 trap avoided). All
+matching the run-16 through run-119 baselines.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+No notification sent: blocked/healthy state unchanged since run 17's
+one-time notification, per the stay-silent note.
+
+Next run: unshallow first; check for Needs-Luca answers and
+credentials; if none, verify CI on any new main tip, regression-check
+(nsc pinned at v2.11.0), log, end silently.
+
 ### 2026-08-15 ~06:15–06:30 UTC — run 119 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 9cb4309 = run 118's
