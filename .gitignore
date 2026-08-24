@@ -63,3 +63,12 @@ site/
 .oam-url
 # Admin UI compiled assets (built by CI at publish time, ADR-0056)
 src/openagentmesh/_ui_assets/
+
+# Frontend build artifacts
+ui/node_modules/
+ui/dist/
+
+# Wildfire dashboard frontend
+demos/wildfire/dashboard/node_modules/
+demos/wildfire/dashboard/dist/*
+!demos/wildfire/dashboard/dist/.gitkeep

@@ -113,6 +113,7 @@ nav:
       - Automatic Load Balancing: cookbook/load-balancing.md
       - Reactive Pipeline: cookbook/reactive-pipeline.md
       - Parallel RAG Indexing: cookbook/parallel-rag-indexing.md
+      - Wildfire Incident Response: cookbook/wildfire-incident.md
   - SDKs:
       - TypeScript Client: sdk/typescript.md
   - API Reference:

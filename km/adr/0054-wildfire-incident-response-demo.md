@@ -2,7 +2,7 @@
 
 - **Type:** demo / portfolio
 - **Date:** 2026-05-04
-- **Status:** spec
+- **Status:** documented
 - **Depends on:** Phase 1 SDK (AgentMesh, `@mesh.agent`, pub/sub, request/reply, queue groups, KV). For the public-mesh variant: ADR-0038 (NATS auth).
 - **Related:** ADR-0019 (OAM vs MCP differentiation by topology), ADR-0007 (plain Pydantic for structured I/O), ADR-0042 (Watcher pattern), ADR-0048 (mesh-native observability).
 - **Source:** conversation 2026-05-04 (portfolio demo design; converged on multi-fleet wildfire response after rejecting newsroom and document-pipeline alternatives).
@@ -368,6 +368,39 @@ The demo lives at `demos/wildfire/` (git path) and is referenced in docs as "Wil
 4. Record canonical 90-second video. Ship as portfolio piece.
 5. (Post-ADR-0038) Public hosted variant + visitor starter repo.
 6. (Phase 4) Polyglot follow-up: TS or Go fleet joining the same mesh.
+
+## Amendment (2026-08-24): what actually shipped
+
+`feature/wildfire-demo` landed on `main` on 2026-08-24 (H2 Stage 0 item 1). The merge
+happened ~7 weeks after the branch's last commit, against a `main` that had since gained
+auth (ADR-0038), liveness (ADR-0016/0040), observability (ADR-0048), lifecycle gates
+(ADR-0055), the admin UI (ADR-0056) and usage attribution (ADR-0023). Four corrections
+against the text above:
+
+1. **Admin UI: the branch's version was dropped, not merged.** The branch carried its own
+   `ui/` (a `components/` + `lib/` React app with fleet grouping) written before ADR-0056
+   shipped. `main`'s ADR-0056 UI — `pages/` + `mesh.ts`, with unit tests and a Playwright
+   smoke e2e — is the one on `main`. The Visualization section above already names ADR-0056
+   as the admin UI, so this resolves the duplication in favour of what the ADR specified.
+2. **Contracts live at `demos/wildfire/core/contracts.py`**, not `demos/wildfire/contracts.py`
+   as the Consequences section says.
+3. **The demo runs without an LLM key.** `OPENROUTER_API_KEY` unset raises `LLMUnavailable`
+   immediately and every consumer takes its degraded path, so the cascade (ignite → UAV
+   detect → drone CAS claim → survey) is demonstrable with no credential. Only the briefing,
+   dispatch-from-natural-language and narration steps need the key.
+4. **The branch fixed two SDK bugs in KV sources** and they came along with the merge:
+   DELETE markers were being classified by a suffix match on the operation name, and a
+   `kv_entry`-kind handler tried to validate the empty payload of a DELETE. Both are covered
+   by tests in `tests/test_sources.py`.
+
+Verified at merge time: 700 pytest passing (336 of them under `tests/wildfire/`), ruff and
+ty clean, sdk-ts 62/62 and admin-UI 30/30 vitest, all 28 wildfire modules importable, and a
+live boot of `python -m demos.wildfire` — embedded NATS, 19 supervised fleet processes,
+11 agents in the catalog, and an ignited cell reaching `surveyed` in 9 seconds.
+
+Still open (see `km/notes/roadmap-cron-state.md`): the 90-second recording (Stage 2 item 1)
+needs `OPENROUTER_API_KEY` and a screen recorder, so sequencing step 4 is not done.
+
 
 ## Consequences
 

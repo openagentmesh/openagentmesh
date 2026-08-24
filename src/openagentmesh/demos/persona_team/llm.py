@@ -128,7 +128,7 @@ class OpenRouterModel:
         try:
             # openai is deliberately not a project dependency: this demo-only
             # backend imports it lazily and fails with instructions instead.
-            from openai import AsyncOpenAI  # ty: ignore[unresolved-import]
+            from openai import AsyncOpenAI
         except ImportError as e:
             raise RuntimeError(
                 "The 'openai' package is required for OpenRouter runs: pip install openai"
