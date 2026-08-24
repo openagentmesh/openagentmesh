@@ -458,6 +458,37 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-24 ~12:25–12:50 UTC — run 156 (Fable 5, cloud) — idle verification, first post-wildfire baseline
+
+Verified this run: no Luca edits (origin/main tip 6c98862 is run 155's own
+commit; state file's last touch is that commit); no OPENROUTER_API_KEY or
+npm credential in the environment; unshallowed first per the run-22 lesson;
+**full remote branch list diffed against expectations per the run-155
+lesson** — exactly main + 5 roadmap/stage-* + 3 feature branches, nothing
+new; all five roadmap/stage-* at 0 unmerged; feature/wildfire-demo and
+feature/tool-conversion at 0 unmerged (deletable, Needs Luca 4);
+feature/error-taxonomy still 4 unmerged; zero open GitHub issues and zero
+open PRs; CI success on main tip 6c98862 (run 258, the run-155 docs commit).
+
+Regression suite green on the post-wildfire tree — this is the **new
+baseline**: 700 pytest passed, 2 skipped (101s; nats-server v2.10.24 +
+nsc v2.11.0 via go install, copied to ~/.agentmesh/bin up front; uv sync
+--all-extras with UV_HTTP_TIMEOUT=120); ruff and ty clean from repo root;
+sdk-ts 62/62 vitest ×5 consecutive after pnpm frozen-lockfile + build;
+admin UI 30/30 vitest + tsc clean (SDK built first per the run-155 lesson).
+All numbers match run 155's merged-tree verification exactly.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11 — one key reactivates both the Stage 2 recording path and the
+Stage 4 measured experiment). No notification sent: run 155 already
+notified the wildfire merge; nothing changed since.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main
+tip, regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-24 ~06:25–07:15 UTC — run 155 (Fable 5, cloud) — WILDFIRE MERGE
 
 **The 137-run idle streak ended: `feature/wildfire-demo` is on origin and is
