@@ -5,66 +5,48 @@ answer a "Needs Luca" item); the executor re-verifies everything against the rep
 
 ## Current stage
 
-Stage 4 — Frontier. Item 2 (ADR-0023 usage attribution) COMPLETE run 14:
-merged to main bf00b88 (--no-ff), ADR at `documented`. Item 1 (persona
-experiment): machinery BUILT run 15 — merged to main 46b4224 (--no-ff),
-`src/openagentmesh/demos/persona_team/` + 10 tests; both topologies run
-the full protocol dry with the stub model (details in the plan note's
-execution-order section). The item's remaining work — measured runs and
-the comparison note — is BLOCKED on OPENROUTER_API_KEY (Needs Luca 11);
-the executor will not fake numbers. Item 3 (ADR-0036 decision) comes
-after the measured experiment.
+**Run 155 (2026-08-24) unblocked and completed Stage 0 item 1 — the wildfire
+merge.** `feature/wildfire-demo` appeared on origin (Luca pushed it; Needs Luca
+item 1 is answered, see the run log for what could and could not be established
+about when). 113 commits merged onto a main seven weeks ahead of the branch
+point, reconciled, and merged to main f639f8c (--no-ff). Details in the Stage 0
+item status below and in ADR-0054's 2026-08-24 amendment.
 
-Run 16 exhausted the unblocked backlog: the docs-consistency sweep is
-done (merged d2d8d74 — see run log) and the "H1 2027 candidates"
-skeleton exists (km/notes/2026-07-20-h1-2027-candidates.md, 33906ca,
-experiment-derived sections deliberately empty). **Stage 4 — and the
-whole roadmap — now has NO unblocked build work left.** Every remaining
-item across all stages waits on a Needs-Luca answer; the single
-highest-leverage unblock is OPENROUTER_API_KEY (item 11), which
-reactivates Stage 4's measured experiment → comparison note → ADR-0036
-decision → stage exit. Next runs: verify CI on main, check for answers,
-run the regression suite, end. Nothing else to build until Luca acts.
+Stage 4 — Frontier remains the current stage for new work. Item 2 (ADR-0023
+usage attribution) COMPLETE run 14: merged to main bf00b88 (--no-ff), ADR at
+`documented`. Item 1 (persona experiment): machinery BUILT run 15 — merged to
+main 46b4224 (--no-ff), `src/openagentmesh/demos/persona_team/` + 10 tests; both
+topologies run the full protocol dry with the stub model. The item's remaining
+work — measured runs and the comparison note — is BLOCKED on OPENROUTER_API_KEY
+(Needs Luca 11); the executor will not fake numbers. Item 3 (ADR-0036 decision)
+comes after the measured experiment.
+
+Every remaining item across all five stages still waits on a Needs-Luca answer.
+The single highest-leverage unblock is OPENROUTER_API_KEY (item 11), which now
+reactivates **two** things at once: Stage 4's measured experiment → comparison
+note → ADR-0036 decision → stage exit, and Stage 2's demo recording, whose code
+blocker just disappeared (`demos/wildfire/DEMO_SCRIPT.md` is on main).
 
 **STAGE 3 COMPLETE (run 13).** All three exit criteria verified against the
-repo this run: (1) every shipped ADR at `documented` in km/adr/index.md —
-0038, 0016, 0040, 0048, 0055, 0056 all checked via grep this run; (2)
-secured multi-node mesh cookbook recipe (docs/cookbook/secured-mesh.md +
-executable twin, since run 5); (3) chaos kill-mid-request test
-(tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
-in the 335-test suite that passed this run). The stage-3 plan sign-off
-(Needs Luca 10) was never answered; the executor ran the plan's default
-order to completion — reordering is moot now, the item stands only as FYI.
-ADR-0038 auth: COMPLETE (run 5, merged 9502f52).
-ADR-0016+0040 liveness pair: COMPLETE (run 6) — health monitor, death
-notices, caller fast-fail, docs — merged to main af5a96a (--no-ff), CI
-success on branch tip e3733e6 (run 35). **Both Stage 3 exit criteria are
-now met**: secured-mesh cookbook (run 5) and the chaos kill-mid-request
-test (tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request,
-passing — caller gets agent_died in ~1s against a 30s timeout).
-ADR-0048 observability v1: COMPLETE (run 7) — merged to main 3e5e486.
-ADR-0055 lifecycle gates: COMPLETE (run 8) — merged to main b7e4093.
-ADR-0056 admin UI: IN PROGRESS — wave 1 of 5 merged to main 7b48e99
-(run 9: websocket listener on dev meshes, `oam ui` static server +
-config.json, ADR amended against the shipped repo); wave 2 of 5 merged to
-main efae05e (run 10: ui/ frontend scaffold, registry + contract viewer
-screens, `ui` CI job — e2e verified in a real browser); wave 3 of 5
-merged to main 968f4f5 (built by run 11 which was cut off before
-merging/logging; verified and merged by run 12: invocation sandbox — rjsf
-form from input schema, Call + Stream from the browser, error envelope
-rendering — plus sdk-ts NotAvailable mapping for ADR-0055 parity); wave 4
-of 5 merged to main 48b9f3b (run 12: event feed screen + registry
-liveness dots, powered by new sdk-ts `tap()` + `instancesWatch()`
-primitives — e2e verified with a real SIGKILL). Build waves tracked in
-km/notes/2026-07-18-adr0056-ui-plan.md; next is wave 5 (wheel packaging,
-Playwright smoke e2e, docs, ADR → documented, CHANGELOG closeout).
-Stage 2 remains open only on Needs-Luca items (demo, docs URL, draft review,
-publishing). Stage 1 open only on npm publish. Stage 0 open only on its
-Needs-Luca items (wildfire merge, worktrees, v0.3.0).
+repo that run: (1) every shipped ADR at `documented` in km/adr/index.md —
+0038, 0016, 0040, 0048, 0055, 0056; (2) secured multi-node mesh cookbook recipe
+(docs/cookbook/secured-mesh.md + executable twin, since run 5); (3) chaos
+kill-mid-request test
+(tests/test_liveness.py::test_call_fast_fails_when_agent_dies_mid_request).
+The stage-3 plan sign-off (Needs Luca 10) was never answered; the executor ran
+the plan's default order to completion — the item stands only as FYI.
+ADR-0038 auth: COMPLETE (run 5, merged 9502f52). ADR-0016+0040 liveness pair:
+COMPLETE (run 6, merged af5a96a). ADR-0048 observability v1: COMPLETE (run 7,
+merged 3e5e486). ADR-0055 lifecycle gates: COMPLETE (run 8, merged b7e4093).
+ADR-0056 admin UI: COMPLETE across five waves (runs 9–13), ADR at `documented`.
+
+Stage 2 remains open on Needs-Luca items (demo recording, docs URL, draft
+review, publishing). Stage 1 open only on npm publish. Stage 0 open only on
+items 2 and 7 (worktree cleanup, v0.3.0 release) — both Luca's.
 
 ## Stage checklist
 
-- [ ] Stage 0 — Consolidate (blocked on Needs-Luca items below; everything else done)
+- [ ] Stage 0 — Consolidate (item 1 DONE run 155: wildfire merged to main f639f8c; open only on items 2 and 7, both Luca's)
 - [ ] Stage 1 — Interop (core done: MCP bridge, to_agent_card, docs; npm publish blocked)
 - [ ] Stage 2 — Launch (drafts + README fold done; demo/URL/publishing need Luca)
 - [x] Stage 3 — Production trust (COMPLETE run 13; exit criteria verified — see Current stage)
@@ -118,12 +100,21 @@ Needs-Luca items (wildfire merge, worktrees, v0.3.0).
 3. **ADR-0036 decision** — NOT STARTED (after the experiment, per the
    stage prompt).
 
-## Stage 0 item status (verified 2026-07-17)
+## Stage 0 item status (item 1 updated 2026-08-24 run 155; rest verified 2026-07-17)
 
-1. **Merge feature/wildfire-demo** — BLOCKED: the branch does not exist on origin
-   (verified: `git branch -r` shows only feature/error-taxonomy, feature/tool-conversion,
-   main; no wildfire code anywhere in `git log --all`). It was never pushed from Luca's
-   machine. → Needs Luca.
+1. **Merge feature/wildfire-demo** — DONE (run 155, 2026-08-24). The branch turned up
+   on origin and was merged to main f639f8c (--no-ff) via roadmap/stage-0. 113 commits,
+   80 files, ~16k lines: `demos/wildfire/` (19-process fleet + Svelte scenario dashboard),
+   `tests/wildfire/` (336 tests), `docs/cookbook/wildfire-incident.md` + executable twin.
+   Conflict policy per the stage prompt — main won for SDK code (its ADR-0056 admin UI
+   over the branch's earlier parallel `ui/`, `_local.py`, `cli/ui.py`), the branch won for
+   demo code; the branch's two KV-source DELETE fixes in `_mesh.py` were kept (additive,
+   test-covered). `.planning/` dropped (gitignored on main). uv.lock regenerated rather
+   than hand-merged. Reconciliation needed after the merge: 34 ruff errors and 54 ty
+   diagnostics, all fixed (commit e421fd2). ADR-0054 → `documented` with an amendment
+   recording what actually shipped. Verified this run: 700 pytest (2 skipped), ruff/ty
+   clean, sdk-ts 62/62 ×5, admin UI 30/30, 28/28 wildfire modules importable, wheel builds
+   with no demo leakage, live boot reaching a `surveyed` detection in 9s.
 2. **Remove stale .claude/worktrees** — N/A from the cloud: worktrees and their branches
    are local to Luca's machine, nothing on origin to clean. → Needs Luca (run locally).
 3. **CI workflow** — DONE. `.github/workflows/ci.yml` runs ruff, ty, pytest, and sdk-ts
@@ -138,6 +129,12 @@ Needs-Luca items (wildfire merge, worktrees, v0.3.0).
    ValidationError→invalid_input mapping ALREADY EXISTED (ADR-0057; prompt's May audit
    was stale — verified in _mesh.py, no code needed); executable cookbook tests added for
    multi-module.md and parallel-rag-indexing.md (3 new tests, passing).
+**Stage 0 exit criteria as of run 155:** CI green on main — MET (run 257 on
+f639f8c); wildfire demo importable/runnable from main — MET (28/28 modules
+import; live boot drove a detection to `surveyed`); zero ruff/ty findings — MET;
+TS suite 5 consecutive full runs — MET (62/62 ×5); v0.3.0 tagged and published —
+NOT MET, and not the executor's to do (item 7 / Needs Luca 3). Four of five.
+
 7. **v0.3.0 release** — NOT DONE, held. Ordering: the stage releases after the wildfire
    merge, which is blocked. Also, pushing a release tag triggers PyPI publish (outward-
    facing). → Needs Luca (decision).
@@ -170,10 +167,12 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Stage 2 item status (verified 2026-07-17, run 3)
 
-1. **Wildfire demo recording** — BLOCKED twice over: feature/wildfire-demo still not on
-   origin (re-verified this run: `git branch -a` has no wildfire branch), and recording
-   needs OPENROUTER_API_KEY. README carries a placeholder comment where the embed goes.
-   → Needs Luca (items 1 and 6 below).
+1. **Wildfire demo recording** — HALF UNBLOCKED (run 155). The code blocker is gone:
+   the demo is on main and boots (`python -m demos.wildfire`), and the recording script
+   is at `demos/wildfire/DEMO_SCRIPT.md`. Still blocked on OPENROUTER_API_KEY (the
+   briefing / natural-language dispatch / narration beats need it; the detect→claim→survey
+   cascade does not) and on screen recording, which is Luca's machine either way. README
+   still carries a placeholder comment where the embed goes. → Needs Luca (item 6).
 2. **Docs URL split** — INVENTORIED, decision recorded as a question (Needs Luca item 7).
    Facts verified this run: README has 3 links to openagentmesh.github.io; mkdocs.yml
    `site_url: https://openagentmesh.dev/`; no CNAME file anywhere in the repo;
@@ -201,10 +200,11 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    trusted publisher) for the 'npm' environment, then say "publish sdk-ts 0.1.0" here;
    the next run will tag sdk-ts-v0.1.0 and the workflow publishes. The `npm i` exit
    criterion stays open until then.
-1. **Push feature/wildfire-demo to origin.** The branch (~50 commits, wildfire test
-   suite) exists only on your machine. Until it's on origin, Stage 0 item 1 can't proceed
-   and Stage 2's demo recording has no code to run. `git push origin feature/wildfire-demo`
-   from the machine that has it is enough; the executor will handle the merge next run.
+1. ~~**Push feature/wildfire-demo to origin.**~~ **ANSWERED — you pushed it, and run 155
+   merged it** (main f639f8c). Nothing further needed here. Two follow-ons for you:
+   the branch is now fully merged into main, so it joins the deletable-branch question in
+   item 4; and the demo recording (Stage 2 item 1) now waits only on your key and your
+   screen recorder.
 2. **Worktree cleanup is yours to run locally** (cloud checkouts don't see
    .claude/worktrees). Per the stage prompt: check none of the 15 agent-* branches has
    unique unmerged work before deleting.
@@ -213,13 +213,16 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
    CI/typing), or wait for the wildfire merge? If "release now", say so here and the next
    run will run the /release flow up to the tag push; note the tag push triggers the PyPI
    publish workflow.
-4. **OK to delete stale remote branches?** feature/error-taxonomy and
-   feature/tool-conversion predate their content landing on main (verified their
-   tests/modules are on main). Deleting remote branches is destructive, so left alone.
-6. **OPENROUTER_API_KEY for the demo recording** (Stage 2 item 1). Also blocked on the
-   wildfire branch push (item 1 above). Both are yours; the executor cannot record the
-   demo in the cloud regardless (no key, no branch, and screen recording is better done
-   on your machine anyway — DEMO_SCRIPT.md will be on the wildfire branch).
+4. **OK to delete stale remote branches?** feature/tool-conversion and (since run 155)
+   feature/wildfire-demo are now fully merged ancestors of main — verified this run with
+   `git merge-base --is-ancestor`. feature/error-taxonomy is 4 commits ahead of main and
+   its content landed by other means, so it needs a look before deletion, not a blind
+   delete. Deleting remote branches is destructive, so all three are left alone.
+6. **OPENROUTER_API_KEY for the demo recording** (Stage 2 item 1). No longer blocked on
+   the branch — the demo is on main and boots. The executor still cannot record in the
+   cloud (no key, and screen recording belongs on your machine); the script is now at
+   `demos/wildfire/DEMO_SCRIPT.md`. Same key as item 11: providing it once covers the
+   recording and the Stage 4 experiment.
 7. **Docs URL decision** (Stage 2 item 2): standardize on
    https://openagentmesh.github.io/openagentmesh/ or wire openagentmesh.dev?
    Facts: no CNAME in the repo, docs deploy to GitHub Pages, mkdocs.yml claims
@@ -454,6 +457,74 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
      CHANGELOG admin-UI entry rewritten as shipped.
 
 ## Run log
+
+### 2026-08-24 ~06:25–07:15 UTC — run 155 (Fable 5, cloud) — WILDFIRE MERGE
+
+**The 137-run idle streak ended: `feature/wildfire-demo` is on origin and is
+now on main.**
+
+Verified before acting: unshallowed first per the run-22 lesson (the initial
+bootstrap clone reported bogus "N commits ahead" for every branch until then);
+all five roadmap/stage-* branches 0 unmerged; no OPENROUTER_API_KEY or npm
+credential in the environment; no Luca edits to this file. The one thing that
+had changed since run 154: `git branch -r` listed `feature/wildfire-demo`
+(tip 55d85d0, committed 2026-07-06), which runs 1–154 recorded as absent.
+**When it was pushed could not be established** — commit dates survive a push,
+CI does not run on `feature/**`, and a fresh clone has no reflog. What is
+certain is that runs 150–154 logged the two stale feature branches by name and
+never mentioned this one, so it either arrived very recently or went unnoticed;
+see the learnings note.
+
+Advanced (all on roadmap/stage-0, merged to main f639f8c --no-ff):
+- **The merge.** 113 commits, 80 files, ~16k lines, onto a main seven weeks
+  ahead of the branch point. Conflict policy from the stage prompt applied
+  literally — main won for SDK code, the branch for demo code. Concretely:
+  main's ADR-0056 admin UI kept and the branch's competing `ui/` dropped
+  (13 branch-only files); main's `_local.py` and `cli/ui.py` kept; the branch's
+  two KV-source DELETE fixes in `_mesh.py` kept because they merged clean, are
+  additive and arrive with a test; `.planning/` dropped (gitignored on main);
+  pyproject hand-merged (new `wildfire-dashboard` extra, fastapi/uvicorn/httpx/
+  openai into dev, `demos/**` added to the ADR-0031 ty override) and uv.lock
+  regenerated with `uv lock` rather than resolved by hand. Commit 2f0385d.
+- **Reconciliation.** The wildfire suite passed untouched (336 tests) but the
+  branch predates main's zero-findings policy: 34 ruff errors, 54 ty
+  diagnostics. All fixed in e421fd2 — details in the commit message; the
+  substantive ones were `mesh._nc` → main's narrowing `mesh._conn` in four
+  tests, and the demo's mypy-syntax `# type: ignore[arg-type]` suppressions
+  translated to ty's syntax (ty does not honour mypy's, so they were dead
+  comments and every one of them was masking a live diagnostic).
+- **ADR-0054 → `documented`** with a 2026-08-24 amendment recording four
+  divergences between the ADR text and what shipped, plus what is still open
+  (the 90-second recording). Index row updated. CHANGELOG: the demo under
+  Added, the KV DELETE fixes under Fixed.
+
+Verified this run, each against a command result:
+- 700 pytest passed, 2 skipped (357 baseline + 343 new), 94s.
+- ruff and ty both clean from the repo root (run-75 trap avoided).
+- sdk-ts 62/62 vitest across 5 consecutive runs (Stage 0 exit criterion) and
+  tsc clean; admin UI 30/30 vitest and typecheck clean after building the SDK
+  first (see the learnings note — locally the ui suite fails without that).
+- CI success on branch tip e421fd2 (run 255, all four jobs) and, after the
+  merge, **CI success on main tip f639f8c (run 257)**. Run 254 on the raw merge
+  commit failed as expected (the lint gates, before reconciliation).
+- All 28 `demos.wildfire.*` modules import; wheel builds with py.typed and no
+  `demos/` leakage.
+- **Live boot**, not just tests: `python -m demos.wildfire --seed 42` brought up
+  embedded NATS and 19 supervised fleet processes, 11 agents in the catalog and
+  13 fleet heartbeats in KV; igniting cell 31.21 at 620 °C produced a detection
+  claimed by CAS within 1s (`assigned:{instance_id}`) and `surveyed` at t+9s.
+  The two frontends exit in a source checkout (no built bundles) with correct
+  instructions — expected, not a regression.
+
+Left open: Stage 0 items 2 (worktree cleanup, local to Luca's machine) and 7
+(v0.3.0 — decision plus an outward-facing PyPI publish). Everything else across
+all stages still waits on a Needs-Luca answer; OPENROUTER_API_KEY now unblocks
+two stages instead of one.
+
+Next run: unshallow first; check for Needs-Luca answers and credentials;
+regression-check; and **explicitly re-check
+`git branch -r` for new or changed branches**, which is the failure mode this
+run nearly repeated.
 
 ### 2026-08-24 ~00:15–00:30 UTC — run 154 (Fable 5, cloud) — idle verification
 

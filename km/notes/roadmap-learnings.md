@@ -506,3 +506,52 @@ update that file too and say so here.
   intact (310 commits). Protocol addition honored this run and recommended
   for all future runs: check for `.git/shallow` right after the initial
   fetch and unshallow before reconciling state.
+
+## 2026-08-24 — Stage 0 run 155 (cloud executor): the wildfire merge
+
+- **A blocked item can silently unblock, and an idle loop will not notice.**
+  `feature/wildfire-demo` was recorded absent from origin by run 1 and treated
+  as absent by every run after it. Runs 150–154 each enumerated the branches
+  they cared about (`roadmap/stage-*`, plus the two known stale ones) and
+  reported "still fully blocked" — a check shaped to confirm the existing state
+  rather than to notice a new one. The branch's arrival was caught this run only
+  because the raw `git fetch` output happened to print it. **Every idle run
+  should diff the full remote branch list against what the state file expects**,
+  not just re-verify the branches it already knows about. The same reasoning
+  applies to any Needs-Luca item whose answer is an artifact rather than a note
+  in the state file: a pushed branch, an added secret, a file dropped in the
+  repo. Cheap to check, and 137 runs of "nothing to do" is what the alternative
+  costs.
+- **Commit dates say nothing about push time.** The branch's tip was dated
+  2026-07-06, which looks like it predates the first executor run. It does not
+  follow that the branch was there: pushing preserves committer dates. With CI
+  scoped to `main` and `roadmap/**` there was no workflow run on `feature/**` to
+  date the push either, and a fresh cloud clone has no reflog. The honest answer
+  went into the run log as "could not be established".
+- **`# type: ignore[...]` is invisible to ty.** The wildfire branch carried a
+  dozen mypy-style suppressions. ty does not read them, so every one was both a
+  dead comment and a live diagnostic in waiting; ty's own syntax is
+  `# ty: ignore[<rule-name>]` with ty's rule names (`invalid-argument-type`, not
+  `arg-type`). A blanket sed across the branch's files converted one suppression
+  that ty did not need, which ty then flagged as an *unused* suppression — so the
+  translation needs a check pass, not just the sed.
+- **Installing a dependency can create a lint failure.** Adding `openai` to the
+  dev group (the wildfire LLM peers' tests need it) made
+  `src/openagentmesh/demos/persona_team/llm.py`'s
+  `# ty: ignore[unresolved-import]` unused, which is itself a ty error. Anything
+  suppressing an *unresolved* import is coupled to the dependency list; if a
+  future change drops `openai` from dev, that suppression has to come back.
+- **The `ui/` suite cannot run without building the TS SDK first.** `pnpm test`
+  in `ui/` fails all five files with "Failed to resolve entry for package
+  @openagentmesh/sdk" unless `sdk-ts` has been built — CI does this explicitly
+  (the "Build the SDK (the ui/ link target)" step) but a local run has to
+  remember. It looks exactly like a merge regression and is not one.
+- **A demo is not verified by its tests passing.** The wildfire suite went green
+  on the merged tree without a single edit, which proves the unit and integration
+  layers, not the demo. Booting it (`python -m demos.wildfire`) and driving the
+  cascade from a second connection — ignite a cell, watch the detection reach
+  `surveyed` — is what actually exercised the merged code against main's SDK, and
+  it took about two minutes. Worth doing for every demo-shaped exit criterion.
+- **Regenerate lockfiles, do not merge them.** `uv.lock` conflicted; taking
+  main's copy and re-running `uv lock` against the hand-merged `pyproject.toml`
+  was faster and safer than resolving 476 changed lines by hand.
