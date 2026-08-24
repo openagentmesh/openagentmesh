@@ -24,6 +24,14 @@ mcp = [
     "mcp>=1.20",
 ]
 
+# Wildfire scenario UI dashboard backend. Lives at demos/wildfire/dashboard/
+# and runs uvicorn programmatically. Demo-scoped: the SDK itself never
+# imports FastAPI.
+wildfire-dashboard = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+
 [project.scripts]
 oam = "openagentmesh.cli:app"
 
@@ -39,9 +47,18 @@ dev = [
     "ty>=0.0.28",
     "zensical>=0.0.32",
     "mcp>=1.20",
+    # Wildfire dashboard backend — pulled into dev so `uv run pytest` exercises
+    # the FastAPI app without `--extra wildfire-dashboard`.
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",  # FastAPI TestClient backend
+    # Wildfire LLM peers (briefer/tasker/narrator) reach OpenRouter through the
+    # openai client; demo-scoped, the SDK never imports it. In dev so pytest
+    # collects the peers' unit tests without extra flags.
+    "openai>=1.60",
 ]
 demo = [
-    "openai>=1.0.0",
+    "openai>=1.60",
 ]
 
 [tool.ruff]
@@ -66,7 +83,7 @@ python = ".venv"
 # AsyncIterator[Chunk]. Tests and demos follow that documented convention, so
 # the resulting invalid-return-type diagnostics are suppressed there.
 [[tool.ty.overrides]]
-include = ["tests/**", "src/openagentmesh/demos/**"]
+include = ["tests/**", "src/openagentmesh/demos/**", "demos/**"]
 
 [tool.ty.overrides.rules]
 invalid-return-type = "ignore"
