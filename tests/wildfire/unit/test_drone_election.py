@@ -36,7 +36,6 @@ drone = pytest.importorskip(
 
 from demos.wildfire.core.contracts import Coords  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Module shape
 # ---------------------------------------------------------------------------
@@ -232,16 +231,15 @@ def test_drone_module_has_no_bare_prefix_kv_list_calls():
 # the low-alt.drone fleet prefix (already gated by
 # test_drone_module_peer_scan_uses_nats_wildcard_suffix above).
 
-import asyncio  # noqa: E402
 import time  # noqa: E402
 
-from openagentmesh import AgentMesh  # noqa: E402
 from demos.wildfire.core.contracts import (  # noqa: E402
     DetectionRecord,
     FleetMemberState,
     SurveyResult,
 )
 from demos.wildfire.core.keys import detection_key, fleet_key  # noqa: E402
+from openagentmesh import AgentMesh  # noqa: E402
 
 
 async def test_is_closest_free_with_closer_peer_returns_false():

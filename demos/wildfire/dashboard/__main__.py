@@ -39,12 +39,11 @@ from pathlib import Path
 import uvicorn
 
 from demos.wildfire.core.config import DASHBOARD_PORT
-from openagentmesh import AgentMesh
-
 from demos.wildfire.dashboard.server import (
     make_app,
     register_mesh_consumers,
 )
+from openagentmesh import AgentMesh
 
 _log = logging.getLogger("wildfire.dashboard")
 

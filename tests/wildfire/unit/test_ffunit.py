@@ -25,12 +25,11 @@ from pathlib import Path
 
 import pytest
 
-from openagentmesh import AgentMesh
-
 from demos.wildfire.core.contracts import (
     Coords,
     DispatchOrder,
 )
+from openagentmesh import AgentMesh
 
 ffunit = pytest.importorskip(
     "demos.wildfire.fleet.ffunit",
@@ -170,7 +169,7 @@ async def test_ffunit_publishes_status_on_dispatch():
             observed_states.append(payload["state"])
             first_msg.set()
 
-        sub = await mesh._nc.subscribe(
+        sub = await mesh._conn.subscribe(
             f"mesh.action.ffunit.{mesh.instance_id}.status",
             cb=_on_status,
         )

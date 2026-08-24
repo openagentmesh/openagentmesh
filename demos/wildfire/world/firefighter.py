@@ -64,6 +64,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import os
 import sys
 import time
@@ -195,7 +196,7 @@ def parse_dispatch_line(line: str) -> DispatchOrder | None:
     return DispatchOrder(
         order_id="",
         target_coords=coords,
-        priority=priority,  # type: ignore[arg-type]
+        priority=priority,  # ty: ignore[invalid-argument-type]
         operator_id="",
         issued_at=0.0,
         persons_estimated=persons,
@@ -294,10 +295,8 @@ async def repl(
         # Print the prompt without trailing newline; flush so it appears
         # before readline blocks. StringIO ignores flush; real stdout needs it.
         out_stream.write(_PROMPT)
-        try:
+        with contextlib.suppress(Exception):
             out_stream.flush()
-        except Exception:
-            pass
 
         # Read one line. asyncio.to_thread keeps stdin off the event-loop
         # thread; for StringIO this is functionally synchronous but the
@@ -416,10 +415,8 @@ async def _handle_nl_line(
 
     if not auto_accept:
         out_stream.write("dispatch? [y/N] ")
-        try:
+        with contextlib.suppress(Exception):
             out_stream.flush()
-        except Exception:
-            pass
         answer = (await asyncio.to_thread(in_stream.readline)).strip().lower()
         if answer not in {"y", "yes"}:
             print("cancelled", file=out_stream)

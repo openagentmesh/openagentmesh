@@ -160,12 +160,10 @@ def test_self_write_filter_attribute_present() -> None:
 import asyncio  # noqa: E402
 import time  # noqa: E402
 
-import pytest  # noqa: E402
-
-from openagentmesh import AgentMesh  # noqa: E402
 from demos.wildfire.core.contracts import CellState, Coords  # noqa: E402
 from demos.wildfire.core.keys import cell_indices, cell_key  # noqa: E402
-from demos.wildfire.world.fire_sim import FireSim, build_agent  # noqa: E402
+from demos.wildfire.world.fire_sim import build_agent  # noqa: E402
+from openagentmesh import AgentMesh  # noqa: E402
 
 
 async def test_firesim_external_write_integrates_into_grid() -> None:

@@ -1454,10 +1454,7 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
         if kind == "kv_entry":
             # DELETE markers carry empty bytes; the entry's value is None,
             # never a validation attempt on b"".
-            if kv_operation == "DELETE":
-                value = None
-            else:
-                value = _validate_or_pass(raw_value, model_cls)
+            value = None if kv_operation == "DELETE" else _validate_or_pass(raw_value, model_cls)
             return KVEntry(
                 key=kv_key or "",
                 value=value,

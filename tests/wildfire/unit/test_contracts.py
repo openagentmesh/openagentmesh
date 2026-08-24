@@ -116,7 +116,7 @@ def test_fleet_member_state_invalid_zone_rejected() -> None:
     with pytest.raises(ValidationError):
         FleetMemberState(
             instance_id="i1",
-            zone="invalid-zone",  # type: ignore[arg-type]
+            zone="invalid-zone",  # ty: ignore[invalid-argument-type]
             fleet_type="drone",
             coords=Coords(x=0.0, y=0.0),
             state="free",
@@ -194,7 +194,7 @@ def test_medevac_status_accepts_every_action_state() -> None:
         MedevacStatus(
             instance_id="m-0",
             order_id="o-1",
-            state=valid,  # type: ignore[arg-type]
+            state=valid,
             coords=Coords(x=0.0, y=0.0),
             capacity_used=0,
             timestamp=0.0,
@@ -209,7 +209,7 @@ def test_medevac_status_rejects_invalid_state() -> None:
         MedevacStatus(
             instance_id="m-0",
             order_id="o-1",
-            state="bogus",  # type: ignore[arg-type]
+            state="bogus",  # ty: ignore[invalid-argument-type]
             coords=Coords(x=0.0, y=0.0),
             capacity_used=0,
             timestamp=0.0,

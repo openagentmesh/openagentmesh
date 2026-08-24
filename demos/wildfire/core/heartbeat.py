@@ -49,8 +49,8 @@ async def heartbeat_loop(
             try:
                 record = FleetMemberState(
                     instance_id=mesh.instance_id,
-                    zone=zone,
-                    fleet_type=fleet_type,
+                    zone=zone,  # ty: ignore[invalid-argument-type]
+                    fleet_type=fleet_type,  # ty: ignore[invalid-argument-type]
                     coords=get_coords(),
                     state=get_state(),
                     current_assignment=get_assignment(),

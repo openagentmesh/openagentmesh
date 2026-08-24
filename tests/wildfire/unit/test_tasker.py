@@ -127,12 +127,18 @@ def _stub_llm(result: TaskCommand | None, captured: dict, *, exc: Exception | No
 # ---------------------------------------------------------------------------
 
 
-class _FakeKV:
-    def __init__(self, entries_by_prefix: dict[str, list[KVEntry]]):
-        self._by_prefix = entries_by_prefix
-        self.requested: list[str] = []
+# Aliased at module level: inside _FakeKV the name `list` resolves to the fake's
+# own list() method, so `list[KVEntry]` is not a valid annotation in that scope.
+_KVEntries = list[KVEntry]
+_Patterns = list[str]
 
-    async def list(self, pattern: str) -> list[KVEntry]:
+
+class _FakeKV:
+    def __init__(self, entries_by_prefix: dict[str, _KVEntries]):
+        self._by_prefix = entries_by_prefix
+        self.requested: _Patterns = []
+
+    async def list(self, pattern: str) -> _KVEntries:
         self.requested.append(pattern)
         for prefix, entries in self._by_prefix.items():
             if pattern.startswith(prefix):

@@ -30,7 +30,6 @@ import time
 
 from demos.wildfire.core.contracts import CellState, Coords
 from demos.wildfire.core.keys import cell_center, cell_indices, cell_key
-
 from openagentmesh import AgentMesh
 
 USAGE = "usage: python -m demos.wildfire.world.spawn <x> <y> <temp_celsius>"

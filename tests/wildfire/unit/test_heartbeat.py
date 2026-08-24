@@ -17,6 +17,7 @@ the wave merge.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -81,14 +82,12 @@ async def test_heartbeat_loop_writes_fleet_member_state_each_tick():
     # Give the loop time to write at least once, then cancel.
     await asyncio.sleep(0.05)
     task.cancel()
-    try:
+    # Either accept or convert; behavior is "exit cleanly". Both are fine because
+    # asyncio.Task.cancel() always surfaces a CancelledError to the awaiter unless
+    # the task already returned. The "no re-raise of the same heartbeat" constraint
+    # applies to the body, not to task cancellation.
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        # Either accept or convert; behavior is "exit cleanly". Both are fine
-        # because asyncio.Task.cancel() always surfaces a CancelledError to the
-        # awaiter unless the task already returned. The "no re-raise of the same
-        # heartbeat" constraint applies to the body, not to task cancellation.
-        pass
 
     assert fake_mesh.kv.put_model.await_count >= 1
     args, _ = fake_mesh.kv.put_model.await_args_list[0]
@@ -133,10 +132,8 @@ async def test_heartbeat_loop_continues_on_put_failure():
     )
     await asyncio.sleep(0.1)
     task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass
 
     # The first call raised; subsequent calls must have happened (loop survived).
     assert call_count["n"] >= 2, (

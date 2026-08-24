@@ -29,12 +29,11 @@ from pathlib import Path
 
 import pytest
 
-from openagentmesh import AgentMesh
-
 from demos.wildfire.core.contracts import (
     Coords,
     DispatchOrder,
 )
+from openagentmesh import AgentMesh
 
 heli = pytest.importorskip(
     "demos.wildfire.fleet.heli",
@@ -175,7 +174,7 @@ async def test_heli_publishes_status_on_dispatch():
             observed_states.append(payload["state"])
             first_msg.set()
 
-        sub = await mesh._nc.subscribe(
+        sub = await mesh._conn.subscribe(
             f"mesh.action.heli.{mesh.instance_id}.status",
             cb=_on_status,
         )

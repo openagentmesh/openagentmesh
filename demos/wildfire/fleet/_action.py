@@ -372,8 +372,8 @@ class ActionFleetAgent:
             assignment = self._order.order_id if self._order is not None else None
         return FleetMemberState(
             instance_id=self.mesh.instance_id,
-            zone=self.zone,  # type: ignore[arg-type]
-            fleet_type=self.fleet_type,  # type: ignore[arg-type]
+            zone=self.zone,  # ty: ignore[invalid-argument-type]
+            fleet_type=self.fleet_type,  # ty: ignore[invalid-argument-type]
             coords=self._coords,
             state=fs_state,
             current_assignment=assignment,
@@ -390,8 +390,8 @@ class ActionFleetAgent:
             assignment = msg.current_assignment
         return FleetMemberState(
             instance_id=self.mesh.instance_id,
-            zone=self.zone,  # type: ignore[arg-type]
-            fleet_type=self.fleet_type,  # type: ignore[arg-type]
+            zone=self.zone,  # ty: ignore[invalid-argument-type]
+            fleet_type=self.fleet_type,  # ty: ignore[invalid-argument-type]
             coords=msg.coords,
             state=fs_state,
             current_assignment=assignment,

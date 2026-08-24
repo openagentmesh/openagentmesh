@@ -55,9 +55,6 @@ from pathlib import Path
 
 import pytest
 
-from openagentmesh import AgentMesh
-from openagentmesh._local import AGENTMESH_DIR
-
 from demos.wildfire.core.config import DASHBOARD_PORT, MEDEVAC_COUNT
 from demos.wildfire.core.contracts import (
     Coords,
@@ -65,6 +62,8 @@ from demos.wildfire.core.contracts import (
     DispatchOrder,
 )
 from demos.wildfire.core.keys import DETECTION_PREFIX, FLEET_PREFIX
+from openagentmesh import AgentMesh
+from openagentmesh._local import AGENTMESH_DIR
 
 # Repository root: tests/wildfire/integration/test_phase2_cascade.py -> ROOT.
 ROOT = Path(__file__).resolve().parents[3]
@@ -184,7 +183,7 @@ async def _collect_subject_messages(
                 msg = await asyncio.wait_for(sub.next_msg(timeout=0.5), timeout=0.6)
                 if msg.data:
                     collected.append(msg.data)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
     finally:
         with contextlib.suppress(Exception):
@@ -235,11 +234,11 @@ async def test_phase2_cascade(tmp_path: Path) -> None:  # noqa: ARG001 -- pytest
             deadline = time.time() + 15.0
             catalog = await client.catalog()
             names = {e.name for e in catalog}
-            while time.time() < deadline and not EXPECTED_AGENTS <= names:
+            while time.time() < deadline and not names >= EXPECTED_AGENTS:
                 await asyncio.sleep(0.5)
                 catalog = await client.catalog()
                 names = {e.name for e in catalog}
-            assert EXPECTED_AGENTS <= names, (
+            assert names >= EXPECTED_AGENTS, (
                 f"missing agents in catalog: have={names}, "
                 f"expected_subset={EXPECTED_AGENTS}"
             )
@@ -260,8 +259,7 @@ async def test_phase2_cascade(tmp_path: Path) -> None:  # noqa: ARG001 -- pytest
                 [sys.executable, "-m", "demos.wildfire.world.spawn", "0", "0", "600"],
                 cwd=str(ROOT),
                 env={**env, "NATS_URL": url},
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 timeout=30.0,
             )
             assert spawn.returncode == 0, (

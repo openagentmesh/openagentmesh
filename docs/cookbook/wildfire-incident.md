@@ -14,6 +14,7 @@ All state lives in the shared `mesh-context` KV bucket under `wildfire.*` keys. 
 
 ```python
 import asyncio
+import contextlib
 import hashlib
 import time
 from typing import Literal
@@ -105,10 +106,10 @@ def build_uav(mesh: AgentMesh) -> None:
             coords=cell.coords,
             severity=min(1.0, (cell.temperature - 100.0) / 700.0),
         )
-        try:
+        # KVKeyExists means this area was already reported in this window:
+        # the create is the dedup.
+        with contextlib.suppress(KVKeyExists):
             await mesh.kv.create(f"wildfire.detection.{detection_id}", record)
-        except KVKeyExists:
-            pass  # this area was already reported in this window: dedup done
 ```
 
 !!! tip "`>` vs `*` in source patterns"
@@ -253,6 +254,7 @@ async def main(mesh: AgentMesh) -> None:
                 return rec
 
     rec = await asyncio.wait_for(until_surveyed(), timeout=10.0)
+    assert rec.survey is not None  # a surveyed detection always carries its result
     print(f"survey: fire_visible={rec.survey.fire_visible}")
 
     # Operator speaks; the mesh answers with a typed, validated command.

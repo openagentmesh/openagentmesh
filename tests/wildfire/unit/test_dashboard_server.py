@@ -36,15 +36,13 @@ from demos.wildfire.core.config import (
     SPAWN_MAGNITUDE_LARGE,
     SPAWN_MAGNITUDE_MEDIUM,
 )
-from demos.wildfire.core.contracts import CellState, Coords
+from demos.wildfire.core.contracts import CellState
 from demos.wildfire.core.keys import (
     CELL_PREFIX,
     cell_center,
     cell_indices,
     cell_key,
 )
-from openagentmesh import AgentMesh
-
 from demos.wildfire.dashboard import server as dashboard_server
 from demos.wildfire.dashboard.server import (
     MSG_ACTION_STATUS,
@@ -56,7 +54,7 @@ from demos.wildfire.dashboard.server import (
     make_app,
     register_mesh_consumers,
 )
-
+from openagentmesh import AgentMesh
 
 SERVER_SRC = Path(dashboard_server.__file__).read_text()
 

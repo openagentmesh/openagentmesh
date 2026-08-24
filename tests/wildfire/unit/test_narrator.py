@@ -24,6 +24,7 @@ from __future__ import annotations
 import inspect
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -50,7 +51,7 @@ narrator = pytest.importorskip(
 
 
 def _briefing(incident_id: str = "inc-1", **overrides) -> IncidentBriefing:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         incident_id=incident_id,
         severity="high",
         summary=f"Fire at {incident_id}: growing, two structures at risk.",
@@ -66,7 +67,7 @@ def _briefing(incident_id: str = "inc-1", **overrides) -> IncidentBriefing:
 
 
 def _stats(**overrides) -> SwarmStats:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         timestamp=time.time(),
         uavs_active=1,
         uavs_total=1,
@@ -88,7 +89,7 @@ def _stats(**overrides) -> SwarmStats:
 
 
 def _incident(incident_id: str = "inc-1", **overrides) -> IncidentState:
-    defaults = dict(
+    defaults: dict[str, Any] = dict(
         incident_id=incident_id,
         detection_ids=["det-1"],
         last_briefing_at=time.time(),

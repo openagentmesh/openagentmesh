@@ -35,12 +35,11 @@ from pathlib import Path
 
 import pytest
 
-from openagentmesh import AgentMesh
-
 from demos.wildfire.core.contracts import (
     Coords,
     DispatchOrder,
 )
+from openagentmesh import AgentMesh
 
 medevac = pytest.importorskip(
     "demos.wildfire.fleet.medevac",
@@ -213,7 +212,7 @@ async def test_medevac_publishes_status_on_dispatch():
             observed_payloads.append(payload)
             first_msg.set()
 
-        sub = await mesh._nc.subscribe(
+        sub = await mesh._conn.subscribe(
             f"mesh.action.medevac.{mesh.instance_id}.status",
             cb=_on_status,
         )

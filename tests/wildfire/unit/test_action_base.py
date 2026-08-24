@@ -22,8 +22,6 @@ import time
 import pytest
 from pydantic import BaseModel
 
-from openagentmesh import AgentMesh
-
 from demos.wildfire.core.contracts import (
     ActionState,
     Coords,
@@ -31,6 +29,7 @@ from demos.wildfire.core.contracts import (
     FleetMemberState,
 )
 from demos.wildfire.core.keys import FLEET_PREFIX
+from openagentmesh import AgentMesh
 
 # Module under test (created by Task 1 GREEN).
 af = pytest.importorskip(
@@ -176,7 +175,7 @@ async def test_simulation_publishes_status_on_each_transition():
             if payload["state"] == "free":
                 ready.set()
 
-        sub = await mesh._nc.subscribe(
+        sub = await mesh._conn.subscribe(
             f"mesh.action.heli.{mesh.instance_id}.status",
             cb=_on_status,
         )

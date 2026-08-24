@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import Literal
 
 from demos.wildfire.core.contracts import (
     Coords,
@@ -39,7 +40,11 @@ from openagentmesh import AgentMesh, KVEntry
 # Fixture builders
 # ---------------------------------------------------------------------------
 
-_ZONE_FOR_TYPE = {
+_FleetType = Literal["uav", "drone", "heli", "ffunit", "medevac"]
+_Zone = Literal["high-alt", "low-alt", "ground"]
+_MemberState = Literal["free", "busy", "offline"]
+
+_ZONE_FOR_TYPE: dict[_FleetType, _Zone] = {
     "uav": "high-alt",
     "drone": "low-alt",
     "heli": "low-alt",
@@ -49,7 +54,7 @@ _ZONE_FOR_TYPE = {
 
 
 def _member(
-    fleet_type: str, state: str, instance_id: str = "i-1"
+    fleet_type: _FleetType, state: _MemberState, instance_id: str = "i-1"
 ) -> FleetMemberState:
     return FleetMemberState(
         instance_id=instance_id,
@@ -87,7 +92,9 @@ def _detection(detection_id: str) -> DetectionRecord:
     )
 
 
-def _entry(key: str, value: bytes, operation: str = "PUT") -> KVEntry[bytes]:
+def _entry(
+    key: str, value: bytes, operation: Literal["PUT", "DELETE"] = "PUT"
+) -> KVEntry[bytes]:
     return KVEntry(key=key, value=value, revision=1, operation=operation)
 
 

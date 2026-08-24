@@ -43,10 +43,10 @@ from pathlib import Path
 
 import pytest
 
-from openagentmesh import AgentMesh
-from openagentmesh._local import AGENTMESH_DIR
 from demos.wildfire.core.contracts import DetectionRecord
 from demos.wildfire.core.keys import DETECTION_PREFIX, FLEET_PREFIX
+from openagentmesh import AgentMesh
+from openagentmesh._local import AGENTMESH_DIR
 
 # Repository root: tests/wildfire/integration/test_phase1_cascade.py -> ROOT.
 ROOT = Path(__file__).resolve().parents[3]
@@ -187,8 +187,7 @@ async def test_phase1_cascade(tmp_path: Path) -> None:  # noqa: ARG001 -- pytest
             [sys.executable, "-m", "demos.wildfire.world.spawn", "0", "0", "600"],
             cwd=str(ROOT),
             env={**env, "NATS_URL": url},
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=30.0,
         )
         assert spawn.returncode == 0, (
@@ -204,11 +203,11 @@ async def test_phase1_cascade(tmp_path: Path) -> None:  # noqa: ARG001 -- pytest
             deadline = time.time() + 10.0
             catalog = await client.catalog()
             names = {e.name for e in catalog}
-            while time.time() < deadline and not EXPECTED_AGENTS <= names:
+            while time.time() < deadline and not names >= EXPECTED_AGENTS:
                 await asyncio.sleep(0.5)
                 catalog = await client.catalog()
                 names = {e.name for e in catalog}
-            assert EXPECTED_AGENTS <= names, (
+            assert names >= EXPECTED_AGENTS, (
                 f"missing agents in catalog: have={names}, "
                 f"expected_subset={EXPECTED_AGENTS}"
             )

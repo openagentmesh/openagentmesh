@@ -157,9 +157,9 @@ def test_uav_module_uses_heartbeat_loop_helper():
 import asyncio  # noqa: E402
 import time  # noqa: E402
 
-from openagentmesh import AgentMesh  # noqa: E402
 from demos.wildfire.core.contracts import CellState, Coords, DetectionRecord  # noqa: E402
 from demos.wildfire.core.keys import DETECTION_PREFIX, cell_key  # noqa: E402
+from openagentmesh import AgentMesh  # noqa: E402
 
 # NATS wildcard suffix — bare prefix returns [] per src/openagentmesh/_context.py:375-405.
 DETECTION_WILDCARD = f"{DETECTION_PREFIX}.>"

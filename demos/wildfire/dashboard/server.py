@@ -43,6 +43,7 @@ from the cell KV namespace.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -446,10 +447,8 @@ def make_app(mesh: AgentMesh) -> FastAPI:
                 _log.debug("dropping ws connection: %s", e)
                 dead.append(ws)
         for ws in dead:
-            try:
+            with contextlib.suppress(ValueError):
                 connections.remove(ws)
-            except ValueError:
-                pass
 
     app.state.broadcast = broadcast
     app.state.connections = connections
@@ -483,9 +482,9 @@ def make_app(mesh: AgentMesh) -> FastAPI:
                 if msg_type == "click":
                     coords = msg.get("coords") or {}
                     try:
-                        x = float(coords.get("x"))
-                        y = float(coords.get("y"))
-                    except (TypeError, ValueError) as e:
+                        x = float(coords["x"])
+                        y = float(coords["y"])
+                    except (KeyError, TypeError, ValueError) as e:
                         _log.warning("click frame missing coords: %s; raw=%r", e, msg)
                         continue
                     raw_temp = msg.get("temperature")
@@ -506,7 +505,7 @@ def make_app(mesh: AgentMesh) -> FastAPI:
                         # Out-of-bounds coords reject here. Reply with an
                         # error frame so the browser can surface it; do
                         # NOT crash the connection.
-                        try:
+                        with contextlib.suppress(Exception):
                             await websocket.send_json(
                                 {
                                     "type": "error",
@@ -514,8 +513,6 @@ def make_app(mesh: AgentMesh) -> FastAPI:
                                     "details": str(e),
                                 }
                             )
-                        except Exception:
-                            pass
                     except Exception as e:
                         _log.warning("click handler raised: %s", e)
                 elif msg_type == "chaos_kill":
@@ -534,10 +531,8 @@ def make_app(mesh: AgentMesh) -> FastAPI:
         except Exception as e:
             _log.warning("ws loop ended: %s", e)
         finally:
-            try:
+            with contextlib.suppress(ValueError):
                 connections.remove(websocket)
-            except ValueError:
-                pass
 
     # Mount static dist/ at /. If dist is missing the make_app() call still
     # succeeds; the __main__ entry point verifies presence at boot and
