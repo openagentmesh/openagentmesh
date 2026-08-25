@@ -458,6 +458,37 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-25 ~18:05–18:30 UTC — run 161 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip c36cc3c is run 160's own
+commit, zero commits since; every commit since the wildfire merge f639f8c is
+the executor's); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed first per the run-22 lesson (567 commits, history intact); full
+remote branch list diffed per the run-155 lesson via `git ls-remote --heads`
+— exactly main + 5 roadmap/stage-* + 3 feature branches, nothing new or
+changed; all five roadmap/stage-* plus feature/wildfire-demo and
+feature/tool-conversion at 0 unmerged; feature/error-taxonomy still 4
+unmerged; zero open GitHub issues and zero open PRs; CI success on main tip
+c36cc3c (run 263 — closes the verification run 160 left implicit on its own
+commit).
+
+Regression suite green, every number matching the run-156 baseline exactly:
+700 pytest passed, 2 skipped (103s; nats-server v2.10.24 tarball + nsc via go
+install copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty clean
+from repo root; sdk-ts 62/62 vitest ×5 consecutive + tsc clean (pnpm
+frozen-lockfile + build first); admin UI 30/30 vitest + tsc clean (SDK built
+first per the run-155 lesson). All commands run foreground per the run-157
+environment note.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11).
+No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-25 ~12:25–12:55 UTC — run 160 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip e449353 is run 159's own
