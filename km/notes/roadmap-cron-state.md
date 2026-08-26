@@ -458,6 +458,34 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-26 ~18:30–18:50 UTC — run 165 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip dcab832 is run 164's own
+commit, zero commits since; all 10 commits since the wildfire merge f639f8c
+are executor run-log commits — one, ece2523, carries Luca's author name from
+that session's git config but its content is run 162's own log, not an
+answer); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed per the run-22 lesson (571 commits — 570 + run 164's one, history
+intact); `git ls-remote --heads` diffed per the run-155 lesson — exactly
+main + 5 roadmap/stage-* + 3 feature branches, nothing new or changed;
+feature branches not re-counted this run (no new commits anywhere to change
+them); zero open GitHub issues and zero open PRs; CI success on main tip
+dcab832 (run 267 — closes the verification run 164 left implicit on its own
+commit).
+
+Regression suite green, every number matching the run-156 baseline exactly:
+700 pytest passed, 2 skipped (98s; nats-server v2.10.24 + nsc v2.11.0 via
+go install copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty
+clean from repo root; sdk-ts 62/62 vitest ×5 consecutive + tsc clean (pnpm
+frozen-lockfile); admin UI 30/30 vitest + tsc clean (needs `pnpm build` in
+sdk-ts first — the link: dependency resolves against dist/).
+
+Advanced: nothing to advance — every open item across stages 0/1/2/4 waits
+on a Needs-Luca answer (items 2–9, 11–12 above; highest-leverage unblock
+remains OPENROUTER_API_KEY, item 11/6). Left open: same as run 156. Next
+run: check Needs-Luca answers and the branch list first; otherwise this
+idle-verification protocol.
+
 ### 2026-08-26 ~12:45–13:05 UTC — run 164 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip d1b0c20 is run 163's own
