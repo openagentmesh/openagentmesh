@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-27 ~18:05–18:30 UTC — run 169 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip fe7d879 is run 168's own
+commit, zero commits since — re-fetched immediately before committing this
+entry, still fe7d879); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed per the run-22 lesson (575 commits — 574 + run
+168's one, history intact); full remote branch list diffed per the run-155
+lesson via `git ls-remote --heads` — exactly main + 5 roadmap/stage-* +
+3 feature branches, same tips as run 168's enumeration (feature branches at
+4022c4b/7cc45e2/55d85d0), nothing new or changed; zero open GitHub issues
+and zero open PRs; CI success on main tip fe7d879 (run 271 — closes the
+verification run 168 left implicit on its own commit).
+
+Regression suite green, every number matching the run-156 baseline exactly:
+700 pytest passed, 2 skipped (97s; nats-server v2.10.24 + nsc via go
+install copied to ~/.agentmesh/bin); ruff and ty clean from repo root;
+sdk-ts 62/62 vitest ×5 consecutive + tsc clean (pnpm frozen-lockfile +
+build first); admin UI 30/30 vitest + tsc clean (SDK built first per the
+run-155 lesson). Two setup notes for future runs, neither a regression:
+(a) the first go install attempt failed on transient sum.golang.org stream
+errors through the proxy — a plain retry succeeded; (b) an sdk-ts vitest
+run started before nats-server lands in ~/.agentmesh/bin reports
+"7 passed | 55 skipped" and still exits 0 — the 55 integration files skip
+without the binary (tests/helpers/server.ts spawns it from there), so a
+62-total-with-skips result means re-run after the install, not a pass.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11).
+No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-27 ~12:25–12:45 UTC — run 168 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip ed32e92 is run 167's own
