@@ -458,6 +458,42 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-28 ~18:25–18:50 UTC — run 173 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 3abd083 is run 172's own
+commit, zero commits since; run 172's commit re-verified as +33 lines on
+the state file only — its run-log entry); no OPENROUTER_API_KEY or npm
+credential in the environment; unshallowed per the run-22 lesson (579
+commits — 578 + run 172's one, history intact); full remote branch list
+diffed per the run-155 lesson via `git ls-remote --heads` — exactly main +
+5 roadmap/stage-* + 3 feature branches, same tips as runs 170–172
+(feature branches at 4022c4b/7cc45e2/55d85d0), nothing new or changed;
+additionally re-proved all 5 roadmap/stage-* branches plus
+feature/tool-conversion and feature/wildfire-demo are merged ancestors of
+main (`git merge-base --is-ancestor`), feature/error-taxonomy still 4
+commits ahead (Needs Luca 4, unchanged); zero open GitHub issues and zero
+open PRs; CI success on main tip 3abd083 (run 275 — closes the
+verification of run 172's own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (97s; nats-server v2.10.24 + nsc v2.11.0 via go
+install copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty
+clean from repo root; sdk-ts tsc clean, vitest 62/62 AND 11/11 test files
+on all 5 consecutive runs with full per-run output captured to files per
+run 171's instruction — no recurrence of the run-171 file-level teardown
+one-off (two consecutive fully-clean runs now, 172 and 173); admin UI tsc
+clean + 30/30 vitest (SDK built first per the run-155 lesson). pnpm used
+for sdk-ts and ui installs per the run-172 environment note.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-28 ~12:25–12:45 UTC — run 172 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 461dde8 is run 171's own
