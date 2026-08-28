@@ -458,6 +458,43 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-28 ~06:10–06:35 UTC — run 171 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 1bfee32 is run 170's own
+commit, zero commits since — re-fetched immediately before committing this
+entry, still 1bfee32); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed per the run-22 lesson (577 commits — 576 + run
+170's one, history intact); full remote branch list diffed per the run-155
+lesson via `git ls-remote --heads` — exactly main + 5 roadmap/stage-* +
+3 feature branches, same tips as run 170's enumeration (feature branches at
+4022c4b/7cc45e2/55d85d0), nothing new or changed; zero open GitHub issues
+and zero open PRs; CI success on main tip 1bfee32 (run 273 — closes the
+verification run 170 left implicit on its own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (103s; nats-server v2.10.24 + nsc v2.11.0 via go
+install copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty
+clean from repo root; admin UI 30/30 vitest + tsc clean (SDK built first
+per the run-155 lesson); sdk-ts tsc clean, vitest 62/62 on runs 1–4 of 5,
+then run 5 reported "1 failed | 10 passed" test FILES while still counting
+62/62 TESTS passed — a file-level error outside any test body (teardown/
+infra, in the family of the known _free_port TOCTOU learning), not a test
+failure. A sixth full run immediately after was completely clean (11/11
+files, 62/62), so recorded as a transient one-off, not a regression; the
+looped grep only kept summary lines, so the failing file's name was lost —
+future runs hitting this should re-run with full output captured before
+the evidence evaporates.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11).
+No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline (capture full vitest output
+if a file-level failure appears), log, end silently.
+
 ### 2026-08-28 ~00:10–00:30 UTC — run 170 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 36b53c6 is run 169's own
