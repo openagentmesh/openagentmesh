@@ -458,6 +458,39 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-28 ~12:25–12:45 UTC — run 172 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 461dde8 is run 171's own
+commit, zero commits since — re-fetched at 12:41 UTC immediately before
+committing this entry, still 461dde8); no OPENROUTER_API_KEY or npm
+credential in the environment; unshallowed per the run-22 lesson (578
+commits — 577 + run 171's one, history intact); full remote branch list
+diffed per the run-155 lesson via `git ls-remote --heads` — exactly main +
+5 roadmap/stage-* + 3 feature branches, same tips as runs 170/171
+(feature branches at 4022c4b/7cc45e2/55d85d0), nothing new or changed;
+zero open GitHub issues and zero open PRs; CI success on main tip 461dde8
+(run 274 — closes the verification of run 171's own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (97s; nats-server v2.10.24 + nsc v2.11.0 via go
+install copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty
+clean from repo root; sdk-ts tsc clean, vitest 62/62 AND 11/11 test files
+on all 5 consecutive runs with full output captured per run 171's
+instruction — run 171's file-level teardown one-off did NOT recur,
+supporting the transient classification; admin UI tsc clean + 30/30
+vitest (SDK built first per the run-155 lesson). Environment note: sdk-ts
+has pnpm-lock.yaml only — `npm ci` fails with EUSAGE; use
+`pnpm install --frozen-lockfile` (pnpm is preinstalled), matching CI.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-28 ~06:10–06:35 UTC — run 171 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 1bfee32 is run 170's own
