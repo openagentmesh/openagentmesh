@@ -458,6 +458,46 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-30 ~06:20–06:45 UTC — run 179 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 7019b97 is run 178's own
+commit, zero commits since); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed (585 commits — 584 + run 178's one, history
+intact); full remote branch list via `git ls-remote --heads` — exactly main
++ 5 roadmap/stage-* + 3 feature branches, same tips as runs 170–178
+(feature branches at 4022c4b/7cc45e2/55d85d0), nothing new or changed; all
+5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4); zero
+open GitHub issues and zero open PRs; CI success on main tip 7019b97
+(run 281 — closes the verification of run 178's own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (101s; nats-server v2.10.24 + nsc v2.11.0 via go
+install copied to ~/.agentmesh/bin); ruff and ty clean from repo root;
+sdk-ts tsc clean (via build), vitest 62/62 AND 11/11 test files on all 5
+consecutive runs — eighth consecutive fully-clean ×5 (172–179); admin UI
+30/30 vitest (SDK built first per the run-155 lesson; pnpm for both
+installs). One benign new test-env warning observed: fastapi's TestClient
+emits a StarletteDeprecationWarning ("install httpx2") on the freshly
+resolved dependency set — no test impact, noted in case it hardens into a
+break on a future resolve.
+
+Lesson re-learned the hard way this run (already in learnings from run 22):
+ancestry checks on a shallow clone lie — before unshallowing, every merged
+branch tip reported NOT-an-ancestor of main, which looked like lost merges
+until `--is-shallow-repository` returned true. Unshallow FIRST, then check
+ancestry.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-30 ~00:10–00:30 UTC — run 178 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 4924147 is run 177's own
