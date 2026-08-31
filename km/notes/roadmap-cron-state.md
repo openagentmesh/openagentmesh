@@ -458,6 +458,42 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-08-31 ~18:25–18:50 UTC — run 185 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 4792b7d is run 184's own
+commit, zero commits since; the 14 commits since run 170's baseline all touch
+only this state file); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed per the run-22 lesson (591 commits = 590 + run
+184's one); full remote branch list via `git ls-remote --heads` — exactly
+main + 5 roadmap/stage-* + 3 feature branches, same tips as runs 170–184
+(feature branches at 4022c4b/7cc45e2/55d85d0), nothing new or changed;
+all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4);
+tags on origin — v0.1.0 through v0.2.0 only, nothing new; zero open GitHub
+issues and zero open PRs; CI success on main tip 4792b7d (run 287 — closes
+the verification of run 184's own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (98s; nats-server v2.10.24 + nsc via go install
+copied to ~/.agentmesh/bin; uv sync --all-extras); ruff and ty clean from
+repo root; sdk-ts tsc clean (via build), vitest 62/62 AND 11/11 test files
+on all 5 consecutive runs — fourteenth consecutive fully-clean ×5
+(172–185), grep over each run's output filtered to non-test-name hits
+found nothing; admin UI tsc clean (--noEmit exit 0) + 30/30 vitest (SDK
+built first per the run-155 lesson; pnpm for both installs). The fastapi
+TestClient StarletteDeprecationWarning recurred, still benign — no test
+impact.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote branch list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline, log, end silently.
+
 ### 2026-08-31 ~12:15–12:50 UTC — run 184 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 2366753 is run 183's own
