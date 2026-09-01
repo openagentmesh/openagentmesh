@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-01 ~12:55–13:10 UTC — run 188 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip ea2838f is run 187's own
+commit, zero commits since; the 186→187 diff is run 187's run-log append
+only, so the Needs Luca section is unchanged); no OPENROUTER_API_KEY or npm
+credential in the environment; unshallowed per the run-22 lesson (594
+commits = 593 + run 187's one); full remote ref list via `git ls-remote` —
+exactly main + 5 roadmap/stage-* + 3 feature branches, same tips as runs
+170–187 (feature branches at 4022c4b/7cc45e2/55d85d0), tags still
+v0.1.0–v0.2.0 only, nothing new or changed; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged ancestors
+of main (feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4);
+zero open GitHub issues and zero open PRs; CI success on main tip ea2838f
+(run 290 — closes the verification of run 187's own commit).
+
+Regression suite green after one transient: the FIRST full pytest pass came
+back 696 passed / 2 skipped with 1 failure + 3 errors, all in
+tests/cli/test_auth_init.py (test_user_revoke_locks_user_out FAILED; the
+worker/invoker/observer e2e tests ERRORed at fixture level). The file in
+isolation immediately passed 5/5, and a full-suite re-run was completely
+clean: 700 passed, 2 skipped (103s) — every number matching the run-156
+baseline. Recorded as a transient one-off (first pytest analogue of the
+run-171 sdk-ts teardown transient; likely resource contention around the
+nsc-booted server in the fresh container). First occurrence for this file
+in 188 runs; NEXT RUN: watch whether test_auth_init interference recurs —
+a second occurrence makes it a real robustness issue, not a one-off.
+Container lacked nsc again (run-187 pattern): provisioned nsc v2.15.0 from
+the GitHub release zip into ~/.agentmesh/bin before the suite. ruff and ty
+clean from repo root; sdk-ts tsc clean (--noEmit) then built, vitest 62/62
+AND 11/11 test files on all 5 consecutive runs — seventeenth consecutive
+fully-clean ×5 (172–188; the grep "ATTENTION" hits were test filenames like
+errors.test.ts, the known run-183 noise); admin UI 30/30 vitest after the
+SDK build. No Luca answers, no repo changes, no stage movement: still fully
+blocked on the Needs-Luca items. Nothing advanced, nothing new left open.
+
 ### 2026-09-01 ~06:30–06:55 UTC — run 187 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 3b0486c is run 186's own
