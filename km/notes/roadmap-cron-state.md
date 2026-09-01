@@ -458,6 +458,43 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-01 ~06:30–06:55 UTC — run 187 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 3b0486c is run 186's own
+commit, zero commits since; Needs Luca section byte-identical); no
+OPENROUTER_API_KEY or npm credential in the environment; unshallowed per the
+run-22 lesson (593 commits = 592 + run 186's one); full remote ref list via
+`git ls-remote` — exactly main + 5 roadmap/stage-* + 3 feature branches,
+same tips as runs 170–186 (feature branches at 4022c4b/7cc45e2/55d85d0),
+tags still v0.1.0–v0.2.0 only, nothing new or changed; all 5 roadmap/stage-*
+tips plus feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4); zero open GitHub issues and zero open PRs; CI success on main
+tip 3b0486c (run 289 — closes the verification of run 186's own commit).
+
+Regression suite green, every number matching the run-156 baseline: 700
+pytest passed, 2 skipped (first pass showed 693/9 — this container lacked
+nsc entirely; provisioned nsc v2.15.0 from the GitHub release zip into
+~/.agentmesh/bin, the 7 nsc-gated tests then passed 7/7; a newer nsc than
+run 186's 2.11.0, no behavior difference observed); ruff and ty clean from
+repo root; sdk-ts tsc clean (--noEmit) then built, vitest 62/62 AND 11/11
+test files on all 5 consecutive runs — sixteenth consecutive fully-clean ×5
+(172–187); admin UI 30/30 vitest after the SDK build (first attempt failed
+to collect with "Failed to resolve entry for @openagentmesh/sdk" because
+sdk-ts/dist was absent in the fresh container — the run-155 lesson again,
+environment not code). The fastapi TestClient StarletteDeprecationWarning
+recurred, still benign — no test impact.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote ref list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline (provision nsc and build
+sdk-ts before judging pytest/ui numbers), log, end silently.
+
 ### 2026-09-01 ~00:10–00:35 UTC — run 186 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip b58dcc7 is run 185's own
