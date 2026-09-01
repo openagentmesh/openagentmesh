@@ -458,6 +458,49 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-01 ~18:15–18:40 UTC — run 189 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip b1191a2 is run 188's own
+commit, zero commits since; this checkout was 18 commits stale at 1bfee32
+(run 170), and the whole 170→188 diff is one insertion-only hunk starting
+at the Run log header — the Needs Luca section provably untouched across
+all 18 commits; two of them carry Luca's git author name (runs 180, 186)
+but are executor run-log appends by content); no OPENROUTER_API_KEY or npm
+credential in the environment; unshallowed per the run-22 lesson (595
+commits = 594 + run 188's one); full remote ref list via `git ls-remote` —
+exactly main + 5 roadmap/stage-* + 3 feature branches, same tips as runs
+170–188 (feature branches at 4022c4b/7cc45e2/55d85d0), tags still
+v0.1.0–v0.2.0 only, nothing new or changed; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged ancestors
+of main (feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4);
+zero open GitHub issues and zero open PRs; CI success on main tip b1191a2
+(run 291 — closes the verification of run 188's own commit).
+
+Regression suite green with NO transients: 700 pytest passed, 2 skipped
+(97s) on the FIRST full pass — the run-188 test_auth_init interference did
+NOT recur, so its one-off classification stands (0 recurrences in 1 watch
+run; keep half an eye out but no action needed). Fresh container lacked
+both nats-server and nsc; provisioned nats-server v2.10.24 and nsc v2.11.0
+via `go install` through the Go module proxy (the learnings-pinned versions;
+go1.24.7 in this container can't build nsc @latest). sdk-ts: pnpm
+frozen-lockfile install (note: `npm ci` fails here — sdk-ts is
+pnpm-lockfile-only, use pnpm as CI does), tsc clean (--noEmit), built,
+vitest 62/62 AND 11/11 test files on all 5 consecutive runs — eighteenth
+consecutive fully-clean ×5 (172–189); admin UI 30/30 vitest after the SDK
+build. ruff and ty clean from repo root. The fastapi TestClient
+StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified).
+Stage 4 remains current; every open item across stages waits on a
+Needs-Luca answer. Highest-leverage unblock is still OPENROUTER_API_KEY
+(items 6/11). No notification sent: nothing changed.
+
+Next run: unshallow first; diff the full remote ref list; check for
+Needs-Luca answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline (provision nats-server +
+nsc via pinned go install, pnpm-install and build sdk-ts before judging
+pytest/ui numbers), log, end silently.
+
 ### 2026-09-01 ~12:55–13:10 UTC — run 188 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip ea2838f is run 187's own
