@@ -458,6 +458,45 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-03 ~06:25–06:50 UTC — run 195 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip 043dab1 is run 194's own
+commit, zero commits since; run 194's state-file diff is 39 additions /
+0 deletions — one run-log append, so chained with the prior insertion-only
+proofs the Needs Luca section stays provably untouched); no
+OPENROUTER_API_KEY or npm credential in the environment; unshallowed per
+the run-22 lesson (601 commits = 600 + run 194's one); full `git ls-remote`
+ref list identical to runs 170–194 (main + 5 roadmap/stage-* + 3 feature
+branches at the same tips 4022c4b/7cc45e2/55d85d0, tags still
+v0.1.0–v0.2.0, pull refs 1–2 present as expected — closed, pre-roadmap);
+all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4); zero
+open GitHub issues and zero open PRs; CI success on main tip 043dab1
+(run 297 — closes the verification of run 194's own commit).
+
+Regression suite green, no transients: 700 pytest passed, 2 skipped (104s)
+on the FIRST full pass; sdk-ts vitest 62/62 AND 11/11 files on all 5
+consecutive runs — twenty-fourth consecutive clean ×5 (172–195); admin UI
+30/30 (5/5 files) and ui tsc clean; ruff and ty clean from repo root;
+sdk-ts tsc --noEmit clean. Fresh container lacked nats-server and nsc;
+provisioned v2.10.24 / v2.11.0 via the pinned `go install` and copied
+nats-server to ~/.agentmesh/bin per the standing gotcha. The fastapi
+TestClient StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage (re-verified;
+prompts and learnings files untouched since run 155). Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: unshallow before any ancestry claims; diff the remote ref list
+(pull refs 1–2 are expected, closed, pre-roadmap); check for Needs-Luca
+answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline (pinned go installs, copy
+nats-server to ~/.agentmesh/bin, pnpm-install and build sdk-ts before
+judging vitest/ui numbers), log, end silently.
+
 ### 2026-09-03 ~00:15–00:40 UTC — run 194 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip ea4cc07 is run 193's own
