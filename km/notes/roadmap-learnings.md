@@ -32,6 +32,11 @@ update that file too and say so here.
   download TLS-times-out through the proxy. Fix: pin
   `go install github.com/nats-io/nsc/v2@v2.11.0` (builds fine on go1.24, all 357
   tests pass with it). Future runs should use the pinned version, not `@latest`.
+- **nsc must be on PATH for pytest, not just installed** (run 198, 2026-09-04):
+  `go install` drops nsc in `$(go env GOPATH)/bin`, which the sandbox shell does
+  not have on PATH. Without it, 7 auth/secured-mesh tests silently skip ("nsc
+  binary not available") and the suite reads 693 passed / 9 skipped instead of
+  the 700/2 baseline. `export PATH="$(go env GOPATH)/bin:$PATH"` before pytest.
 - **The sdk-ts flake was a missing flush**, as suspected: sim helpers subscribed but never
   flushed before tests invoked agents on a second connection. Making the registration
   helpers async (flush inside) fixed it; 5 consecutive full runs green. Related JS footgun
