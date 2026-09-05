@@ -489,8 +489,11 @@ _resolve_binary), and all three test files. Verified red→green: each
 file passes 5/13/2 from an EMPTY ~/.agentmesh/bin (downloads on
 demand); full suite on the branch 700 passed / 2 skipped (96s), ruff/ty
 clean, cli+embedded subset re-run clean after the mesh.py consolidation
-(35 passed). CI on merge commit 87708e1 not yet observed — verify next
-run.
+(35 passed). CI observed before run end: run 310 SUCCESS on main tip
+d856eaa (the state-file commit, which contains the merge); run 309 on
+87708e1 itself was cancelled as superseded by the newer push — normal
+per-branch concurrency, not a failure. Verify run 311 (this correction
+commit) next run.
 
 Also verified this run (idle-protocol checks, all pre-fix): no Luca
 edits (origin/main tip b6be579 is run 204's own commit, zero commits
