@@ -560,3 +560,16 @@ update that file too and say so here.
 - **Regenerate lockfiles, do not merge them.** `uv.lock` conflicted; taking
   main's copy and re-running `uv lock` against the hand-merged `pyproject.toml`
   was faster and safer than resolving 476 changed lines by hand.
+- **"Transient, watch for recurrence" needs a stated criterion — and honoring
+  it.** Run 188 recorded the test_auth_init fresh-container failure as a
+  one-off with an explicit tripwire ("a second occurrence makes it a real
+  robustness issue"). Run 205 hit the identical signature, and the tripwire
+  turned a would-be shrug into a root-cause session: the auth e2e tests
+  asserted `find_nats_server() is not None` but ran before anything triggered
+  the lazy binary download, so they only passed when an earlier suite pass (or
+  PATH) had left a binary behind. The failure was deterministic all along —
+  reproduced by deleting `~/.agentmesh/bin/nats-server` — just masked in most
+  containers by nsc being absent on the first pass (auth tests skip → later
+  tests download → re-run clean). Tests that boot real servers must
+  provision what they boot (`ensure_nats_server()`), not assert that someone
+  else already did.

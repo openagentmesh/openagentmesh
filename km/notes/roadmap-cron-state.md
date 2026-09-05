@@ -458,6 +458,69 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-05 ~18:15–19:05 UTC — run 205 (Fable 5, cloud) — auth-test robustness fix landed
+
+The run-188 tripwire fired: the FIRST full pytest pass came back 696
+passed / 2 skipped with 1 failure + 3 errors, ALL in
+tests/cli/test_auth_init.py — the byte-identical signature run 188
+recorded as a one-off with "a second occurrence makes it a real
+robustness issue". Second occurrence → root-caused and FIXED this run.
+
+Root cause (proven, not guessed): the three server-booting test files
+(tests/cli/test_auth_init.py, tests/test_auth.py,
+tests/cookbook/test_secured_mesh.py) asserted `find_nats_server() is
+not None`, but find_nats_server only *finds* (PATH, then
+~/.agentmesh/bin) — the download is lazy and lives in
+EmbeddedNats.start()/`oam mesh up`. In a fresh container with nsc
+installed BEFORE the first pytest pass (this run did exactly that, per
+run 204's own next-run instruction) tests/cli/test_auth_init.py is
+collected before anything has downloaded the binary → assert None.
+Reproduced deterministically by removing ~/.agentmesh/bin/nats-server
+(exact 1-failed/3-errors signature, 0.4s); isolation and re-runs always
+passed because by then the lazy download had happened — which is why
+runs 188 and 205 look "transient". Runs whose first pass lacked nsc
+(e.g. 204) never hit it: the auth tests skip on pass 1 and the binary
+arrives before pass 2.
+
+Fix (roadmap/stage-0 12e8b04, merged to main 87708e1 --no-ff): new
+`_local.ensure_nats_server()` (find, else download); used by
+EmbeddedNats.start(), `oam mesh up` (replacing its duplicated
+_resolve_binary), and all three test files. Verified red→green: each
+file passes 5/13/2 from an EMPTY ~/.agentmesh/bin (downloads on
+demand); full suite on the branch 700 passed / 2 skipped (96s), ruff/ty
+clean, cli+embedded subset re-run clean after the mesh.py consolidation
+(35 passed). CI on merge commit 87708e1 not yet observed — verify next
+run.
+
+Also verified this run (idle-protocol checks, all pre-fix): no Luca
+edits (origin/main tip b6be579 is run 204's own commit, zero commits
+since; run 204's diff insertion-only 43/0, Needs Luca provably
+untouched); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed (611 commits) before ancestry claims — all 5
+roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4);
+full ls-remote ref list identical to runs 170–204; zero open GitHub
+issues and zero open PRs; CI run 307 success on main tip b6be579
+(closes run 204's own-commit verification). Suite otherwise at
+baseline: the post-download full-suite re-run hit 700/2 (92s) before
+the fix was written; sdk-ts vitest 62/62 and 11/11 files ×5 —
+thirty-fourth consecutive clean ×5; admin UI 30/30 after sdk-ts build;
+ruff/ty clean.
+
+Stage status: unchanged — Stage 4 current, every roadmap item still
+waits on a Needs-Luca answer; this was maintenance on the regression
+suite itself. Note for Luca: roadmap/stage-0 on origin now points at
+the fix commit (12e8b04, merged), no longer at the historical 3925eb3.
+Notification sent (first non-idle run since 155).
+
+Next run: verify CI on 87708e1 (and on the state-file commit); the
+fresh-container pytest prep simplifies — nsc + GOPATH/bin before the
+first pass still required for the 700/2 count, but a missing
+nats-server no longer fails the auth files (they download on demand);
+pnpm build sdk-ts before ui vitest unchanged. Watch for any new
+Needs-Luca answers as usual.
+
 ### 2026-09-05 ~12:15–12:45 UTC — run 204 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip dddc1c3 is run 203's own
