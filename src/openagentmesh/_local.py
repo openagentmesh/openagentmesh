@@ -96,6 +96,14 @@ async def download_nats_server() -> Path:
     return target
 
 
+async def ensure_nats_server() -> Path:
+    """Find nats-server, downloading it to ~/.agentmesh/bin/ if absent."""
+    binary = find_nats_server()
+    if binary is None:
+        binary = await download_nats_server()
+    return binary
+
+
 def _free_port() -> int:
     """Find a free TCP port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -157,9 +165,7 @@ class EmbeddedNats:
         self._data_dir: Path | None = None
 
     async def start(self) -> None:
-        binary = find_nats_server()
-        if not binary:
-            binary = await download_nats_server()
+        binary = await ensure_nats_server()
 
         # _free_port() is a check-then-use race: the port can be taken between
         # probing and nats-server binding it. Re-pick auto-selected ports and

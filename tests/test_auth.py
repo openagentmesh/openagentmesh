@@ -7,6 +7,7 @@ test is the ADR-0038 code sample:
     mesh = AgentMesh(url=..., creds="./worker.creds")
 """
 
+import asyncio
 import socket
 import subprocess
 import textwrap
@@ -17,7 +18,7 @@ import pytest
 from pydantic import BaseModel
 
 from openagentmesh import AgentMesh, AgentSpec, ConnectionDenied, MeshError
-from openagentmesh._local import _free_port, find_nats_server
+from openagentmesh._local import _free_port, ensure_nats_server
 
 FIXTURES = "tests/auth_fixtures"
 ACCOUNT_PUBLIC_KEY = "ADY6WZ3PGJNK7G5VT2Z47GDMJVDFXXJ65BC3YEUFP7LGK7A3W3XBREDR"
@@ -35,8 +36,7 @@ class EchoOutput(BaseModel):
 @pytest.fixture(scope="module")
 def auth_server(tmp_path_factory):
     """A JWT-auth'd nats-server with JetStream; yields its client URL."""
-    binary = find_nats_server()
-    assert binary is not None, "nats-server binary required (see roadmap-learnings)"
+    binary = asyncio.run(ensure_nats_server())
 
     tmp = tmp_path_factory.mktemp("nats-auth")
     fx = Path(FIXTURES).resolve()

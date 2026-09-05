@@ -8,6 +8,7 @@ the recipe.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import socket
 import subprocess
@@ -18,7 +19,7 @@ from pydantic import BaseModel
 from typer.testing import CliRunner
 
 from openagentmesh import AgentMesh, AgentSpec, ConnectionDenied
-from openagentmesh._local import _free_port, find_nats_server
+from openagentmesh._local import _free_port, ensure_nats_server
 from openagentmesh.cli import app
 from openagentmesh.cli.auth import find_nsc
 
@@ -50,8 +51,7 @@ def secured_mesh_url(tmp_path_factory):
         )
         assert r.exit_code == 0, r.output
 
-    binary = find_nats_server()
-    assert binary is not None
+    binary = asyncio.run(ensure_nats_server())
     port = _free_port()
     conf = base / "server.conf"
     conf.write_text(
