@@ -458,6 +458,49 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-05 ~12:15–12:45 UTC — run 204 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip dddc1c3 is run 203's own
+commit; the four commits since run 199's baseline are all executor run-log
+commits, each insertion-only on the state file — 44/45/45/45/45 additions,
+0 deletions — so chained with the prior proofs the Needs Luca section stays
+provably untouched); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed before ancestry claims per the standing lesson
+(shallow clone initially reported every branch NOT-ancestor — false, all 5
+roadmap/stage-* tips plus feature/tool-conversion and feature/wildfire-demo
+re-proved merged ancestors of main after `git fetch --unshallow`;
+feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4); zero
+open GitHub issues and zero open PRs; CI success on main tip dddc1c3
+(workflow run 306 — closes the verification of run 203's own commit).
+
+Regression suite green at baseline: 700 pytest passed, 2 skipped (98s)
+with GOPATH/bin exported before pytest; sdk-ts vitest 62/62 and 11/11
+files on all 5 consecutive runs — thirty-third consecutive clean ×5;
+admin UI 30/30 (5/5 files); ruff and ty clean from repo root. Two
+fresh-container lessons re-confirmed the hard way this run: (1) a first
+pytest pass launched before installing nsc gave 693 passed / 9 skipped —
+exactly the run-198 silent-skip signature; installed nsc via go install
+and re-ran to the clean 700/2. nats-server v2.10.24 was already at
+~/.agentmesh/bin (lazy download during the first pass) — --version
+verified; nsc self-reports "0.0.0-dev" (known quirk; installed @latest
+this run rather than the pinned tag, version string can't confirm which
+tag was fetched — cosmetic, the 7 auth tests pass). (2) ui vitest run
+before building sdk-ts failed all 5 files on "Failed to resolve entry
+for package @openagentmesh/sdk" — the existing link:-protocol learning
+(build tsc → dist/ first) covers it; after `pnpm build` in sdk-ts, 30/30.
+The fastapi TestClient StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: unshallow before any ancestry claims; check for Needs-Luca
+answers and credentials; if none, verify CI on this run's own commit,
+regression-check against the 700/62/30 baseline (install nsc AND export
+GOPATH/bin onto PATH BEFORE the first pytest launch; pnpm-install and
+`pnpm build` sdk-ts before running ui vitest), log, end silently.
+
 ### 2026-09-05 ~06:10–06:35 UTC — run 203 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip a9f35e9 is run 202's own
