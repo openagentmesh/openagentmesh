@@ -15,8 +15,7 @@ import typer
 
 from .._local import (
     AGENTMESH_DIR,
-    download_nats_server,
-    find_nats_server,
+    ensure_nats_server,
     render_mesh_server_conf,
 )
 from .._mesh import AgentMesh
@@ -65,13 +64,6 @@ def _read_pid() -> int | None:
     except ValueError:
         return None
     return pid if pid > 0 else None
-
-
-async def _resolve_binary() -> Path:
-    binary = find_nats_server()
-    if binary is None:
-        binary = await download_nats_server()
-    return binary
 
 
 async def _prime_buckets(url: str) -> None:
@@ -152,7 +144,7 @@ def up(
             )
             raise typer.Exit(1)
 
-    binary = asyncio.run(_resolve_binary())
+    binary = asyncio.run(ensure_nats_server())
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 

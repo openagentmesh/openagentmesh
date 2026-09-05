@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from typer.testing import CliRunner
 
 from openagentmesh import AgentMesh, AgentSpec, ConnectionDenied
-from openagentmesh._local import _free_port, find_nats_server
+from openagentmesh._local import _free_port, ensure_nats_server
 from openagentmesh.cli import app
 from openagentmesh.cli.auth import find_nsc
 
@@ -27,8 +27,11 @@ pytestmark = pytest.mark.skipif(find_nsc() is None, reason="nsc binary not avail
 
 
 def _boot_server(conf: Path, port: int, store_dir: Path) -> subprocess.Popen:
-    binary = find_nats_server()
-    assert binary is not None
+    # download if absent: in a fresh environment these tests can run before
+    # anything has triggered the lazy AgentMesh.local() download
+    import asyncio
+
+    binary = asyncio.run(ensure_nats_server())
     # per-boot copy with its own JetStream store so parallel servers don't collide
     import re
 
