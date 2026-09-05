@@ -458,6 +458,51 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-05 ~06:10–06:35 UTC — run 203 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip a9f35e9 is run 202's own
+commit, zero commits since; run 202's diff is 45 additions / 0 deletions on
+the state file — insertion-only, so chained with the prior proofs the Needs
+Luca section stays provably untouched); no OPENROUTER_API_KEY or npm
+credential in the environment; unshallowed per the run-22 lesson (609
+commits = 608 + run 202's one); full `git ls-remote` ref list identical to
+runs 170–202 (main + 5 roadmap/stage-* + 3 feature branches at the same
+tips 4022c4b/7cc45e2/55d85d0, tags still v0.1.0–v0.2.0, pull refs 1–2
+present as expected — closed, pre-roadmap); all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4); zero open GitHub issues and zero open PRs; CI success on
+main tip a9f35e9 (run 305 — closes the verification of run 202's own
+commit).
+
+Regression suite green at baseline, first pass clean: 700 pytest passed,
+2 skipped (101s) — GOPATH/bin exported before pytest per the run-198
+lesson, no nsc skips; sdk-ts vitest 62/62 AND 11/11 files on all 5
+consecutive runs — thirty-second consecutive clean ×5 (172–203); admin UI
+30/30 (5/5 files) and ui tsc clean; ruff and ty clean from repo root;
+sdk-ts tsc --noEmit clean. Fresh container lacked nats-server and nsc;
+provisioned the pinned v2.10.24 / v2.11.0 via go install and copied
+nats-server to ~/.agentmesh/bin per the standing gotcha, `--version`
+verified after the copy (nsc's go-install build self-reports
+"0.0.0-dev" — the pinned v2.11.0 tag was what was fetched; version-string
+quirk only, seen every run). The fastapi TestClient
+StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage (prompts file
+untouched since its original commit 116e1bc). Stage 4 remains current;
+every open item across stages waits on a Needs-Luca answer. Highest-
+leverage unblock is still OPENROUTER_API_KEY (items 6/11). No notification
+sent: nothing changed.
+
+Next run: unshallow before any ancestry claims; diff the remote ref list
+(pull refs 1–2 are expected, closed, pre-roadmap); check for Needs-Luca
+answers and credentials; if none, verify CI on any new main tip,
+regression-check against the 700/62/30 baseline (pinned go installs
+nats-server v2.10.24 + nsc v2.11.0, copy nats-server to ~/.agentmesh/bin,
+verify --version after the copy, export GOPATH/bin onto PATH before
+pytest, pnpm-install and build sdk-ts before judging vitest/ui numbers),
+log, end silently.
+
 ### 2026-09-05 ~00:05–00:25 UTC — run 202 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 9fd45cf is run 201's own
