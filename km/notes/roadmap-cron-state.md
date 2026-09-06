@@ -458,6 +458,45 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-06 ~00:05–00:30 UTC — run 206 (Fable 5, cloud) — idle verification; run-205 fix validated in the wild
+
+Verified this run: no Luca edits (origin/main tip e709d74 is run 205's own
+addendum commit, zero commits since; run 205's two docs commits diff
+insertion-only — 66/0 on the state file, 13/0 on learnings — so chained
+with the prior proofs the Needs Luca section stays provably untouched); no
+OPENROUTER_API_KEY or npm credential in the environment; clone already
+full (615 commits = 611 + run 205's four); full `git ls-remote` ref list
+identical to runs 170–205 apart from the expected roadmap/stage-0 move to
+12e8b04 that run 205 announced; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4); zero open GitHub issues and zero open PRs; CI run 311
+SUCCESS on main tip e709d74 (closes run 205's remaining verification; run
+310 success on d856eaa re-confirmed in the same listing).
+
+Regression suite green at baseline, and the run-205 fix validated in its
+target scenario: this container had nsc installed and GOPATH/bin on PATH
+BEFORE the first pytest launch with an empty ~/.agentmesh/bin — exactly
+the fresh-container ordering that produced the run-188/205 failure
+signature — and the FIRST pass came back 700 passed / 2 skipped (97s),
+nats-server downloaded on demand mid-suite. First first-pass-clean run
+under that ordering since the fix merged. sdk-ts vitest 62/62 and 11/11
+files on all 5 consecutive runs — thirty-fifth consecutive clean ×5;
+admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts per the
+link:-protocol learning; ruff and ty clean from repo root. The fastapi
+TestClient StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 700/62/30
+baseline (nsc via go install + GOPATH/bin on PATH before the first
+pytest pass; pnpm install + `pnpm build` in sdk-ts before ui vitest),
+log, end silently.
+
 ### 2026-09-05 ~18:15–19:05 UTC — run 205 (Fable 5, cloud) — auth-test robustness fix landed
 
 The run-188 tripwire fired: the FIRST full pytest pass came back 696
