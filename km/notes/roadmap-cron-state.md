@@ -458,6 +458,40 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-06 ~06:05–06:30 UTC — run 207 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip b133fa7 is run 206's own
+commit, zero commits since; run 206's diff insertion-only — 39/0 on the
+state file — so chained with the prior proofs the Needs Luca section stays
+provably untouched); no OPENROUTER_API_KEY or npm credential in the
+environment; unshallowed (616 commits) before ancestry claims — all 5
+roadmap/stage-* tips plus feature/tool-conversion and feature/wildfire-demo
+re-proved merged ancestors of main (feature/error-taxonomy stays the known
+4-ahead case, Needs Luca 4); full `git ls-remote` ref list identical to
+runs 170–206 (roadmap/stage-0 at 12e8b04 as announced by run 205); zero
+open GitHub issues and zero open PRs; CI run 312 SUCCESS on main tip
+b133fa7 (closes run 206's own-commit verification).
+
+Regression suite green at baseline, second consecutive first-pass-clean
+fresh-container run: nsc v2.11.0 installed via go, GOPATH/bin on PATH,
+~/.agentmesh/bin empty before the FIRST pytest launch — 700 passed /
+2 skipped (102s), nats-server downloaded on demand mid-suite. sdk-ts
+vitest 62/62 and 11/11 files on all 5 consecutive runs — thirty-sixth
+consecutive clean ×5; admin UI 30/30 (5/5 files) after `pnpm build` in
+sdk-ts per the link:-protocol learning; ruff and ty clean from repo root.
+The fastapi TestClient StarletteDeprecationWarning recurred, still benign.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 700/62/30
+baseline (nsc v2.11.0 via go install + GOPATH/bin on PATH before the
+first pytest pass; pnpm install + `pnpm build` in sdk-ts before ui
+vitest), log, end silently.
+
 ### 2026-09-06 ~00:05–00:30 UTC — run 206 (Fable 5, cloud) — idle verification; run-205 fix validated in the wild
 
 Verified this run: no Luca edits (origin/main tip e709d74 is run 205's own
