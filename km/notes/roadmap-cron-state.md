@@ -458,6 +458,42 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-07 ~06:05–06:30 UTC — run 211 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (all 14 commits since run 199's efd1fe2 are
+executor commits — runs 200–210's insertion-only state-file entries plus the
+run-205 test_auth fix merge 87708e1 — zero non-Claude-authored commits in the
+range, so chained with the prior proofs the Needs Luca section stays provably
+untouched; re-read directly this run and it matches the blocked state); no
+OPENROUTER_API_KEY or npm credential in the environment; unshallowed before
+ancestry claims — all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4); full
+`git ls-remote` ref list identical to runs 170–210 (roadmap/stage-0 at
+12e8b04); zero open GitHub issues and zero open PRs; CI run 316 SUCCESS on
+main tip 5e61236 (closes run 210's own-commit verification).
+
+Regression suite green at baseline: 700 passed / 2 skipped (103s) first-pass
+clean — note this run pre-copied nats-server 2.10.24 into ~/.agentmesh/bin
+before pytest, so the run-205 download-on-demand path was NOT exercised this
+run (it holds per runs 206–210's five consecutive proofs). sdk-ts vitest
+62/62 and 11/11 files on all 5 consecutive runs — fortieth consecutive clean
+×5; admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts per the
+link:-protocol learning (first attempt without the build reproduced the
+resolve failure, confirming the learning still applies); ruff and ty clean
+from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 700/62/30 baseline
+(nsc v2.11.0 via go install + GOPATH/bin on PATH before the first pytest
+pass; pnpm install + `pnpm build` in sdk-ts before ui vitest), log, end
+silently.
+
 ### 2026-09-07 ~00:05–00:30 UTC — run 210 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip 5abd5aa is run 209's own
