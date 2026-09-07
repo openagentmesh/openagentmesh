@@ -458,6 +458,39 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-07 ~18:05–18:30 UTC — run 213 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the only commit since run 212's read is run
+212's own insertion-only state-file entry 8c23ead, 34 insertions / 0 deletions,
+executor-authored — chained with the prior proofs the Needs Luca section stays
+provably untouched; re-read directly this run and it matches the blocked
+state); no OPENROUTER_API_KEY or npm credential in the environment; unshallowed
+before ancestry claims — all 5 roadmap/stage-* tips plus feature/tool-conversion
+and feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4). Full
+`git ls-remote` ref list identical to runs 170–212 (roadmap/stage-0 at
+12e8b04); zero open GitHub issues and zero open PRs; CI run 318 SUCCESS on
+main tip 8c23ead (closes run 212's own-commit verification).
+
+Regression suite green at baseline: 700 passed / 2 skipped (98s) first-pass
+clean — nats-server 2.10.24 pre-copied into ~/.agentmesh/bin before pytest,
+so the run-205 download-on-demand path was NOT exercised (it holds per runs
+206–210's proofs); nsc v2.11.0 on PATH via go install. sdk-ts vitest 11/11
+files on all 5 consecutive runs plus a sixth confirming 62/62 tests —
+forty-second consecutive clean ×5; admin UI 30/30 (5/5 files) after
+`pnpm build` in sdk-ts; ruff and ty both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 700/62/30 baseline
+(nsc v2.11.0 via go install + GOPATH/bin on PATH before the first pytest
+pass; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim), log, end silently.
+
 ### 2026-09-07 ~12:05–12:35 UTC — run 212 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit since run 211's read is run
