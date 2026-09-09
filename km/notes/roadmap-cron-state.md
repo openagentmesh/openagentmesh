@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-09 ~12:05–12:30 UTC — run 220 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (all commits since run 218's read are
+executor-authored — run 219's fix/merge/log commits and this file's own
+entries, checked via `git log` on the state file; Needs Luca section
+untouched); no OPENROUTER_API_KEY or npm credential in the environment;
+unshallowed before ancestry claims — all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4). Zero open GitHub issues and zero open PRs. CI run 328
+SUCCESS on main tip 2fd1352 (closes run 219's own-commit verification;
+runs 325/327 on the fix and its log commit were already observed success
+by run 219).
+
+Regression suite green at the new post-fix baseline: **701 passed / 2
+skipped** (99s) first-pass clean — the +1 over the old 700 is run 219's
+kv.list regression test; nats-server 2.10.24 via go install pre-copied
+into ~/.agentmesh/bin, nsc v2.11.0 on PATH via go install (proxy.golang.org
+threw transient INTERNAL_ERROR stream errors twice before the install
+succeeded on the third attempt — retry with backoff, nothing to fix).
+sdk-ts vitest 62/62 (11/11 files) ×5 consecutive — forty-eighth
+consecutive clean ×5; admin UI 30/30 (5/5 files) after `pnpm build` in
+sdk-ts; ruff and ty both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nsc + nats-server via go install with GOPATH/bin on PATH before the first
+pytest pass; pnpm install + `pnpm build` in sdk-ts before ui vitest;
+unshallow before any ancestry claim or push), log, end silently.
+
 ### 2026-09-09 ~06:25–07:05 UTC — run 219 (Fable 5, cloud) — kv.list flake root-caused and fixed
 
 Verified this run: no Luca edits (all commits since run 217's read are
