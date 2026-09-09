@@ -378,13 +378,45 @@ class KVStore:
         NATS subject wildcards (``*``, ``>``) are accepted. Returns current
         entries; does not continue watching after the initial replay.
         """
+        # nats-py's watcher can signal init-done (a None marker) before the
+        # initial replay has drained: it decides from consumer_info() while
+        # delivered messages are still in flight to the client, so trusting
+        # the marker alone occasionally truncates the snapshot. Pin the
+        # expected number of distinct keys from the stream itself and read
+        # until that count is reached, treating the marker as advisory.
+        expected: int | None = None
+        try:
+            sinfo = await self._kv._js.stream_info(
+                self._kv._stream, subjects_filter=f"{self._kv._pre}{prefix}"
+            )
+            expected = len(sinfo.state.subjects or {})
+        except Exception:
+            pass  # fall back to marker-only termination below
+        if expected == 0:
+            return []
+
         watcher = await self._kv.watch(prefix)
         entries: list[KVEntry[bytes]] = []
+        seen = 0
+        marker_seen = False
         try:
-            async for entry in watcher:
+            while expected is None or seen < expected:
+                try:
+                    # After an early marker, any remaining entries are already
+                    # in flight; the short timeout only guards the (benign)
+                    # case of a key purged between stream_info and watch.
+                    entry = await watcher.updates(
+                        timeout=2.0 if marker_seen else 30.0
+                    )
+                except TimeoutError:
+                    break
                 if entry is None:
                     # nats-py yields None when initial replay completes.
-                    break
+                    marker_seen = True
+                    if expected is None:
+                        break
+                    continue
+                seen += 1
                 if entry.value is None:
                     continue
                 op = (
