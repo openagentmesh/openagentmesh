@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-09 ~00:05–00:30 UTC — run 218 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the only commit since run 217's read is run
+217's own insertion-only state-file entry fddd100, executor-authored — the
+Needs Luca section stays provably untouched, confirmed via `git log` on the
+file: last 5 commits all executor-authored run-log entries); no
+OPENROUTER_API_KEY or npm credential in the environment; unshallowed before
+ancestry claims — all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4; the
+pre-unshallow check again falsely reported stage-1..4 NOT-ancestor,
+reconfirming the mandatory unshallow step). Full `git ls-remote` ref list
+identical to runs 170–217 (roadmap/stage-0 at 12e8b04, main at fddd100);
+zero open GitHub issues and zero open PRs; CI run 323 SUCCESS on main tip
+fddd100 (closes run 217's own-commit verification).
+
+Regression suite green at baseline: 700 passed / 2 skipped (99s) first-pass
+clean — nats-server 2.10.24 built via go install and pre-copied into
+~/.agentmesh/bin before pytest (download-on-demand path not exercised; it
+holds per runs 206–210's proofs); nsc v2.11.0 on PATH via go install. sdk-ts
+vitest 62/62 tests (11/11 files) on all 5 consecutive runs — forty-seventh
+consecutive clean ×5; admin UI 30/30 (5/5 files) after `pnpm build` in
+sdk-ts; ruff and ty both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 700/62/30 baseline
+(nsc v2.11.0 via go install + GOPATH/bin on PATH before the first pytest
+pass; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim), log, end silently.
+
 ### 2026-09-08 ~18:25–18:55 UTC — run 217 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit since run 216's read is run
