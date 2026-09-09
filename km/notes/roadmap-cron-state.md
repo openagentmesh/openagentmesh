@@ -495,8 +495,10 @@ tests pass too, restoring the full 700-equivalent baseline (700 old + 1 new
 = 701 available, 2 integration skips remain by design). sdk-ts vitest 62/62
 ×5, admin UI 30/30 after sdk-ts build, ruff/ty clean. CI run 325 SUCCESS on
 branch tip 73a1398 (all four jobs: python, sdk-ts, ui, ui-e2e), then merged
-to main 5f08a84 (--no-ff) and pushed. CI on the merge commit was pending
-when this run ended — verify next run.
+to main 5f08a84 (--no-ff) and pushed. CI on main after the merge: run 326
+(merge commit) auto-cancelled as superseded; run 327 SUCCESS on main tip
+f439ff0, which contains the merge — observed before run end, nothing left
+pending.
 
 No notification sent: a flake fixed and merged with all suites green is
 routine maintenance, nothing Luca needs to act on.
