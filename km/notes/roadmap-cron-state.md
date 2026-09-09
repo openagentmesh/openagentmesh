@@ -458,6 +458,54 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-09 ~06:25–07:05 UTC — run 219 (Fable 5, cloud) — kv.list flake root-caused and fixed
+
+Verified this run: no Luca edits (all commits since run 217's read are
+executor-authored run-log entries, checked via `git log` on the state file);
+no OPENROUTER_API_KEY or npm credential in the environment; zero new remote
+refs. Container came up SHALLOW again — unshallowed before ancestry claims;
+all roadmap/stage-* tips re-proved ancestors of main. New shallow gotcha:
+the push to roadmap/stage-4 was rejected as non-fast-forward until the
+unshallow (see learnings).
+
+Advanced — first non-idle work since run 205. The first full pytest pass
+failed `tests/test_kv_ergonomics.py::TestKVList::test_list_returns_entries_
+under_prefix` (1 failed / 692 passed); it passed in isolation and in 30
+stress repeats, so not environmental. Root cause found in nats-py's
+`KeyValue.watch()`: after subscribing it checks `consumer_info().num_pending
+== 0 and sub.delivered == 0` and queues the init-done None marker — but
+delivered messages can still be in flight to the client at that moment, so
+the marker occasionally precedes the replayed entries and `list()` (which
+broke on the first None) returned a truncated snapshot. Fix on
+roadmap/stage-4 (rebased onto main tip — old branch content verified fully
+merged, diff main→branch is only stale/older content):
+- d9232fe test: deterministic regression test that reorders the watcher
+  queue so the marker jumps ahead (the exact upstream race shape); red
+  against the old code.
+- 73a1398 fix: `list()` now pins the expected key count via
+  `stream_info(subjects_filter=...)` and reads until the count is reached,
+  marker advisory, 2s grace timeout for the purged-in-between edge,
+  marker-only fallback if stream_info fails. `list_models()` inherits.
+  CHANGELOG Fixed entry added.
+
+Verified on the branch: kv_ergonomics 15/15 (×4 including stress), full
+pytest 694 passed / 9 skipped first pass — 7 of those skips were "nsc not
+available" in this fresh container; after `go install` of nsc all 7 auth
+tests pass too, restoring the full 700-equivalent baseline (700 old + 1 new
+= 701 available, 2 integration skips remain by design). sdk-ts vitest 62/62
+×5, admin UI 30/30 after sdk-ts build, ruff/ty clean. CI run 325 SUCCESS on
+branch tip 73a1398 (all four jobs: python, sdk-ts, ui, ui-e2e), then merged
+to main 5f08a84 (--no-ff) and pushed. CI on the merge commit was pending
+when this run ended — verify next run.
+
+No notification sent: a flake fixed and merged with all suites green is
+routine maintenance, nothing Luca needs to act on.
+
+Next run: check Needs-Luca answers and credentials; verify CI on the merge
+commit if not observed this run; regression-check against the new
+701-available baseline (unshallow BEFORE pushing, nsc + nats-server via go
+install, pnpm build in sdk-ts before ui tests); log, end silently.
+
 ### 2026-09-09 ~00:05–00:30 UTC — run 218 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit since run 217's read is run

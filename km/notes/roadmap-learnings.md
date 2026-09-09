@@ -573,3 +573,28 @@ update that file too and say so here.
   tests download → re-run clean). Tests that boot real servers must
   provision what they boot (`ensure_nats_server()`), not assert that someone
   else already did.
+
+## 2026-09-09 — maintenance run 219 (cloud executor): kv.list flake root-caused
+
+- **A once-in-60-runs flake is still a bug with a shape.** The full suite
+  showed `test_list_returns_entries_under_prefix` failing once, passing in
+  isolation and in 30 stress repeats. Instead of logging "flake, watch for
+  recurrence", reading the nats-py watcher source found a structural race:
+  `watch()` decides initial-replay-done from `consumer_info()` while delivered
+  messages can still be in flight, so the `None` marker can precede the
+  entries. Rare under normal timing, deterministic once you know the shape.
+- **Reproduce the race's shape, not its timing.** The regression test reorders
+  the watcher's update queue so the marker jumps ahead of the entries — the
+  exact upstream interleaving — rather than trying to win a timing lottery.
+  Red against the old code every time, green against the fix.
+- **Termination by count beats termination by marker.** `stream_info` with a
+  `subjects_filter` gives the exact number of distinct keys the replay must
+  deliver; reading until that count (marker advisory, short grace timeout for
+  the purged-in-between edge) makes `list()` deterministic instead of
+  fast-but-occasionally-wrong.
+- **Shallow clones lie about ancestry AND block valid pushes.** This container
+  came up shallow (run 218 already knew ancestry checks lie); new this run:
+  `git push` to roadmap/stage-4 was rejected as non-fast-forward purely
+  because the local shallow history couldn't see the remote tip. After
+  `git fetch --unshallow` the same push fast-forwarded cleanly. Unshallow
+  before pushing to a pre-existing branch, not just before ancestry claims.
