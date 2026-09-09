@@ -47,6 +47,34 @@ class TestKVList:
             keys = sorted(e.key for e in entries)
             assert keys == ["a.b.c", "a.b.d.e"]
 
+    async def test_list_survives_early_init_marker(self, monkeypatch):
+        """nats-py's watcher can signal init-done before the replay drains
+        (consumer_info() races messages still in flight to the client);
+        list() must not truncate the snapshot when the marker jumps ahead."""
+        async with AgentMesh.local() as mesh:
+            await mesh.kv.put("race.a", "1")
+            await mesh.kv.put("race.b", "2")
+
+            real_watch = mesh.kv._kv.watch
+
+            async def racy_watch(prefix, **kwargs):
+                watcher = await real_watch(prefix, **kwargs)
+                # Re-order the update queue so the init-done marker precedes
+                # any already-replayed entries — the shape of the upstream race.
+                backlog = []
+                while not watcher._updates.empty():
+                    item = watcher._updates.get_nowait()
+                    if item is not None:
+                        backlog.append(item)
+                watcher._updates.put_nowait(None)
+                for item in backlog:
+                    watcher._updates.put_nowait(item)
+                return watcher
+
+            monkeypatch.setattr(mesh.kv._kv, "watch", racy_watch)
+            entries = await mesh.kv.list("race.*")
+            assert sorted(e.key for e in entries) == ["race.a", "race.b"]
+
 
 # --- try_cas ---
 
