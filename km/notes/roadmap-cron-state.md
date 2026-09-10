@@ -458,6 +458,47 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-10 ~00:15–00:45 UTC — run 222 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is still run 221's own
+commit babeed2 — zero new commits of any kind since; Needs Luca section
+untouched); no OPENROUTER_API_KEY or npm credential in the environment;
+remote refs unchanged (same 9 heads, same SHAs). Zero open GitHub issues
+and zero open PRs. CI run 330 SUCCESS on main tip babeed2 (closes run
+221's own-commit verification). Container came up shallow again —
+unshallowed before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (102s)
+first-pass clean; nats-server 2.10.24 + nsc via go install (no proxy
+retries needed; nsc@latest binary now stamps itself "0.0.0-dev" — version
+metadata missing from the module build, binary works fine). sdk-ts vitest
+62/62 (11/11 files) ×5 consecutive — fiftieth consecutive clean ×5; admin
+UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and ty both clean
+from repo root.
+
+Operational note (executor error, not a repo problem): an early vitest ×5
+attempt was started before go install finished and all 5 runs failed
+suite-collection with "nats-server exited (code -2)" — the sdk-ts tests
+spawn a REAL nats-server (tests/helpers/server.ts), they are not
+sim-only. Re-run with ~/go/bin on PATH was 62/62 ×5 clean. Sequencing
+rule: no test suite (pytest OR sdk-ts vitest) starts before nats-server
+is on PATH.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nsc + nats-server via go install with GOPATH/bin on PATH before ANY test
+suite — sdk-ts vitest spawns nats-server too; pnpm install + `pnpm build`
+in sdk-ts before ui vitest; unshallow before any ancestry claim or push),
+log, end silently.
+
 ### 2026-09-09 ~18:15–18:45 UTC — run 221 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is still run 220's own
