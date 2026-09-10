@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-10 ~12:15–12:40 UTC — run 224 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is still run 223's own
+commit 4722384 — zero new commits of any kind since; Needs Luca section
+untouched; the two state-file commits under Luca's git identity are runs
+180/186's own executor log commits, re-checked, not answers); no
+OPENROUTER_API_KEY or npm credential in the environment; remote refs
+unchanged (same 9 heads). Zero open GitHub issues and zero open PRs. CI
+run 332 SUCCESS on main tip 4722384 (closes run 223's own-commit
+verification). Container came up shallow again — unshallowed before
+ancestry claims; all 5 roadmap/stage-* tips plus feature/tool-conversion
+and feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4; a
+pre-unshallow check misreported it as 135 ahead — shallow ancestry
+results are worthless, unshallow first, always).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (95s)
+first-pass clean; nats-server 2.10.24 + nsc v2.11.0 (pinned) via go
+install, no proxy retries. sdk-ts vitest 62/62 (11/11 files) ×5
+consecutive — fifty-second consecutive clean ×5; admin UI 30/30 (5/5
+files) after `pnpm build` in sdk-ts (first ui attempt without the build
+failed to collect, as the baseline requires — rebuilt and green); ruff
+and ty both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nsc + nats-server via go install with GOPATH/bin on PATH before ANY test
+suite; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim), log, end silently.
+
 ### 2026-09-10 ~06:05–06:30 UTC — run 223 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is still run 222's own
