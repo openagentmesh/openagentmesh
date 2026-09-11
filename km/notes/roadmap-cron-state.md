@@ -458,6 +458,44 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-11 ~06:15–06:45 UTC — run 226 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is still run 225's own
+commit ec6da9c — zero new commits of any kind since; Needs Luca section
+untouched); no OPENROUTER_API_KEY or npm credential in the environment
+(only proxy-config vars match a grep for openrouter/npm); remote refs
+unchanged (same 9 heads, same SHAs, full branch list diffed against
+expectations). Zero open GitHub issues and zero open PRs. CI run 334
+SUCCESS on main tip ec6da9c (closes run 225's own-commit verification).
+Container came up shallow again — unshallowed before ancestry claims
+(pre-unshallow, merge-base misreported stage-1 as 200 ahead — the run-224
+lesson holds); all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy stays the known 4-ahead case, Needs Luca 4).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (97s)
+first-pass clean; nats-server 2.10.24 via go install, nsc via `nsc/v2@v2.11.0`
+pin (built on go1.24.7, self-reports 0.0.0-dev — known cosmetic; auth tests
+all ran, no silent skips). sdk-ts vitest 62/62 (11/11 files) ×5 consecutive —
+fifty-fourth consecutive clean ×5; admin UI 30/30 (5/5 files) after
+`pnpm build` in sdk-ts; ruff and ty both clean from repo root. Setup
+reminder re-earned: sdk-ts vitest spawns `~/.agentmesh/bin/nats-server` by
+absolute path — copying the go-installed binary there is required, PATH
+alone is not enough (first ×5 attempt failed all spawns with ENOENT until
+the copy; not a regression).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nats-server + nsc via go install, copy nats-server to ~/.agentmesh/bin/
+AND put GOPATH/bin on PATH before ANY test suite; pnpm install + `pnpm
+build` in sdk-ts before ui vitest; unshallow before any ancestry claim or
+push), log, end silently.
+
 ### 2026-09-11 — run 225 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is still run 224's own
