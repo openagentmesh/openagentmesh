@@ -458,6 +458,40 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-11 — run 225 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is still run 224's own
+commit 0bc3943 — zero new commits of any kind since; Needs Luca section
+untouched); no OPENROUTER_API_KEY or npm credential in the environment;
+remote refs unchanged (same 9 heads, same SHAs — full branch list diffed
+against expectations per the run-155 lesson). Zero open GitHub issues and
+zero open PRs. CI run 333 SUCCESS on main tip 0bc3943 (closes run 224's
+own-commit verification). Container came up shallow again — unshallowed
+before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy stays the known 4-ahead case,
+Needs Luca 4).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (101s)
+first-pass clean; nats-server 2.10.24 via go install, nsc via
+`nsc/v2@latest` (built clean on go1.24.7 without a toolchain switch this
+time, self-reports 0.0.0-dev as in run 222 — works fine; auth tests all
+ran, no silent skips). sdk-ts vitest 62/62 (11/11 files) ×5 consecutive —
+fifty-third consecutive clean ×5; admin UI 30/30 (5/5 files) after
+`pnpm build` in sdk-ts; ruff and ty both clean from repo root. Sequencing
+rule honored: no test suite started before nats-server was on PATH.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nsc + nats-server via go install with GOPATH/bin on PATH before ANY test
+suite; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim or push), log, end silently.
+
 ### 2026-09-10 ~12:15–12:40 UTC — run 224 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is still run 223's own
