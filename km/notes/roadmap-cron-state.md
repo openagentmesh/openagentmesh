@@ -458,6 +458,41 @@ All merged to main (`merge: stage-1 interop`, --no-ff). Merged tree verified thi
 
 ## Run log
 
+### 2026-09-11 ~18:15–18:45 UTC — run 228 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 227's own commit
+8e46112 — zero new commits of any kind since; all commits in the last 30
+authored by the executor); no OPENROUTER_API_KEY or npm credential in the
+environment (env grep matches only proxy-config vars); remote refs
+unchanged (same 9 heads); origin tags unchanged (8, ending v0.2.0). Zero
+open GitHub issues and zero open PRs. CI run 336 SUCCESS on main tip
+8e46112 (closes run 227's own-commit verification). Container came up
+shallow again — unshallowed before ancestry claims; all 5 roadmap/stage-*
+tips plus feature/tool-conversion and feature/wildfire-demo re-proved
+merged ancestors of main (feature/error-taxonomy re-measured at exactly
+4 ahead, the known Needs Luca 4 case).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (90s)
+first-pass clean (the 1 warning is the known StarletteDeprecationWarning,
+cosmetic); nats-server 2.10.24 via go install (copied to ~/.agentmesh/bin
+per the standing reminder), nsc via `nsc/v2@v2.11.0` pin (self-reports
+0.0.0-dev, known cosmetic; auth tests all ran — 701/2, not 693/9). sdk-ts
+vitest 62/62 (11/11 files) ×5 consecutive — fifty-sixth consecutive clean
+×5; admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and ty
+both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(nats-server + nsc via go install, copy nats-server to ~/.agentmesh/bin/
+AND put GOPATH/bin on PATH before ANY test suite; sdk-ts uses pnpm not
+npm; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim or push), log, end silently.
+
 ### 2026-09-11 ~12:15–12:45 UTC — run 227 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 226's own commit
