@@ -462,6 +462,52 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-09-14 ~06:15–06:50 UTC — run 238 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 237's own commit
+63e57d6 — zero new commits of any kind since; last 3 commits all
+executor-authored run logs, Needs Luca section untouched); no
+OPENROUTER_API_KEY or npm credential in the environment (env grep matched
+nothing); remote refs unchanged (same 9 heads plus the two known
+refs/pull/* refs, SHAs listed and checked); origin tags unchanged (8,
+ending v0.2.0). Zero open GitHub issues and zero open PRs. CI run 346
+SUCCESS on main tip 63e57d6 (closes run 237's own-commit verification).
+Container came up shallow again — unshallowed before ancestry claims; all
+5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy re-measured at exactly 4 ahead, the known Needs
+Luca 4 case).
+
+Regression suite green at baseline, with one sequencing slip corrected
+mid-run: the sdk-ts vitest loop was started while the background
+go-install of nats-server was still running — first attempt failed runs 1
+(10/11 files) and 2 (3/11 files), turning green the moment
+~/.agentmesh/bin/nats-server landed (zero code changes). After the
+binaries were in place: sdk-ts vitest 11/11 files ×5 consecutive clean,
+62/62 test count confirmed on an additional run (the earlier failures
+were environmental, but the unbroken-streak count resets to this run's
+clean ×5); **701 passed / 2 skipped** pytest (102s) first-pass clean (the
+1 warning is the known StarletteDeprecationWarning, cosmetic); admin UI
+30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and ty both clean
+from repo root. nats-server 2.10.24 + nsc v2.11.0 via go install as
+usual. Slip and its evidence recorded in roadmap-learnings.md — first
+direct observation that sdk-ts vitest hard-depends on the
+~/.agentmesh/bin binary.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed (the vitest failures were self-inflicted
+sequencing, not a regression — proven by the immediate green ×5 after).
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(install nats-server + nsc via go install AND copy nats-server to
+~/.agentmesh/bin/ TO COMPLETION before starting ANY suite — do not
+background the install past suite start; GOPATH/bin on PATH; sdk-ts uses
+pnpm not npm; pnpm install + `pnpm build` in sdk-ts before ui vitest;
+unshallow before any ancestry claim or push), log, end silently.
+
 ### 2026-09-14 ~06:15–06:45 UTC — run 237 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 236's own commit

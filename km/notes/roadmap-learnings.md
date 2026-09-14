@@ -598,3 +598,11 @@ update that file too and say so here.
   because the local shallow history couldn't see the remote tip. After
   `git fetch --unshallow` the same push fast-forwarded cleanly. Unshallow
   before pushing to a pre-existing branch, not just before ancestry claims.
+- **sdk-ts vitest hard-depends on `~/.agentmesh/bin/nats-server` — observed,
+  not just presumed (run 238).** The vitest loop was started while the
+  go-install of nats-server was still running in the background: run 1 failed
+  10/11 files, run 2 failed 3/11 (binary landed mid-run), runs 3+ all green
+  with zero code changes. Same slip class as run 232 (nsc before pytest), new
+  evidence for the TS side. The standing reminder means what it says: finish
+  the toolchain install — including the copy into `~/.agentmesh/bin/` —
+  before starting ANY suite, and don't background it past that point.
