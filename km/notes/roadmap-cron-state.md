@@ -462,6 +462,43 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-09-14 ~18:20–18:40 UTC — run 240 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 239's own commit
+afcdf30 — zero new commits of any kind since; Needs Luca section
+untouched); no OPENROUTER_API_KEY or npm credential in the environment
+(env grep matched nothing); remote refs unchanged (same 9 heads plus the
+two known refs/pull/* refs, SHAs listed and checked); origin tags
+unchanged (8, ending v0.2.0). Zero open GitHub issues and zero open PRs.
+CI run 348 SUCCESS on main tip afcdf30 (closes run 239's own-commit
+verification). Container came up shallow again — unshallowed before
+ancestry claims; all 5 roadmap/stage-* tips plus feature/tool-conversion
+and feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy re-measured at exactly 4 ahead, the known Needs
+Luca 4 case).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (101s)
+first-pass clean (the 1 warning is the known StarletteDeprecationWarning,
+cosmetic); nats-server 2.10.24 via go install (copied to ~/.agentmesh/bin
+per the standing reminder), nsc via `nsc/v2@v2.11.0` pin, both installed
+TO COMPLETION before any suite ran. sdk-ts vitest 62/62 (11/11 files) ×5
+consecutive — third consecutive clean ×5 since run 238's streak reset;
+admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and ty both
+clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(install nats-server + nsc via go install AND copy nats-server to
+~/.agentmesh/bin/ TO COMPLETION before starting ANY suite; GOPATH/bin on
+PATH; sdk-ts uses pnpm not npm; pnpm install + `pnpm build` in sdk-ts
+before ui vitest; unshallow before any ancestry claim or push), log, end
+silently.
+
 ### 2026-09-14 ~12:15–12:40 UTC — run 239 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 238's own commit
