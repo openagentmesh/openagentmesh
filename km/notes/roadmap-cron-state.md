@@ -462,6 +462,51 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-09-16 ~06:20–06:35 UTC — run 246 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 245's own commit
+bf88676 — zero new commits of any kind since, and that commit touched only
+this state file; Needs Luca section untouched; recent main commits all
+executor-authored run logs); no OPENROUTER_API_KEY or npm credential in
+the environment (env grep matched nothing); remote refs unchanged (same 9
+heads plus the two known refs/pull/* refs, SHAs listed and checked);
+origin tags unchanged (8, ending v0.2.0). Zero open GitHub issues and
+zero open PRs. CI run 354 SUCCESS on main tip bf88676 (closes run 245's
+own-commit verification). Container came up shallow again — unshallowed
+before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy re-measured at exactly 4 ahead,
+the known Needs Luca 4 case).
+
+Regression suite green at baseline: **701 passed / 2 skipped** (95s)
+first-pass clean (the 1 warning is the known StarletteDeprecationWarning,
+cosmetic); nats-server 2.10.24 via go install (copied to ~/.agentmesh/bin
+per the standing reminder), nsc via `nsc/v2@v2.11.0` pin, both installed
+TO COMPLETION before any nats-dependent suite ran (only pnpm installs,
+the nats-free ui vitest, ruff/ty, and ancestry checks overlapped the
+install). sdk-ts vitest 62/62 (11/11 files) ×5 consecutive — ninth
+consecutive clean ×5 since run 238's streak reset; admin UI 30/30 (5/5
+files) after `pnpm build` in sdk-ts; ruff and ty both clean from repo
+root. One sequencing note, recorded honestly: this run the pytest suite
+and the sdk-ts vitest ×5 loop ran concurrently (both after the binaries
+were fully installed); both were first-pass green with no contention
+observed, but the proven baseline procedure is sequential — next run
+should keep them sequential.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 701/62/30 baseline
+(install nats-server + nsc via go install AND copy nats-server to
+~/.agentmesh/bin/ TO COMPLETION before starting ANY nats-dependent suite;
+run pytest and the sdk-ts vitest loop sequentially, not concurrently;
+GOPATH/bin on PATH; sdk-ts uses pnpm not npm; pnpm install + `pnpm build`
+in sdk-ts before ui vitest; unshallow before any ancestry claim or push;
+UV_HTTP_TIMEOUT=120 on uv sync if downloads time out), log, end silently.
+
 ### 2026-09-16 ~00:15–00:35 UTC — run 245 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 244's own commit
