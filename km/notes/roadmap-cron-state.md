@@ -462,6 +462,46 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-09-30 ~18:15–18:35 UTC — run 296 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip e724b98 is run 295's own
+commit; the only commit since run 295's verification point 9a7669a is
+e724b98 itself — 1 file, 53 insertions, 0 deletions in the state file, so
+the Needs Luca section is untouched); no OPENROUTER_API_KEY / NPM_TOKEN /
+NODE_AUTH_TOKEN in the environment (per-variable printenv presence tests,
+values never printed); remote refs unchanged (same 9 heads, main advanced
+only by run 295's own commit e724b98; other 8 SHAs identical to run 295's
+list); origin tags unchanged (8, ending v0.2.0). Zero open GitHub issues
+and zero open PRs. CI run 405 SUCCESS on main tip e724b98 (closes run
+295's own-commit verification). Container came up shallow — unshallowed
+before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy re-measured at exactly 4 ahead,
+the known Needs Luca 4 case). Operational note: the GitHub MCP
+list_workflow_runs call with a branch filter and no workflow id returned
+a stale page (newest shown was Sep 7's run 317); querying ci.yml by
+resource_id returned the true latest (run 405) — prefer the resource_id
+form.
+
+Regression suite green at baseline, fully sequential (pytest before the
+vitest loop): **701 passed / 2 skipped** (109.5s) — but NOT first-pass
+clean this run, by executor setup slip, not code: the first full pass was
+694/9, the 7 extra skips all "nsc binary not available" (nsc was
+installed to completion and version-verified, but by absolute GOPATH
+path — it was never exported onto the PATH pytest ran under; shell state
+does not persist between tool calls in this harness). Re-run with
+GOPATH/bin on PATH: 701/2, the 2 skips the known OAM_INTEGRATION_TESTS
+gates, the 1 warning the known cosmetic StarletteDeprecationWarning.
+Learnings updated with the slip's new wrinkle. nats-server 2.10.24 via
+go install (copied to ~/.agentmesh/bin and version-verified before any
+suite), nsc via nsc/v2@v2.11.0 pin. sdk-ts vitest 62/62 (11/11 files) ×5
+consecutive — fifty-ninth consecutive clean ×5 since run 238's streak
+reset; admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and
+ty both clean from repo root (`uv run ty check`, never uvx).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+
 ### 2026-09-30 ~12:23–12:45 UTC — run 295 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 294's own commit

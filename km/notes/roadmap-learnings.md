@@ -606,3 +606,12 @@ update that file too and say so here.
   evidence for the TS side. The standing reminder means what it says: finish
   the toolchain install — including the copy into `~/.agentmesh/bin/` —
   before starting ANY suite, and don't background it past that point.
+- **"Installed and version-verified" is not "on the suites' PATH" (run 296).**
+  nsc was go-installed to completion and verified with `--version` — via its
+  absolute GOPATH path — yet the first pytest pass skipped all 7 nsc tests
+  ("nsc binary not available"): the harness shell does not persist exports
+  between tool calls, so the verification and the suite ran under different
+  PATHs. Third member of the run-232/238 slip class, with a new wrinkle: the
+  install WAS complete this time. Verify the tool the way the suite will find
+  it (`which nsc` inside the same command that runs pytest), not by absolute
+  path in a separate call.
