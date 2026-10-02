@@ -24,6 +24,19 @@ class Tick(BaseModel):
     n: int
 
 
+async def _wait_for(predicate, timeout: float = 5.0, interval: float = 0.02) -> None:
+    """Poll until predicate() is true or the deadline passes.
+
+    A fixed sleep between "emission started" and the assertion is a timing
+    lottery under CPU contention; polling keeps the test fast in the common
+    case and robust in the slow one.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while not predicate() and loop.time() < deadline:
+        await asyncio.sleep(interval)
+
+
 # --- Attribute behavior ---
 
 
@@ -164,7 +177,11 @@ class TestInstanceIdOnInvocation:
                     }),
                 )
                 await caller._conn.flush()
-                await asyncio.sleep(0.5)  # allow streamer to emit chunks
+                await _wait_for(
+                    lambda: any(
+                        h.get(X_MESH_INSTANCE_ID) == host.instance_id for h in received
+                    )
+                )
                 await sub.unsubscribe()
 
                 # At least one chunk header carried the responder's instance_id
@@ -194,7 +211,11 @@ class TestInstanceIdOnPublisher:
 
                 # Now start the publisher emit task.
                 await host._subscribe_pending()
-                await asyncio.sleep(0.5)
+                await _wait_for(
+                    lambda: any(
+                        h.get(X_MESH_INSTANCE_ID) == host.instance_id for h in received
+                    )
+                )
                 await sub.unsubscribe()
 
                 assert any(h.get(X_MESH_INSTANCE_ID) == host.instance_id for h in received), \

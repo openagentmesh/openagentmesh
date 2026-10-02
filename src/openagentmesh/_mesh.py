@@ -316,16 +316,20 @@ class AgentMesh(InvocationMixin, DiscoveryMixin):
                     # the gate decide whether to subscribe.
                     await self._start_gate(name, gate)
 
+                self._subscribed.add(name)
+                # The instance record must land before the agent becomes
+                # discoverable: the monitor maps disconnect advisories to
+                # agents via mesh-instances, so a host killed after its
+                # catalog write but before its record would die invisibly —
+                # stale catalog entry, no death notice.
+                await self._record_instance()
                 await self._publish_contract(contract)
                 await self._update_catalog(contract, add=True)
                 self._catalog_cache[name] = contract.to_catalog_entry()
-                self._subscribed.add(name)
                 await self._publish_log(
                     name, "info", "agent_registered",
                     message=f"Agent '{name}' registered",
                 )
-
-        await self._record_instance()
 
     async def _activate_agent(self, name: str) -> None:
         """Bring an agent online: RPC subscription, background tasks, sources.

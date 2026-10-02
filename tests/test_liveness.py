@@ -288,3 +288,43 @@ async def test_death_notice_payload_shape(hosts):
             assert json.dumps(notice)  # JSON-serializable end to end
         finally:
             collector.cancel()
+
+
+async def test_instance_record_precedes_catalog_visibility():
+    """The mesh-instances record must land before the agent's catalog entry.
+
+    The monitor maps a disconnect advisory to agents via the instance record
+    and silently treats a missing record as graceful shutdown. A host killed
+    after its catalog write but before its record write would therefore die
+    invisibly: stale catalog entry, no death notice. Pin the write order
+    instead of racing a real kill into the millisecond window.
+    """
+    from openagentmesh import AgentSpec
+
+    async with AgentMesh.local() as mesh:
+        record_at_catalog_write: dict[str, list[str]] = {}
+        orig = mesh._update_catalog
+
+        async def spy(contract, *, add: bool) -> None:
+            assert mesh._instances_kv is not None
+            try:
+                entry = await mesh._instances_kv.get(mesh.instance_id)
+                agents = json.loads(entry.value or b"{}").get("agents", [])
+            except Exception:
+                agents = []
+            record_at_catalog_write[contract.name] = agents
+            await orig(contract, add=add)
+
+        mesh._update_catalog = spy  # ty: ignore[invalid-assignment]
+
+        @mesh.agent(AgentSpec(name="early.bird", description="ordering probe"))
+        async def early_bird(req: dict) -> dict:
+            return req
+
+        await mesh._subscribe_pending()
+
+        assert "early.bird" in record_at_catalog_write, "catalog was never written"
+        assert "early.bird" in record_at_catalog_write["early.bird"], (
+            "instance record did not cover the agent at catalog-write time; "
+            "a SIGKILL in this window dies invisibly (no death notice)"
+        )
