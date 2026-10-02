@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An agent host killed in the brief window between its catalog registration and its liveness record could die invisibly: the health monitor had no instance record to correlate the disconnect with, so the dead agent kept its catalog entry and no death notice was published. Hosts now write the liveness record before the agent becomes discoverable, so any agent you can see in the catalog is one the monitor can clean up.
 - `mesh.kv.list()` could occasionally return a truncated snapshot (missing keys that were definitely written): the underlying NATS client sometimes signals "initial replay complete" before all replayed entries have reached the client. `list()` now pins the expected key count from the stream itself and reads until the snapshot is complete, so the race can no longer drop entries. `list_models()` inherits the fix.
 - KV sources delivered spurious events for deleted keys: the DELETE marker was detected by a suffix match on the operation name (so a future operation ending in "delete" would have been misread), and a handler taking a `KVEntry` tried to validate the DELETE's empty payload as its model, raising on every drain. Deletes now resolve to `value=None`, and model- and message-kind handlers skip them instead of failing.
 
