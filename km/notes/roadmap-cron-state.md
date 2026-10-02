@@ -462,6 +462,67 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-02 ~00:05–01:10 UTC — run 301 (Fable 5, cloud) — liveness bug found and fixed
+
+Not an idle run: the regression check caught two distinct one-off failures,
+one of which root-caused to a real SDK liveness gap. Merged to main 9ace64d
+(--no-ff, via roadmap/stage-4 reused per protocol). **Pytest baseline is now
+702 passed / 2 skipped** (+1: new regression test).
+
+The bug: `_subscribe_pending` wrote an agent's catalog entry BEFORE
+`_record_instance`. The health monitor maps disconnect advisories to agents
+via the mesh-instances record and silently treats a missing record as
+graceful shutdown, so a host SIGKILLed in that millisecond window died
+invisibly — stale catalog entry forever, no death notice. Found because
+`tests/cookbook/test_agent_liveness.py::test_watchdog_sees_both_reasons`
+(which kills the host the moment the agent appears in the catalog) failed
+once in the full suite and passed 5×5 in isolation; reading the ordering
+explained the full-suite failure exactly. Fix: the instance record now lands
+per agent before its registry/catalog writes (commit 86b6ef2). Regression
+test `test_liveness.py::test_instance_record_precedes_catalog_visibility`
+pins the write order deterministically — verified red against the old code,
+green against the fix. CHANGELOG Fixed entry added (9f13403).
+
+Also fixed: `test_instance_id.py::test_publisher_events_carry_instance_id`
+failed once in the first full pass (green 5× isolated) — fixed 0.5s sleeps
+in the publisher and streamer emission tests replaced with 5s-deadline
+polling (commit 1c4ba0f); the file also runs ~1s faster.
+
+Verified this run: no Luca edits (only commit since 9566a17 was run 300's
+own insertion-only state-file commit); no OPENROUTER_API_KEY / NPM_TOKEN /
+NODE_AUTH_TOKEN (per-variable printenv); remote refs unchanged at run start
+(same 9 heads, main 24313eb advanced only by run 300's commit); tags
+unchanged (8, ending v0.2.0); zero open issues/PRs; CI run 410 SUCCESS on
+main tip 24313eb (closes run 300's own-commit verification); CI runs 411
+and 412 SUCCESS on the branch tips (queried ci.yml by resource_id).
+Container came up shallow — unshallowed; all 5 roadmap/stage-* tips plus
+tool-conversion and wildfire-demo re-proved ancestors of main
+(error-taxonomy still exactly 4 ahead).
+
+Suite on the merged tree (branch tip before merge; fully sequential,
+nats-server 2.10.24 + nsc v2.11.0 go-installed to completion,
+version-verified on the same PATH pytest ran under): **702/2 pytest**
+first-pass clean on the final pass (the two pre-fix passes each showed the
+one flake that led to the fixes); sdk-ts vitest 62/62 ×5 (sixty-fourth
+consecutive clean ×5); ui 30/30; ruff and `uv run ty check` clean. Note:
+ty does NOT honor `# type: ignore[...]` — use `# ty: ignore[rule]` (the
+wildfire tests' existing convention).
+
+Advanced: the fix itself. Stage 4 unchanged otherwise; every roadmap item
+still waits on a Needs-Luca answer (highest-leverage unblock remains
+OPENROUTER_API_KEY, items 6/11). Notification sent (real bug fixed).
+
+Next run: check for Needs-Luca answers and credentials; verify CI on main
+tip 9ace64d (merge commit); regression-check against the NEW 702/62/30
+baseline (all standing operational notes apply: go install nats-server
+2.10.24 + nsc/v2@v2.11.0 TO COMPLETION, copy nats-server to
+~/.agentmesh/bin, verify both with --version on the SAME PATH exported in
+the same command that runs pytest; pytest before the vitest loop,
+sequential; pnpm not npm; pnpm install + build in sdk-ts before ui vitest;
+unshallow before ancestry claims or pushes; UV_HTTP_TIMEOUT=120 if needed;
+per-variable printenv for credentials; query ci.yml by resource_id; `uv run
+ty check` never uvx), log, end silently if nothing changed.
+
 ### 2026-10-01 ~18:10–18:35 UTC — run 300 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 299's own commit

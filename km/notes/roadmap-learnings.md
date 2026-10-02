@@ -615,3 +615,30 @@ update that file too and say so here.
   install WAS complete this time. Verify the tool the way the suite will find
   it (`which nsc` inside the same command that runs pytest), not by absolute
   path in a separate call.
+
+## 2026-10-02 — maintenance run 301 (cloud executor): invisible-death ordering race
+
+- **Registration visibility and liveness coverage must be ordered, not just
+  both-eventually-true.** `_subscribe_pending` wrote the catalog entry before
+  the mesh-instances record; the monitor treats a missing record as graceful
+  shutdown, so a SIGKILL between the two writes left a stale catalog entry
+  and no death notice. Any "X makes you discoverable, Y makes you cleanable"
+  pair needs Y-before-X, per item — a trailing batch write reopens the window
+  for every agent registered before it.
+- **A kill-on-first-sight test is a window detector.** The watchdog cookbook
+  test kills the host the instant its agent appears in the catalog, which is
+  precisely what made a millisecond-wide SDK window observable once in ~300
+  full-suite runs. When such a test flakes, suspect the ordering of the
+  writes the trigger condition depends on before suspecting the test.
+- **Pin write order, don't race it.** The regression test wraps
+  `_update_catalog` and asserts the instance record already covers the agent
+  at call time: red against the old code on every run, no timing lottery —
+  same lesson as run 219's kv.list fix, applied to ordering instead of
+  termination.
+- **ty ignores `# type: ignore[rule]` on its own rules — use
+  `# ty: ignore[rule]`** (the convention the wildfire tests already use).
+  A `type: ignore` that mypy would honor still counts as a ty diagnostic.
+- **Fixed sleeps in emission tests are the same flake class every time.**
+  Two more (publisher + streamer instance-id tests, 0.5s each) replaced with
+  deadline polling; the file got faster, not slower, because polls exit
+  early. When one fixed-sleep test flakes, sweep its file for siblings.
