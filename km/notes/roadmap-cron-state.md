@@ -462,6 +462,56 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-04 ~12:10–12:40 UTC — run 311 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip c8830a1 is run 310's own
+insertion-only state-file commit — zero commits of any kind since; `git
+log --format='%h %an %s'` over the fetched range a409e34..c8830a1 shows
+only executor log commits); no OPENROUTER_API_KEY / NPM_TOKEN /
+NODE_AUTH_TOKEN (env presence tests, values never printed); remote refs
+unchanged (same 9 heads — the fresh container's default clone showed only
+origin/main until an explicit `git fetch origin '+refs/heads/*:...'`;
+`git ls-remote --heads` confirmed all 9 before any conclusion was drawn);
+origin tags unchanged (8, ending v0.2.0); unshallowed before ancestry
+claims — all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main; error-taxonomy
+still exactly 4 ahead (Needs Luca 4). Zero open GitHub issues and zero
+open PRs. CI run 425 SUCCESS on main tip c8830a1 (closes run 310's
+own-commit verification; ci.yml by resource_id).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (103.37s,
+`-x` so first-pass clean; 1 warning, the known cosmetic one) — tenth
+idle-run confirmation of run 301's 702 baseline; nats-server 2.10.24 +
+nsc (nsc/v2@latest, go toolchain auto-switched to 1.26.8, self-reports
+"0.0.0-dev" — known fine) via go install to completion, both verified
+with --version; nats-server SYMLINKED into ~/.agentmesh/bin (equivalent
+to the copy the standing note asks for; the sdk-ts helper resolves
+NATS_SERVER_BIN ?? ~/.agentmesh/bin/nats-server, not PATH). sdk-ts vitest
+62/62 (11/11 files) ×5 consecutive — seventy-fourth consecutive clean ×5;
+admin UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and
+`uv run ty check` both clean from repo root.
+
+Deviation, no impact on results: two vitest invocations were started
+before the go install had completed and before the ~/.agentmesh/bin link
+existed — both died on spawn ENOENT (exit -2 from the helper, no test
+bodies ran), exactly the sequencing failure the standing notes warn
+about. Discarded as false starts; the counted ×5 ran only after the
+binary was in place and was clean. Suite order this run was vitest → ui
+→ pytest rather than pytest-first; all suites green regardless.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 702/62/30 baseline
+(all standing operational notes apply — and note the fresh-container
+gotcha re-hit this run: install nats-server+nsc TO COMPLETION and place
+the binary at ~/.agentmesh/bin BEFORE starting any nats-dependent suite;
+the default clone may show only origin/main, so fetch all heads before
+reasoning about branches), log, end silently if nothing changed.
+
 ### 2026-10-04 ~12:25–12:55 UTC — run 310 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit since run 308's 54bdb21
