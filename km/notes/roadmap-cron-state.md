@@ -462,6 +462,50 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-06 ~06:10–06:30 UTC — run 318 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the only commit new since run 317's
+verification is run 317's own log commit cf79841, re-checked via
+`git show --stat` — 46 insertions, 0 deletions, state file only, so no
+Needs-Luca answer was edited in); no OPENROUTER_API_KEY / NPM_TOKEN /
+NODE_AUTH in the environment (`env | grep -iE` matched nothing, not
+policy-denied this run); remote refs unchanged (same 9 heads: main cf79841
+— advanced only by run 317's own commit — stage-0 12e8b04, stage-1
+2facaa7, stage-2 cdaf60d, stage-3 949619a, stage-4 9f13403, error-taxonomy
+4022c4b, tool-conversion 7cc45e2, wildfire-demo 55d85d0); origin tags
+unchanged (8, ending v0.2.0); container came up NOT shallow this time
+(`git rev-parse --is-shallow-repository` → false, checked before ancestry
+claims); all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main; error-taxonomy
+still exactly 4 ahead (Needs Luca 4). Zero open GitHub issues and zero
+open PRs. CI run 432 SUCCESS on main tip cf79841 (closes run 317's
+own-commit verification; ci.yml by resource_id).
+
+Regression suite green at baseline, sequential (pytest before the vitest
+loop): **702 passed / 2 skipped** (96.87s, zero failures so first-pass
+clean; 1 warning, the known cosmetic StarletteDeprecationWarning) —
+seventeenth idle-run confirmation of run 301's 702 baseline; nats-server
+2.10.24 + nsc (nsc/v2@v2.11.0 pin, self-reports "0.0.0-dev" — known fine)
+via go install in a background task, nats-server copied to
+~/.agentmesh/bin, both verified with --version before any nats-dependent
+suite started, GOPATH/bin + ~/.agentmesh/bin on the PATH of the command
+that ran pytest. sdk-ts vitest 62/62 (11/11 files) ×5 consecutive —
+eighty-first consecutive clean ×5; admin UI 30/30 (5/5 files) after
+`pnpm install --frozen-lockfile` + `pnpm build` in sdk-ts; ruff and
+`uv run ty check` both clean from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 702/62/30 baseline
+(nats-server + nsc via go install, copy nats-server to ~/.agentmesh/bin/
+AND put GOPATH/bin on PATH before ANY test suite; sdk-ts uses pnpm not
+npm; pnpm install + `pnpm build` in sdk-ts before ui vitest; unshallow
+before any ancestry claim or push), log, end silently.
+
 ### 2026-10-06 ~00:15–00:35 UTC — run 317 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (fetched range a409e34..1b682f9 is 24
