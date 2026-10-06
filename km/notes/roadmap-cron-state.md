@@ -462,6 +462,49 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-06 ~18:30–18:55 UTC — run 320 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the two commits new since run 318's
+verification, dea3ae8 and 3d83372, are runs 318/319's own insertion-only
+state-file log commits, re-checked via `git log --stat` — no Needs-Luca
+answer was edited in); no OPENROUTER_API_KEY / NPM_TOKEN / NODE_AUTH in
+the environment (`env | grep -iE` matched nothing, not policy-denied);
+remote refs unchanged (same 9 heads, main 3d83372 advanced only by run
+319's own commit); origin tags unchanged (8, ending v0.2.0); container
+came up shallow — unshallowed before ancestry claims; all 5
+roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy still exactly 4 ahead, Needs Luca 4). Zero open
+GitHub issues and zero open PRs. CI run 434 SUCCESS on main tip 3d83372
+(closes run 319's own-commit verification).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (107s)
+first-pass clean — nineteenth idle confirmation of run 301's baseline;
+nats-server 2.10.24 via go install, nsc via `nsc/v2@latest` (go toolchain
+auto-switched to 1.26.8 for nsc 2.15.0, self-reports 0.0.0-dev — works
+fine, auth tests all ran). sdk-ts vitest 62/62 (11/11 files) ×5
+consecutive — eighty-third consecutive clean ×5; admin UI 30/30 (5/5
+files) after `pnpm build` in sdk-ts; ruff and ty both clean from repo
+root. Operational note: the first two vitest attempts this run failed
+10 files (spawn ENOENT, "exited (code -2)") because the binary copy to
+`~/.agentmesh/bin/nats-server` had been skipped — the already-recorded
+learning applies, PATH alone is not enough for vitest; after the copy,
+×5 clean. Not a regression; not counted against the streak (the streak
+counts the suite's behavior, and the suite ran clean once the documented
+prerequisite was in place).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 702/62/30 baseline
+(nsc + nats-server via go install AND copy nats-server to
+`~/.agentmesh/bin/` before ANY test suite; pnpm install + `pnpm build` in
+sdk-ts before ui vitest; unshallow before any ancestry claim or push),
+log, end silently.
+
 ### 2026-10-06 ~12:25–12:50 UTC — run 319 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit new since run 317's
