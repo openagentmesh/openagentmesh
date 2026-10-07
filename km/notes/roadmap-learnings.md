@@ -27,6 +27,11 @@ update that file too and say so here.
   `AgentMesh.local()`'s embedded-NATS download fails. Workaround that works:
   `go install github.com/nats-io/nats-server/v2@v2.10.24` (proxy.golang.org is allowed),
   copy to `~/.agentmesh/bin/`. Every future cloud run needs this before pytest/vitest.
+  **UPDATE (run 322, 2026-10-07): no longer true** — the embedded download succeeded
+  on its own during pytest (binary appeared in `~/.agentmesh/bin/` with no go install),
+  and a direct HEAD of the release-asset URL returns 302, not 403. Keep the go-install
+  recipe as fallback in case the proxy policy flips back; nsc still needs go install
+  (pinned v2.11.0) and GOPATH/bin on PATH, or 7 auth tests silently skip.
 - **`nsc/v2@latest` broke in the cloud env (run 95, 2026-08-09):** nsc v2.15.0 now
   requires Go ≥1.25 while the sandbox has go1.24.7, and Go's automatic toolchain
   download TLS-times-out through the proxy. Fix: pin

@@ -462,6 +462,53 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-07 ~06:24–06:45 UTC — run 322 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the 4 commits new since run 317's
+verification, cf79841..d901a46, are runs 318–321's own insertion-only log
+commits; the Needs Luca section re-read, unchanged); no OPENROUTER_API_KEY /
+NPM_TOKEN / NODE_AUTH in the environment (`env | grep -iE` matched nothing,
+not policy-denied); remote refs unchanged (same 9 heads, SHAs identical to
+run 321's entry except main d901a46 advanced only by run 321's own commit);
+origin tags unchanged (8, ending v0.2.0); container came up shallow —
+unshallowed before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged ancestors
+of main (feature/error-taxonomy still exactly 4 ahead, Needs Luca 4). Zero
+open GitHub issues and zero open PRs. CI run 436 SUCCESS on main tip d901a46
+(closes run 321's own-commit verification).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (95.26s)
+first-pass clean with nsc on PATH — twenty-first idle confirmation of run
+301's baseline. (An earlier invocation before nsc was installed showed
+695/9, the 7 extra skips all "nsc binary not available" — the known silent-
+skip trap from run 198; installed nsc v2.11.0 pinned via go install, the 7
+auth/secured-mesh tests passed standalone, then the full suite re-ran
+702/2 in one pass.) sdk-ts vitest 62/62 (11/11 files) ×5 consecutive —
+eighty-fifth consecutive clean ×5; admin UI 30/30 (5/5 files) after
+`pnpm build` in sdk-ts (first attempt without the build failed to collect,
+as the baseline requires — rebuilt and green); ruff and ty both clean from
+repo root.
+
+Environment change observed and verified: GitHub release downloads now pass
+the proxy — `~/.agentmesh/bin/nats-server` appeared during the first pytest
+invocation with no manual go-install (embedded `AgentMesh.local()` download
+succeeded on its own), and a direct HEAD of the nats-server release asset
+URL returns 302 (was 403 per the run-early learning). go-install workaround
+kept in learnings as fallback; nsc is still needed via go install (not a
+release download).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify CI
+on this run's own commit, regression-check against the 702/62/30 baseline
+(nsc v2.11.0 via go install with GOPATH/bin on PATH before pytest — the
+embedded nats-server download now works by itself; pnpm install +
+`pnpm build` in sdk-ts before ui vitest; unshallow before any ancestry
+claim), log, end silently.
+
 ### 2026-10-07 ~00:15–00:45 UTC — run 321 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit new since run 319's
