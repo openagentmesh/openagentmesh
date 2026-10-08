@@ -654,3 +654,15 @@ update that file too and say so here.
   row once pytest had finished. Contention (CPU and/or ports) corrupts
   collection, not tests — a "Errors N" summary with no "Tests" line means
   the run never started, so rerun serially before suspecting the code.
+- **The toolchain slip happened a fourth time (run 328) — the copy into
+  `~/.agentmesh/bin/` is a separate step and the easiest one to forget.**
+  nats-server was go-installed, version-verified, AND on the suite shell's
+  PATH, and the vitest ×5 loop still failed 10/11 files every run: the TS
+  helper (`tests/helpers/server.ts`) spawns only `$NATS_SERVER_BIN` or
+  `~/.agentmesh/bin/nats-server`, never PATH. Two full ×5 loops were burned
+  (the first also lacked PATH — exports don't persist between tool calls).
+  All 100 file-failures were "nats-server exited (code -2)" = ENOENT, zero
+  suite defects; after `cp` into `~/.agentmesh/bin/` the loop went 62/62 ×5
+  first-pass. The provisioning checklist is three distinct facts, verify
+  each in the same shell that runs the suite: binary installed, GOPATH/bin
+  on PATH (pytest/nsc), AND the copy in `~/.agentmesh/bin/` (vitest).
