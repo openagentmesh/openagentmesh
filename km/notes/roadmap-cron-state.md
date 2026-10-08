@@ -462,6 +462,52 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-08 ~12:27–12:45 UTC — run 327 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (the only commit since run 325's log
+commit 213fca5 is run 326's own insertion-only log commit ed32459 —
+`git log --numstat` shows the two km/notes files only; Needs Luca section
+re-read, unchanged); credentials confirmed unset via the presence-only
+`test -n` form (OPENROUTER_API_KEY unset, NPM_TOKEN unset — value never
+printed); 9 remote heads and 8 tags unchanged; container came up shallow —
+unshallowed before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy still exactly 4 ahead, Needs
+Luca 4). Zero open GitHub issues and zero open PRs. CI run 443 SUCCESS on
+main tip ed32459 (closes run 326's own-commit verification).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (97.72s)
+first-pass clean (the 1 warning is the known StarletteDeprecationWarning,
+cosmetic); nats-server 2.10.24 + nsc v2.11.0 via go install (nsc
+self-reports 0.0.0-dev as in runs 222/223 — works fine, all auth tests
+ran), both which-verified in the same shell invocation as pytest,
+nats-server copied to `~/.agentmesh/bin/`. sdk-ts vitest 62/62 (11/11
+files) ×5 consecutive serial runs — ninetieth consecutive clean ×5; admin
+UI 30/30 (5/5 files) after `pnpm build` in sdk-ts; ruff and ty both clean
+from repo root.
+
+Deviation recorded, resolved in-run: a first vitest ×5 loop launched
+CONCURRENTLY with the pytest suite showed collection errors (10/10/10/10/6
+"Errors", no tests executed at all in runs 1–4) that vanished entirely
+once pytest finished — a standalone run plus a serial ×5 loop were all
+62/62 first-pass clean (6 consecutive clean runs total this session). Not
+counted as a baseline breach: zero test failures, only collection errors
+under contention. Lesson appended to roadmap-learnings.md: run the suites
+sequentially in the sandbox, never concurrently.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4 remains
+current; every open item across stages waits on a Needs-Luca answer.
+Highest-leverage unblock is still OPENROUTER_API_KEY (items 6/11). No
+notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials (presence-only
+`test -n` form); if none, verify CI on this run's own commit,
+regression-check against the 702/62/30 baseline (nsc + nats-server via
+go install with GOPATH/bin on PATH before ANY test suite, copy
+nats-server into `~/.agentmesh/bin/`; pnpm install + `pnpm build` in
+sdk-ts before ui vitest; run pytest and vitest SEQUENTIALLY, never
+concurrently; unshallow before any ancestry claim), log, end silently.
+
 ### 2026-10-08 ~06:23–06:45 UTC — run 326 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (the only commit since run 324's log

@@ -647,3 +647,10 @@ update that file too and say so here.
   Two more (publisher + streamer instance-id tests, 0.5s each) replaced with
   deadline polling; the file got faster, not slower, because polls exit
   early. When one fixed-sleep test flakes, sweep its file for siblings.
+- **Never run pytest and vitest concurrently in the sandbox.** Run 327
+  launched the sdk-ts vitest ×5 loop while the pytest suite was booting its
+  embedded NATS servers; vitest reported 10/10/10/10/6 collection errors
+  with zero tests executed, then went 62/62 first-pass clean six times in a
+  row once pytest had finished. Contention (CPU and/or ports) corrupts
+  collection, not tests — a "Errors N" summary with no "Tests" line means
+  the run never started, so rerun serially before suspecting the code.
