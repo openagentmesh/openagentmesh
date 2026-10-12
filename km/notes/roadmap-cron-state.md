@@ -462,6 +462,46 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-12 ~06:29–06:55 UTC — run 342 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 341's own log
+commit cb32cef — zero commits of any kind since; Needs Luca section
+re-read unchanged); credentials confirmed unset (OPENROUTER_API_KEY,
+NPM_TOKEN, NODE_AUTH_TOKEN — presence-only env grep found none, values
+never printed); 9 remote heads and 8 tags unchanged (full `ls-remote`
+heads+tags diffed against expectations); container came up shallow —
+unshallowed before ancestry claims; all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy still exactly 4 ahead, Needs
+Luca 4). Zero open GitHub issues and zero open PRs. CI run 458 SUCCESS
+on main tip cb32cef (closes run 341's own-commit verification).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (104.01s)
+first-pass clean (1 warning = the known cosmetic
+StarletteDeprecationWarning); nats-server 2.10.24 and nsc v2.11.0
+(pinned, self-reports 0.0.0-dev — known cosmetic; auth tests all ran,
+skips stayed at 2) go-installed, which-verified in the same shell
+invocation as pytest, nats-server copied into ~/.agentmesh/bin before
+any suite (run 328's three-fact checklist followed exactly). One hundred
+fifth consecutive clean sdk-ts vitest ×5 (62/62, 11/11 files each,
+serial, first-attempt clean, started only after pytest finished). Admin
+UI 30/30 (5/5 files) after sdk-ts pnpm build; ruff and ty both clean
+from repo root.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials (diff the FULL
+remote branch list, not just known branches); if none, verify CI on this
+run's own commit, regression-check against the 702/62/30 baseline (nsc +
+nats-server go-installed with GOPATH/bin on PATH and the copy into
+~/.agentmesh/bin, all verified in the same shell that runs each suite;
+pytest and vitest strictly serial; pnpm install + build in sdk-ts before
+ui vitest; unshallow before any ancestry claim or push), log, end
+silently.
+
 ### 2026-10-12 ~00:10–00:30 UTC — run 341 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 340's own log
