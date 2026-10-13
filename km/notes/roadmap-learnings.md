@@ -666,3 +666,9 @@ update that file too and say so here.
   first-pass. The provisioning checklist is three distinct facts, verify
   each in the same shell that runs the suite: binary installed, GOPATH/bin
   on PATH (pytest/nsc), AND the copy in `~/.agentmesh/bin/` (vitest).
+- **`git ls-remote` without `--heads`/`--tags` also advertises
+  `refs/pull/N/head` for every PR ever opened, closed ones included.**
+  Run 345 briefly read the repo's two refs/pull entries as new PR
+  activity; both are the long-closed PRs #1 and #2 (April/May 2026).
+  When diffing remote refs against the expected 9 heads + 8 tags,
+  filter with `--heads --tags` or expect the two pull refs.
