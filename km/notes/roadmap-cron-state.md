@@ -462,6 +462,47 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-16 ~12:26–12:35 UTC — run 359 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 358's own log
+commit dfa5d9a — zero commits of any kind since; last 20 non-merge
+commits on main all Claude-authored; Needs Luca section re-read
+unchanged); credentials confirmed unset (OPENROUTER_API_KEY, NPM_TOKEN —
+presence-only shell checks, values never printed). 9 remote heads and 8
+tags unchanged (full ls-remote = 20 refs incl. HEAD + the two known
+closed-PR refs). Zero open issues and zero open PRs (API). CI run 475
+SUCCESS on main tip dfa5d9a (closes run 358's own-commit verification).
+Container came up with a full clone this time (is-shallow-repository =
+false, checked before ancestry claims); all 5 roadmap/stage-* tips plus
+feature/tool-conversion and feature/wildfire-demo re-proved merged
+ancestors of main (feature/error-taxonomy still exactly 4 ahead, now
+645 behind, Needs Luca 4).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (97.05s)
+first-pass clean (1 warning = the known cosmetic
+StarletteDeprecationWarning); nats-server 2.10.24 go-installed,
+which-verified in the same shell invocation as pytest, copied into
+~/.agentmesh/bin before any suite (run 328's three-fact checklist
+followed); nsc go-installed pinned @v2.11.0 (baseline skip count
+unchanged at 2, so auth tests all ran). One hundred twenty-second
+consecutive clean sdk-ts vitest ×5 (62/62, 11/11 files each, serial,
+first-attempt clean, started only after pytest finished). Admin UI
+30/30 (5/5 files) after sdk-ts pnpm build; ruff clean; ty clean via
+CI's own invocation `uv run ty check`.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 702/62/30
+baseline (nsc + nats-server via go install with GOPATH/bin on PATH
+before ANY test suite AND the copy into ~/.agentmesh/bin; pnpm install +
+`pnpm build` in sdk-ts before ui vitest; check shallowness before any
+ancestry claim or push; presence-only credential checks; ty via `uv run
+ty check`, never unpinned uvx), log, end silently.
+
 ### 2026-10-16 ~06:05–06:30 UTC — run 358 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 357's own log
