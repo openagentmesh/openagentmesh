@@ -462,6 +462,46 @@ Recent entries only. Runs 1–223 are archived verbatim in
 `km/notes/roadmap-cron-runlog-archive.md` (moved by run 232 when this file
 passed 400KB; nothing deleted).
 
+### 2026-10-17 ~06:05–06:35 UTC — run 362 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 361's own log
+commit 003da7b — zero commits of any kind since; recent commits all
+Claude-authored run logs; Needs Luca section re-read unchanged);
+credentials confirmed unset (OPENROUTER_API_KEY, NPM_TOKEN —
+presence-only shell checks, values never printed). 9 remote heads
+unchanged. Zero open issues and zero open PRs (API). CI run 478 SUCCESS
+on main tip 003da7b (closes run 361's own-commit verification).
+Container came up shallow — unshallowed before ancestry claims; all 5
+roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy still exactly 4 ahead, now 648 behind, Needs
+Luca 4).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (101.63s)
+first-pass clean (1 warning = the known cosmetic
+StarletteDeprecationWarning); nats-server 2.10.24 go-installed,
+which-verified in the same shell invocation as pytest, copied into
+~/.agentmesh/bin before any suite (run 328's three-fact checklist
+followed); nsc go-installed pinned @v2.11.0 (baseline skip count
+unchanged at 2, so auth tests all ran). sdk-ts vitest 62/62 (11/11
+files) ×5 consecutive serial after pytest finished, each run's full
+output captured to a file and the five summaries read directly, all
+exit 0 — one hundred twenty-fifth consecutive clean ×5. Admin UI 30/30
+(5/5 files) after sdk-ts pnpm build; ruff clean; ty clean via CI's own
+invocation `uv run ty check`.
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 702/62/30
+baseline (nsc + nats-server via go install with GOPATH/bin on PATH
+before ANY test suite AND the copy into ~/.agentmesh/bin; pnpm install +
+`pnpm build` in sdk-ts before ui vitest; unshallow before any ancestry
+claim), log, end silently.
+
 ### 2026-10-17 ~00:05–00:30 UTC — run 361 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 360's own log
