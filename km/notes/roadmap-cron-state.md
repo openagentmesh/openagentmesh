@@ -463,6 +463,60 @@ Recent entries only. Runs 1–360 are archived verbatim in
 runs 224–360 moved by run 380, each time this file passed 400KB; nothing
 deleted).
 
+### 2026-10-23 ~12:20–12:45 UTC — run 387 (Fable 5, cloud) — idle verification; one sdk-ts infra flake, re-proved clean
+
+Verified this run: no Luca edits (origin/main tip is run 386's own log
+commit 89e5c97 — zero commits of any kind since; a `--since=2026-10-12
+--invert-grep --grep='^docs(km): run'` log over origin/main came back
+empty on the unshallowed clone, so every commit since Oct 12 is a
+Claude-authored run log; Needs Luca section re-read unchanged);
+credentials confirmed unset (OPENROUTER_API_KEY, NPM_TOKEN —
+presence-only shell checks, values never printed). 9 remote heads and
+8 tags unchanged (`ls-remote --heads` / `--tags`, stage/feature SHAs
+matched the run-386 set). Zero open issues and zero open PRs (API).
+CI run 503 SUCCESS on main tip 89e5c97 (closes run 386's own-commit
+verification). Container came up shallow — unshallowed before ancestry
+claims; all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy still exactly 4 ahead, now 673 behind, Needs
+Luca 4).
+
+Regression suite green at baseline, with one anomaly re-proved benign:
+**702 passed / 2 skipped** (99.40s) first-pass clean (1 warning = the
+known cosmetic StarletteDeprecationWarning); nats-server 2.10.24
+go-installed, which-verified in the same shell invocation as pytest,
+copied into ~/.agentmesh/bin before any suite (run 328's three-fact
+checklist followed); nsc go-installed pinned @v2.11.0 (baseline skip
+count unchanged at 2, so auth tests all ran). sdk-ts vitest: run 3 of
+the ×5 serial loop FAILED (first break after 149 consecutive clean ×5)
+— 2 tests in tests/kv.test.ts timed out on a JetStream KV put and the
+file teardown got "RequestError: connection disconnected": the embedded
+NATS connection dropped mid-file, an infrastructure signature, on a
+tree whose code is unchanged since the streak began. Extended to 10
+total runs: 9/10 clean 62/62 (11/11 files), only run 3 failed, each
+run's full output captured to a file and summaries read directly.
+Verdict: sandbox infra flake, not a regression; signature + response
+recorded in roadmap-learnings.md. Admin UI 30/30 (5/5 files) after
+sdk-ts pnpm build, ui tsc --noEmit clean; ruff clean; ty clean via
+CI's own invocation `uv run ty check` (ruff/ty ran before pytest while
+the go install finished — they need no nats-server, sequencing rule
+intact).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: the flake re-proved benign (9/10 clean,
+no code change), everything else unchanged.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 702/62/30
+baseline (nsc + nats-server via go install COMPLETED and which-verified
+before ANY test suite — pytest and vitest alike — AND the copy into
+~/.agentmesh/bin; pnpm install + `pnpm build` in sdk-ts before ui
+vitest; unshallow before any ancestry claim), log, end silently. If
+kv.test.ts drops its connection again, treat it as recurring (twice in
+two runs) and investigate rather than rerun-and-move-on.
+
 ### 2026-10-23 ~06:10–06:35 UTC — run 386 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 385's own log

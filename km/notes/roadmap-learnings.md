@@ -672,3 +672,13 @@ update that file too and say so here.
   activity; both are the long-closed PRs #1 and #2 (April/May 2026).
   When diffing remote refs against the expected 9 heads + 8 tags,
   filter with `--heads --tags` or expect the two pull refs.
+- **First sdk-ts vitest flake in ~150 clean ×5 loops (run 387, 2026-10-23):
+  `tests/kv.test.ts` lost its NATS connection mid-run** — two tests timed
+  out on a JetStream KV put and the file-level teardown got
+  "RequestError: connection disconnected", i.e. the embedded nats-server
+  (or its TCP conn) dropped, not a suite defect. Same tree had ~150 clean
+  ×5 loops behind it and 9 of 10 runs that day were clean, so this is
+  sandbox infrastructure, not code. Signature to recognize: timeouts
+  confined to one test file plus a connection-disconnected error in the
+  same file. Response: rerun; escalate only if it repeats within a run or
+  across consecutive runs.
