@@ -463,6 +463,59 @@ Recent entries only. Runs 1–360 are archived verbatim in
 runs 224–360 moved by run 380, each time this file passed 400KB; nothing
 deleted).
 
+### 2026-10-26 ~06:20–06:35 UTC — run 398 (Fable 5, cloud) — idle verification
+
+Verified this run: no Luca edits (origin/main tip is run 397's own log
+commit 8631658 — zero commits of any kind since; a `--since=2026-10-12
+--invert-grep --grep='^docs(km): run'` log over origin/main came back
+empty on the unshallowed clone, so every commit since Oct 12 is a
+Claude-authored run log; Needs Luca section re-read unchanged; prompts
+file last touched by its original 2026-07-16 commit 116e1bc and
+roadmap-learnings.md untouched since run 387's own commit 1328c46 —
+`git log -1` per file, run on the unshallowed clone; the shallow clone
+had misattributed the prompts file to a graft boundary before
+unshallowing, which is why unshallow-first matters); credentials
+confirmed unset (OPENROUTER_API_KEY, NPM_TOKEN — presence-only
+`env | grep -c '^NAME='` checks, both 0, values never printed).
+9 remote heads and 8 tags unchanged (`ls-remote`, stage/feature SHAs
+matched the run-397 set). Zero open issues and zero open PRs (API).
+CI run 514 SUCCESS on main tip 8631658 (closes run 397's own-commit
+verification). Container came up shallow — unshallowed before ancestry
+claims; all 5 roadmap/stage-* tips plus feature/tool-conversion and
+feature/wildfire-demo re-proved merged ancestors of main
+(feature/error-taxonomy still exactly 4 ahead, now 684 behind, Needs
+Luca 4).
+
+Regression suite green at baseline: **702 passed / 2 skipped** (108.77s)
+first-pass clean (1 warning = the known cosmetic
+StarletteDeprecationWarning); nats-server 2.10.24 go-installed,
+which-verified in the same shell invocation as pytest, copied into
+~/.agentmesh/bin before pytest and the sdk-ts suite (run 328's
+three-fact checklist followed); nsc go-installed pinned @v2.11.0
+(baseline skip count unchanged at 2, so auth tests all ran). sdk-ts
+vitest 62/62 (11/11 files) ×5 consecutive serial after pytest finished,
+each run's full output captured to a file and the five summaries read
+directly, all exit 0 — eleventh consecutive clean ×5 since the run-387
+kv.test.ts infra flake. Admin UI 30/30 (5/5 files) after sdk-ts pnpm
+build, ui tsc --noEmit clean (ui suite ran before pytest this run —
+it has no nats-server dependence, so the sequencing rule is intact);
+ruff clean; ty clean via CI's own invocation `uv run ty check` (ruff/ty
+ran before pytest while the go install finished).
+
+Advanced: nothing — no unblocked work exists in any stage. Stage 4
+remains current; every open item across stages waits on a Needs-Luca
+answer. Highest-leverage unblock is still OPENROUTER_API_KEY (items
+6/11). No notification sent: nothing changed.
+
+Next run: check for Needs-Luca answers and credentials; if none, verify
+CI on this run's own commit, regression-check against the 702/62/30
+baseline (nsc + nats-server via go install COMPLETED and which-verified
+before ANY test suite — pytest and vitest alike — AND the copy into
+~/.agentmesh/bin; pnpm install + `pnpm build` in sdk-ts before ui
+vitest; unshallow before any ancestry claim; credential presence checks
+via `env | grep -c '^NAME='`, never parameter expansion), log, end
+silently.
+
 ### 2026-10-26 ~00:20–00:35 UTC — run 397 (Fable 5, cloud) — idle verification
 
 Verified this run: no Luca edits (origin/main tip is run 396's own log
